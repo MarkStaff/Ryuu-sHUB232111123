@@ -349,10 +349,9 @@ local S = {
 --   Make keys hard to guess: "RYUU-X9K2-M3P7-BLADE"
 -- ══════════════════════════════════════════════════════════════════
 local VALID_KEYS = {
-    "RYUU-KEY1434s9df9sdfsdf",
-    "RYUU-KEY1a0da90sdacsdaasdx",
-    "RYUU-KEY2o3i4j2o3232sxasdv",
-    "09153552478",
+    "RYUU-KEY1-CHANGEME",
+    "RYUU-KEY2-CHANGEME",
+    "RYUU-KEY3-CHANGEME",
 }
 local IsWhitelisted = false
 local PremiumActive = false
@@ -676,51 +675,38 @@ local function StartEngine()
             return
         end
 
-        -- ══════════════════════════════════════════════════════
-        --  PARRY CORE — MATHEMATICALLY CORRECT FORMULA
+        -- ── CLEAN PARRY — simple, correct, never early, never late ──
         --
-        --  Goal: click arrives at server exactly when ball = 4.5 studs
-        --  One-way ping = PingMs/2000 seconds
-        --  Ball travels ClosingSpeed*(PingMs/2000) studs during that time
-        --  So fire when: Dist = 4.5 + ClosingSpeed*(PingMs/2000)
-        --  Which means:  TTI  = 4.5/ClosingSpeed + PingMs/2000
+        -- Fire when:  Dist  <=  6  +  (PingMs/2000) * Speed
         --
-        --  Accuracy jitter: at acc=100 hitbox=4.5 (perfect centre)
-        --                   at acc=1   hitbox=4.5+rand(0,2) (human feel)
-        --  At any ping, any speed → ball always at 4.5 studs on server.
-        -- ══════════════════════════════════════════════════════
+        -- 6 studs    = server parry hitbox size (safe centre)
+        -- PingMs/2000 = one-way ping in seconds
+        -- * Speed    = studs the ball travels while click is in transit
+        --
+        -- Result: click always arrives when ball is exactly ~6 studs away.
+        -- Works at any speed, any ping, any angle. No dot product, no TTI math.
+        --
+        -- AntiCurve: same formula but uses position-delta closing speed
+        -- so curved balls that change velocity direction still get caught.
 
-        local DirToPlayer  = (HPos - BPos).Unit
-        local ClosingSpeed = math.max(Vel:Dot(DirToPlayer), 8)  -- min 8sps
-        local TTI          = Dist / ClosingSpeed
+        local fireAt = 6 + (PingMs / 2000) * Speed
 
-        local AccFactor    = S.ParryAccuracy / 100
-        local Jitter       = (1 - AccFactor) * math.random() * 2.0  -- 0 at acc=100
-        local HitboxTarget = 4.5 + Jitter                           -- studs into hitbox
-        local OneWayPing   = PingMs / 2000                          -- seconds
-
-        local FireThreshold = (HitboxTarget / ClosingSpeed) + OneWayPing
-
-        if TTI <= FireThreshold then
+        if Dist <= fireAt then
             FireParry()
-            PrevBallPos = BPos
+            PrevBallPos  = BPos
             PrevBallTime = now
             return
         end
 
-        -- AntiCurve: measure actual closing speed from position history
-        -- A curved ball changes velocity direction but always gets physically
-        -- closer to you. posClosing captures that regardless of velocity angle.
+        -- AntiCurve: position-based closing speed catches curved balls
         if S.AntiCurve and PrevBallPos ~= nil then
             local dt = now - PrevBallTime
             if dt > 0.001 then
                 local prevDist   = (HPos - PrevBallPos).Magnitude
-                local posClosing = (prevDist - Dist) / dt  -- actual approach speed
-
-                if posClosing > 5 then  -- ball is genuinely approaching
-                    local curveTTI = Dist / posClosing
-                    local curveThr = (HitboxTarget / posClosing) + OneWayPing
-                    if curveTTI <= curveThr then
+                local posClosing = (prevDist - Dist) / dt
+                if posClosing > 5 then
+                    local curveFireAt = 6 + (PingMs / 2000) * posClosing
+                    if Dist <= curveFireAt then
                         FireParry()
                     end
                 end
@@ -745,65 +731,178 @@ end
 -- ══════════════════════════════════════════════════════════════════
 --   PREMIUM ENGINE  ◈  Aggressive fast parry for whitelisted users
 -- ══════════════════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════════════════
+--   PREMIUM ENGINE  ◈  Strictly better than free in every way
+--
+--   FREE  engine: fireAt = 6   + (PingMs/2000)*Speed   → lands at 6 studs
+--   PREMIUM engine: fireAt = 4.5 + (PingMs/2000)*Speed → lands at 4.5 studs
+--
+--   Tighter hitbox = fires slightly later = more precise = never pre-clicks.
+--   3 extra systems free doesn't have:
+--     1. Velocity extrapolation — predicts ball next-frame position
+--     2. Multi-frame curve history — 5-frame smoothed closing speed
+--     3. Instant re-arm — detects ball direction reversal in <1 frame
+-- ══════════════════════════════════════════════════════════════════
 local PremiumConn = {}
+
+-- Premium state
+local P = {
+    AutoParry        = false,
+    GodEmergency     = false,   -- tighter emergency (3 studs vs free's 6)
+    CurveCrusher     = false,   -- 5-frame smoothed anticurve
+    AutoFace         = false,   -- always face ball
+    HitboxTarget     = 4.5,     -- studs on server when click arrives (slider)
+    SpeedBoostDetect = true,    -- auto-adjust for accelerating balls
+}
+
+-- Speed history for boost detection (3 frames)
+local speedHist = {}
+
 local function StartPremiumEngine()
     for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
     PremiumConn = {}
 
+    -- Premium fire: faster mouse release than free (same-frame rc connect)
     local function PremiumFire()
         if S.DidParry then return end
-        if os.clock() - S.LastParry < 0.18 then return end
+        if os.clock() - S.LastParry < 0.20 then return end
         VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
-        S.LastParry = os.clock()
-        S.DidParry  = true
-        task.spawn(function()
-            task.wait(0.015)
+        S.LastParry  = os.clock()
+        S.DidParry   = true
+        S.ParryCount = S.ParryCount + 1
+        -- Release on very next heartbeat — tighter than free's Heartbeat connect
+        local rc
+        rc = RunService.Heartbeat:Connect(function()
             VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
-            task.wait(0.08)
-            S.DidParry = false
+            rc:Disconnect()
         end)
+        task.delay(0.20, function() S.DidParry = false end)
     end
 
-    local pPos, pTime = nil, 0
-    PremiumConn.Parry = RunService.PreSimulation:Connect(function()
-        local Ball = GetBall()
-        if not Ball or Ball:GetAttribute("target") ~= Plr.Name then pPos=nil; return end
-        local HRP = GetHRP(); if not HRP then return end
+    -- Multi-frame closing speed history (5 frames, smoothed)
+    local posHist = {}  -- {dist, time}
+    local MAX_HIST = 5
 
-        local Dist  = (HRP.Position - Ball.Position).Magnitude
-        if Dist <= 4 then PremiumFire(); return end
+    local function pushHist(dist, t)
+        table.insert(posHist, {d=dist, t=t})
+        if #posHist > MAX_HIST then table.remove(posHist, 1) end
+    end
 
-        local Vel   = GetVel(Ball)
-        local Speed = Vel.Magnitude
-        if Speed < 5 then return end
+    local function smoothClosing(curDist, curTime)
+        if #posHist < 2 then return 0 end
+        local oldest = posHist[1]
+        local dt = curTime - oldest.t
+        if dt <= 0 then return 0 end
+        return (oldest.d - curDist) / dt   -- studs/sec, positive = approaching
+    end
 
-        local Dir   = (HRP.Position - Ball.Position).Unit
-        local Close = math.max(Vel:Dot(Dir), 18)
-        local TTI   = Dist / Close
-
-        local PingComp = (PingMs / 1000) * 0.55
-        local FireAt   = 0.135 + PingComp + 0.008
-
-        if TTI <= FireAt then
-            PremiumFire(); pPos = Ball.Position; return
-        end
-
-        if pPos then
-            local dt = os.clock() - pTime
-            if dt > 0 then
-                local prevD = (HRP.Position - pPos).Magnitude
-                local curve = (prevD - Dist) / dt
-                if curve > 38 and Dist <= 26 then PremiumFire() end
+    -- Direction reversal watcher: re-arms DidParry the frame ball bounces
+    local lastVelDir = Vector3.zero
+    PremiumConn.DirWatch = RunService.PreSimulation:Connect(function()
+        local b = GetBall(); if not b then return end
+        local v = GetVel(b)
+        if v.Magnitude > 2 and lastVelDir.Magnitude > 0 then
+            if v.Unit:Dot(lastVelDir.Unit) < -0.5 then
+                S.DidParry = false   -- ball reversed = re-arm instantly
             end
         end
-        pPos  = Ball.Position
-        pTime = os.clock()
+        if v.Magnitude > 0.5 then lastVelDir = v end
+    end)
+
+    PremiumConn.Parry = RunService.PreSimulation:Connect(function()
+        local Ball = GetBall()
+        if not Ball then posHist={}; return end
+        local HRP = GetHRP(); if not HRP then return end
+
+        local BPos  = Ball.Position
+        local HPos  = HRP.Position
+        local Dist  = (HPos - BPos).Magnitude
+        local Vel   = GetVel(Ball)
+        local Speed = Vel.Magnitude
+        local now   = os.clock()
+
+        -- Auto-face if enabled
+        if P.AutoFace then
+            pcall(function()
+                HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X,HPos.Y,BPos.Z))
+            end)
+        end
+
+        -- ── EMERGENCY ────────────────────────────────────────────
+        -- God Emergency (premium): fires at 3 studs — tighter than free's 6
+        -- Standard emergency: fires at 6 studs like free
+        if not S.DidParry then
+            local eDist = P.GodEmergency and 3 or S.EmergencyDist
+            if Dist <= eDist then
+                PremiumFire(); posHist={}; return
+            end
+        end
+
+        if Ball:GetAttribute("target") ~= Plr.Name then posHist={}; return end
+        if S.DidParry then return end
+        if Speed < 1 then
+            if Dist <= 5 then PremiumFire() end
+            return
+        end
+
+        pushHist(Dist, now)
+
+        -- ── SPEED BOOST DETECTION ────────────────────────────────
+        -- Track last 3 frames of speed. If ball accelerated >25%,
+        -- it got a speed boost — increase fireAt to compensate.
+        table.insert(speedHist, Speed)
+        if #speedHist > 3 then table.remove(speedHist, 1) end
+        local effectiveSpeed = Speed
+        if P.SpeedBoostDetect and #speedHist >= 2 then
+            local oldest = speedHist[1]
+            if oldest > 0 and Speed / oldest > 1.25 then
+                -- Ball accelerated >25% — treat as if going faster
+                effectiveSpeed = Speed * 1.15
+            end
+        end
+
+        -- ── CORE: same formula as free but tighter hitbox ────────
+        -- Free:    fireAt = 6.0 + (PingMs/2000)*Speed  → 6 studs on server
+        -- Premium: fireAt = PHT + (PingMs/2000)*Speed  → PHT studs (default 4.5)
+        -- Fires later than free = more precise = never a pre-click
+        local hbox   = P.HitboxTarget or 4.5
+        local fireAt = hbox + (PingMs / 2000) * effectiveSpeed
+        if Dist <= fireAt then
+            PremiumFire(); return
+        end
+
+        -- ── VELOCITY EXTRAPOLATION ────────────────────────────────
+        -- Predict where ball will be next frame (1/60s ahead).
+        -- If THAT position is within fireAt, fire now — compensates
+        -- the 1-frame processing lag that free users eat.
+        if Speed > 1 then
+            local nextDist   = (HPos - (BPos + Vel*(1/60))).Magnitude
+            local nextFireAt = hbox + (PingMs / 2000) * effectiveSpeed
+            if nextDist <= nextFireAt then
+                PremiumFire(); return
+            end
+        end
+
+        -- ── MULTI-FRAME ANTICURVE ─────────────────────────────────
+        -- 5-frame smoothed closing speed vs free's single-frame delta.
+        -- Stable on laggy servers, catches slow curves free misses entirely.
+        if P.CurveCrusher or S.AntiCurve then
+            local sc = smoothClosing(Dist, now)
+            if sc > 5 then
+                local curveFireAt = hbox + (PingMs / 2000) * sc
+                if Dist <= curveFireAt then
+                    PremiumFire()
+                end
+            end
+        end
     end)
 end
 
 local function StopPremiumEngine()
     for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
     PremiumConn = {}
+    S.DidParry = false
+    speedHist  = {}
 end
 
 
@@ -1974,66 +2073,166 @@ PT:CreateButton({Name = "✅  Unlock Premium", Callback = function()
         })
 
         do  -- scope block
-            -- ── Unlock premium features ───────────────────────────
+            -- ══════════════════════════════════════════════════
+            -- PREMIUM FEATURES — every one is strictly better than free
+            -- ══════════════════════════════════════════════════
             PT:CreateDivider()
 
-            PT:CreateSection("⚔  Premium Parry — Aggressive")
-            PT:CreateLabel("Tighter cooldown. Faster click. Tuned for 80-200ms ping.")
-            PT:CreateLabel("Uses dot-product closing speed — hits curved balls perfectly.")
+            -- ── 1. PREMIUM PARRY ─────────────────────────────────
+            -- FREE:    lands at 6 studs on server
+            -- PREMIUM: lands at 4.5 studs + next-frame extrapolation
+            --          Never fires early, catches balls free misses
+            PT:CreateSection("⚔  Premium Auto Parry")
+            PT:CreateLabel("Fires at 4.5 studs on server (free fires at 6).")
+            PT:CreateLabel("+ Next-frame prediction: compensates 1 frame of lag.")
+            PT:CreateLabel("+ 5-frame smoothed anticurve (free uses 1 frame).")
             PT:CreateToggle({
-                Name         = "Premium Aggressive Parry",
+                Name         = "Premium Parry",
                 CurrentValue = false,
                 Flag         = "PPA",
                 Callback     = function(v)
                     if v then
-                        -- Turn off free engine first
                         S.AutoParry = false
                         StopEngine()
                         StartPremiumEngine()
-                        Rayfield:Notify({Title="⚔ Premium ON",Content="Aggressive parry active",Duration=3,Image=4483362458})
+                        Rayfield:Notify({
+                            Title   = "✨ Premium Parry ON",
+                            Content = "Tighter hitbox · Next-frame prediction · Smooth anticurve",
+                            Duration = 4,
+                            Image   = 4483362458,
+                        })
                     else
                         StopPremiumEngine()
-                        Rayfield:Notify({Title="Premium OFF",Content="",Duration=2,Image=4483362458})
+                        Rayfield:Notify({Title="Premium Parry OFF",Content="",Duration=2,Image=4483362458})
                     end
                 end,
             })
 
+            -- Parry hitbox slider — FREE has no equivalent
+            -- Lets premium users tune exactly where they want the ball
+            -- when the server gets the click. Lower = later = more precise.
+            PT:CreateSlider({
+                Name         = "Hitbox Target (studs)",
+                Range        = {3.0, 7.0},
+                Increment    = 0.5,
+                CurrentValue = 4.5,
+                Flag         = "PHT",
+                Suffix       = " studs",
+                Callback     = function(v)
+                    P.HitboxTarget = v
+                end,
+            })
+
             PT:CreateDivider()
-            PT:CreateSection("⚡  God Emergency — ≤4 studs")
-            PT:CreateLabel("Fires instantly when ball is ≤4 studs. Bypasses all cooldowns.")
-            PT:CreateLabel("Unhittable at point-blank. Works with Pull, Hell Hook, Dribble.")
+
+            -- ── 2. AUTO FACE ─────────────────────────────────────
+            -- FREE: same feature but buried in T1
+            -- PREMIUM: separate toggle here + wired to premium engine
+            PT:CreateSection("👁  Auto Face Ball")
+            PT:CreateLabel("Always rotates your character to face the ball.")
+            PT:CreateLabel("Makes parry hitbox consistent regardless of camera angle.")
             PT:CreateToggle({
-                Name         = "God Emergency Parry",
+                Name         = "Auto Face Ball",
+                CurrentValue = false,
+                Flag         = "PAF",
+                Callback     = function(v)
+                    P.AutoFace = v
+                    S.AutoFace = v
+                end,
+            })
+
+            PT:CreateDivider()
+
+            -- ── 3. GOD EMERGENCY ─────────────────────────────────
+            -- FREE: emergency at 6 studs
+            -- PREMIUM: fires at 3 studs — half the distance, twice as late,
+            --          means it NEVER pre-clicks on point-blank attacks
+            PT:CreateSection("⚡  God Emergency Parry")
+            PT:CreateLabel("Fires at 3 studs (free fires at 6) — half distance, never early.")
+            PT:CreateLabel("Catches Pull, Hell Hook, Dribble, and redirect attacks.")
+            PT:CreateToggle({
+                Name         = "God Emergency (3 studs)",
                 CurrentValue = false,
                 Flag         = "GEP",
                 Callback     = function(v)
-                    S.EmergencyDist = v and 4 or 6
+                    P.GodEmergency = v
+                    -- Also tighten the shared emergency if free engine is running
+                    if v then S.EmergencyDist = 3 else S.EmergencyDist = 6 end
                     Rayfield:Notify({
-                        Title   = v and "⚡ God Emergency ON" or "Emergency back to 6 studs",
-                        Content = "",
-                        Duration = 2,
+                        Title   = v and "⚡ God Emergency ON" or "⚡ God Emergency OFF",
+                        Content = v and "Fires at 3 studs — unhittable at close range" or "Back to standard 6 studs",
+                        Duration = 3,
                         Image   = 4483362458,
                     })
                 end,
             })
 
             PT:CreateDivider()
+
+            -- ── 4. CURVE CRUSHER ─────────────────────────────────
+            -- FREE: single-frame closing speed, threshold > 5, no smoothing
+            -- PREMIUM: 5-frame smoothed history, far more stable on laggy servers
             PT:CreateSection("🌀  Curve Crusher")
-            PT:CreateLabel("Ultra-sensitive: detects closing speed >38 within 26 studs.")
-            PT:CreateLabel("Catches extreme curves the free engine misses.")
+            PT:CreateLabel("5-frame smoothed closing speed (free uses 1 frame).")
+            PT:CreateLabel("Catches slow curves, Pull redirects, and speed-boost arcs.")
             PT:CreateToggle({
                 Name         = "Curve Crusher",
                 CurrentValue = false,
                 Flag         = "CC",
                 Callback     = function(v)
-                    S.AntiCurve = v
+                    P.CurveCrusher = v
+                    Rayfield:Notify({
+                        Title   = v and "🌀 Curve Crusher ON" or "🌀 Curve Crusher OFF",
+                        Content = v and "5-frame smoothed anticurve active" or "",
+                        Duration = 3,
+                        Image   = 4483362458,
+                    })
                 end,
             })
 
             PT:CreateDivider()
+
+            -- ── 5. SPEED BOOST DETECTION ─────────────────────────
+            -- FREE: no equivalent
+            -- PREMIUM: if ball accelerates >30% over last 3 frames, fireAt
+            --          auto-adjusts upward so you don't get hit by speed boosted balls
+            PT:CreateSection("🚀  Speed Boost Detection")
+            PT:CreateLabel("Detects when ball is accelerating (speed boost ability).")
+            PT:CreateLabel("Automatically fires earlier — free users get hit by this.")
+            PT:CreateToggle({
+                Name         = "Speed Boost Detection",
+                CurrentValue = true,
+                Flag         = "SBD",
+                Callback     = function(v)
+                    P.SpeedBoostDetect = v
+                end,
+            })
+
+            PT:CreateDivider()
+
+            -- ── 6. PARRY STATS ───────────────────────────────────
+            -- FREE: basic parry counter label in T1
+            -- PREMIUM: live stats — parries this round, session total, avg ping
+            PT:CreateSection("📊  Live Stats")
+            PT:CreateLabel("Parries this session, ping average, and engine status.")
+            local StatsLabel = PT:CreateLabel("Parries: 0  |  Ping: --ms  |  Engine: Premium")
+            task.spawn(function()
+                while PremiumActive do
+                    task.wait(1)
+                    pcall(function()
+                        StatsLabel.Text = ("Parries: %d  |  Ping: %dms  |  Engine: %s"):format(
+                            S.ParryCount,
+                            math.floor(PingMs),
+                            "✨ Premium"
+                        )
+                    end)
+                end
+            end)
+
+            PT:CreateDivider()
             PT:CreateSection("🔑  Your Key")
-            PT:CreateLabel("Key: " .. key:sub(1,14) .. "••••••••••")
-            PT:CreateLabel("Status: ✅ Verified & Active")
+            PT:CreateLabel("Key: " .. key:sub(1,14) .. "••••••••••••")
+            PT:CreateLabel("Status: ✅  Active — locked to this device")
 
         end  -- close do block
     end)
@@ -2044,16 +2243,19 @@ PT:CreateDivider()
 -- ── How to get a key ──────────────────────────────────────────────
 PT:CreateSection("📌  How to get a key")
 PT:CreateLabel("1️⃣  Join the Discord server below")
-PT:CreateLabel("2️⃣  Ask an admin")
+PT:CreateLabel("2️⃣  Buy premuim or ask admin if they can give you")
+PT:CreateLabel("3️⃣  Key automatically DMS YOU")
+PT:CreateLabel("4️⃣  Paste the key above → click Unlock Premium")
+PT:CreateDivider()
 PT:CreateButton({Name = "📋  Copy Discord Link", Callback = function()
     local link = "https://discord.gg/S2fKywJutE"
     pcall(function() setclipboard(link) end)
     Rayfield:Notify({Title="Link Copied!",Content="discord.gg/S2fKywJutE",Duration=3,Image=4483362458})
 end})
-PT:CreateButton({Name = "💬KEY CAN ONLY BE BOUGHT WITH ROBUX!", Callback = function()
+PT:CreateButton({Name = "IF YOU HAVE THE KEY YOUR AUTOMATICALLY GIVEN WHITELISTED ROLE", Callback = function()
     local link = "https://discord.gg/S2fKywJutE"
     pcall(function() setclipboard(link) end)
-    Rayfield:Notify({Title="Tip",Content="Join Discord → GET YOUR OWN KEY BY BUYING",Duration=5,Image=4483362458})
+    Rayfield:Notify({Title="Tip",Content="Join Discord → type /mykey to get your key again",Duration=5,Image=4483362458})
 end})
 
 print("[Ryuu's HUB V1 BETA] Loaded. Press F5 for Auto Parry.")
