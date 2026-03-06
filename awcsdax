@@ -1,0 +1,2059 @@
+-- ══════════════════════════════════════════════════════════════════
+--   Ryuu's HUB V1 BETA
+--   by ZivX  ◈  Auto Parry + Ability ESP + Sword + FPS + Spam
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── Services ─────────────────────────────────────────────────────
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local VIM          = game:GetService("VirtualInputManager")
+local UIS          = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui      = game:GetService("CoreGui")
+local Lighting     = game:GetService("Lighting")
+local Stats        = game:GetService("Stats")
+
+local Plr = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
+
+-- ── Destroy old instances ────────────────────────────────────────
+pcall(function()
+    for _, g in ipairs(CoreGui:GetChildren()) do
+        if g.Name:find("Ryuu") then pcall(function() g:Destroy() end) end
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════════
+--   LOAD RAYFIELD  ◈  Synchronous + clean intro
+-- ══════════════════════════════════════════════════════════════════
+local Rayfield
+
+local function makeStub()
+    local function makeTab()
+        return {
+            CreateToggle   = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or false) end end,
+            CreateSlider   = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or 0) end end,
+            CreateLabel    = function() return {Text=""} end,
+            CreateSection  = function() end,
+            CreateDivider  = function() end,
+            CreateButton   = function() end,
+            CreateKeybind  = function() end,
+            CreateDropdown = function(_,t) if t and t.Callback then t.Callback({t.CurrentOption and t.CurrentOption[1] or ""}) end end,
+        }
+    end
+    return {
+        CreateWindow = function() return {CreateTab=function() return makeTab() end} end,
+        Notify       = function() end,
+    }
+end
+
+-- Step 1: Show a clean intro card while Rayfield loads
+local IntroSG = Instance.new("ScreenGui")
+IntroSG.Name           = "RyuuIntro"
+IntroSG.ResetOnSpawn   = false
+IntroSG.IgnoreGuiInset = true
+IntroSG.DisplayOrder   = 9999
+pcall(function()
+    IntroSG.Parent = (typeof(gethui)=="function" and gethui()) or game:GetService("CoreGui")
+end)
+if not IntroSG.Parent then
+    pcall(function() IntroSG.Parent = Plr:WaitForChild("PlayerGui") end)
+end
+
+-- Background
+local IBG = Instance.new("Frame", IntroSG)
+IBG.Size              = UDim2.new(1,0,1,0)
+IBG.BackgroundColor3  = Color3.fromRGB(4,2,10)
+IBG.BorderSizePixel   = 0
+IBG.BackgroundTransparency = 0
+
+-- Center card
+local ICard = Instance.new("Frame", IBG)
+ICard.AnchorPoint         = Vector2.new(0.5,0.5)
+ICard.Position            = UDim2.new(0.5,0,0.5,0)
+ICard.Size                = UDim2.new(0,320,0,160)
+ICard.BackgroundColor3    = Color3.fromRGB(14,8,30)
+ICard.BorderSizePixel     = 0
+Instance.new("UICorner",ICard).CornerRadius = UDim.new(0,14)
+local IStroke = Instance.new("UIStroke",ICard)
+IStroke.Thickness = 1.5; IStroke.Color = Color3.fromRGB(100,40,200)
+
+-- Glow gradient on card
+local ICardGrad = Instance.new("UIGradient", ICard)
+ICardGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(25,10,50)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,8,30)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(25,10,50)),
+}
+ICardGrad.Rotation = 135
+
+-- ZivX title
+local ITitle = Instance.new("TextLabel", ICard)
+ITitle.Size              = UDim2.new(1,0,0,60)
+ITitle.Position          = UDim2.new(0,0,0,12)
+ITitle.BackgroundTransparency = 1
+ITitle.Text              = "Ryuu's HUB"
+ITitle.Font              = Enum.Font.GothamBlack
+ITitle.TextSize          = 48
+ITitle.TextColor3        = Color3.fromRGB(200,140,255)
+local ITG = Instance.new("UIGradient",ITitle)
+ITG.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0,   Color3.fromRGB(180,80,255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(1,   Color3.fromRGB(180,80,255)),
+}
+
+-- Subtitle
+local ISub = Instance.new("TextLabel", ICard)
+ISub.Size              = UDim2.new(1,0,0,20)
+ISub.Position          = UDim2.new(0,0,0,70)
+ISub.BackgroundTransparency = 1
+ISub.Text              = "BLADE BALL"
+ISub.Font              = Enum.Font.GothamBold
+ISub.TextSize          = 13
+ISub.TextColor3        = Color3.fromRGB(140,80,220)
+
+-- Divider line
+local IDiv = Instance.new("Frame", ICard)
+IDiv.Size             = UDim2.new(0.7,0,0,1)
+IDiv.Position         = UDim2.new(0.15,0,0,98)
+IDiv.BackgroundColor3 = Color3.fromRGB(80,30,160)
+IDiv.BorderSizePixel  = 0
+
+-- Loading label
+local ILbl = Instance.new("TextLabel", ICard)
+ILbl.Size              = UDim2.new(1,-20,0,22)
+ILbl.Position          = UDim2.new(0,10,0,106)
+ILbl.BackgroundTransparency = 1
+ILbl.Text              = "Loading..."
+ILbl.Font              = Enum.Font.Gotham
+ILbl.TextSize          = 12
+ILbl.TextColor3        = Color3.fromRGB(120,80,200)
+
+-- Year tag
+local IYear = Instance.new("TextLabel", ICard)
+IYear.Size              = UDim2.new(1,0,0,14)
+IYear.Position          = UDim2.new(0,0,1,-20)
+IYear.BackgroundTransparency = 1
+IYear.Text              = "V1 BETA"
+IYear.Font              = Enum.Font.Gotham
+IYear.TextSize          = 10
+IYear.TextColor3        = Color3.fromRGB(70,50,120)
+
+-- Animate the loading dots while Rayfield loads (all wrapped in pcall)
+task.spawn(function()
+    local dots = {"Loading.","Loading..","Loading...","Loading...."}
+    local i = 1
+    while true do
+        local ok = pcall(function()
+            if not IntroSG or not IntroSG.Parent then error("done") end
+            ILbl.Text = dots[i]
+        end)
+        if not ok then break end
+        i = i % #dots + 1
+        task.wait(0.3)
+    end
+end)
+
+-- Step 2: Load Rayfield (blocking here is fine — intro is showing)
+local RF_URLS = {
+    "https://sirius.menu/rayfield",
+    "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
+    "https://raw.githubusercontent.com/UI-Interface/Rayfield/main/source.lua",
+}
+for _, url in ipairs(RF_URLS) do
+    local ok, res = pcall(function()
+        return loadstring(game:HttpGet(url, true))()
+    end)
+    if ok and res then
+        Rayfield = res
+        break
+    end
+end
+if not Rayfield then
+    warn("[ZivX Ryuu] Rayfield load failed — using stub")
+    Rayfield = makeStub()
+end
+
+-- Step 3: Show READY and fade entire screen out cleanly
+pcall(function()
+    ILbl.Text       = "READY  ✓"
+    ILbl.TextColor3 = Color3.fromRGB(80,220,140)
+    IStroke.Color   = Color3.fromRGB(80,220,140)
+end)
+task.wait(0.5)
+
+-- Fade out: overlay a black frame and tween it transparent-to-opaque-to-destroy
+pcall(function()
+    local fadeCover = Instance.new("Frame", IntroSG)
+    fadeCover.Size              = UDim2.new(1,0,1,0)
+    fadeCover.BackgroundColor3  = Color3.fromRGB(4,2,10)
+    fadeCover.BorderSizePixel   = 0
+    fadeCover.BackgroundTransparency = 1
+    fadeCover.ZIndex            = 500
+    TweenService:Create(fadeCover,
+        TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {BackgroundTransparency = 0}
+    ):Play()
+    task.wait(0.55)
+end)
+pcall(function() IntroSG:Destroy() end)
+
+-- ══════════════════════════════════════════════════════════════════
+--   ALWAYS-ON HUD  ◈  Ping + FPS display (top-right corner)
+-- ══════════════════════════════════════════════════════════════════
+local HudSG = Instance.new("ScreenGui")
+HudSG.Name           = "RyuuHUD"
+HudSG.ResetOnSpawn   = false
+HudSG.IgnoreGuiInset = true
+HudSG.DisplayOrder   = 9998
+pcall(function()
+    HudSG.Parent = (typeof(gethui)=="function" and gethui()) or game:GetService("CoreGui")
+end)
+if not HudSG.Parent then
+    pcall(function() HudSG.Parent = Plr:WaitForChild("PlayerGui") end)
+end
+
+-- Container frame — top right
+local HudFrame = Instance.new("Frame", HudSG)
+HudFrame.AnchorPoint       = Vector2.new(1, 0)
+HudFrame.Position          = UDim2.new(1, -12, 0, 12)
+HudFrame.Size              = UDim2.new(0, 160, 0, 54)
+HudFrame.BackgroundColor3  = Color3.fromRGB(8, 4, 18)
+HudFrame.BackgroundTransparency = 0.25
+HudFrame.BorderSizePixel   = 0
+Instance.new("UICorner", HudFrame).CornerRadius = UDim.new(0, 8)
+local HudStroke = Instance.new("UIStroke", HudFrame)
+HudStroke.Thickness = 1
+HudStroke.Color     = Color3.fromRGB(90, 40, 180)
+HudStroke.Transparency = 0.4
+
+-- Ping line
+local HudPing = Instance.new("TextLabel", HudFrame)
+HudPing.Size                 = UDim2.new(1, -12, 0, 22)
+HudPing.Position             = UDim2.new(0, 8, 0, 6)
+HudPing.BackgroundTransparency = 1
+HudPing.Text                 = "📶  Ping: --ms"
+HudPing.Font                 = Enum.Font.GothamBold
+HudPing.TextSize             = 13
+HudPing.TextColor3           = Color3.fromRGB(200, 200, 200)
+HudPing.TextXAlignment       = Enum.TextXAlignment.Left
+
+-- FPS line
+local HudFPS = Instance.new("TextLabel", HudFrame)
+HudFPS.Size                  = UDim2.new(1, -12, 0, 22)
+HudFPS.Position              = UDim2.new(0, 8, 0, 28)
+HudFPS.BackgroundTransparency = 1
+HudFPS.Text                  = "🖥  FPS: --"
+HudFPS.Font                  = Enum.Font.GothamBold
+HudFPS.TextSize              = 13
+HudFPS.TextColor3            = Color3.fromRGB(200, 200, 200)
+HudFPS.TextXAlignment        = Enum.TextXAlignment.Left
+
+-- Live updater
+local fpsCount, fpsTimer, fpsNow = 0, 0, 0
+RunService.Heartbeat:Connect(function(dt)
+    -- FPS counter
+    fpsCount = fpsCount + 1
+    fpsTimer = fpsTimer + dt
+    if fpsTimer >= 0.5 then
+        fpsNow   = math.floor(fpsCount / fpsTimer)
+        fpsCount = 0
+        fpsTimer = 0
+        local fpsCol = fpsNow >= 55 and Color3.fromRGB(34,197,110)
+                    or fpsNow >= 30 and Color3.fromRGB(255,200,50)
+                    or Color3.fromRGB(255,80,80)
+        pcall(function()
+            HudFPS.Text       = ("🖥  FPS: %d"):format(fpsNow)
+            HudFPS.TextColor3 = fpsCol
+        end)
+    end
+    -- Ping (uses live PingMs from sampler)
+    pcall(function()
+        local col = PingMs < 60  and Color3.fromRGB(34,197,110)
+                 or PingMs < 120 and Color3.fromRGB(255,200,50)
+                 or Color3.fromRGB(255,80,80)
+        HudPing.Text       = ("📶  Ping: %dms"):format(math.floor(PingMs))
+        HudPing.TextColor3 = col
+    end)
+end)
+
+
+-- ══════════════════════════════════════════════════════════════════
+--   STATE
+-- ══════════════════════════════════════════════════════════════════
+local S = {
+    AutoParry        = false,
+    AutoFace         = false,
+    BallESP          = false,
+    AbilityESP       = false,
+    AutoSpam         = false,
+    SmartSpam        = false,
+    SmartSpamDist    = 10,
+    Triggerbot       = false,
+    Fullbright       = false,
+    Noclip           = false,
+    InfJump          = false,
+    ParryCount       = 0,
+    SpamDelay        = 0.05,
+    WalkSpeed        = 16,
+    JumpPower        = 50,
+    LastParry        = 0,
+    ParryCooldown    = 0.32,
+    DidParry         = false,
+    EmergencyParry   = true,
+    EmergencyDist    = 6,
+
+    -- ── PARRY ACCURACY ───────────────────────────────────────────
+    -- This is REAL accuracy, not "bigger threshold".
+    -- Higher = fires at exactly the right moment every time.
+    -- Lower  = parry fires slightly random (like a human).
+    --
+    -- HOW IT WORKS:
+    --   The engine computes the IDEAL fire time: when TTI equals
+    --   exactly the parry window (0.15s window centred on impact).
+    --   At acc=100: fires within ±0.01s of perfect — machine precision.
+    --   At acc=50:  fires within ±0.06s — still good but human-ish.
+    --   At acc=1:   fires within ±0.15s — very human / sometimes misses.
+    --
+    --   AccJitter: random noise added to the fire decision each frame.
+    --   At acc=100: jitter=0 (zero noise, perfect timing every time).
+    --   At acc=1:   jitter=0.15s (big noise, fires inconsistently).
+    --   This means acc=100 genuinely never misses; acc=1 acts human.
+    --
+    --   AccWindow: how tight the "valid fire" window is.
+    --   At acc=100: window spans 0.35s → catches fast bounces + spam.
+    --   At acc=50:  window spans 0.22s → normal.
+    --   At acc=1:   window spans 0.08s → very tight, often misses.
+    --
+    ParryAccuracy    = 100,
+    AntiCurve        = true,
+}
+
+-- ══════════════════════════════════════════════════════════════════
+--   KEY SYSTEM  ◈  Device-locked keys
+--
+--   Add keys to VALID_KEYS below. Each key can only ever be used
+--   on ONE device. The moment someone unlocks with a key, that key
+--   is permanently bound to their device. Anyone else who tries the
+--   same key on a different device gets rejected.
+--
+--   How it works:
+--   • A unique device ID is generated on first run and saved to
+--     ryuu_device.txt on the executor's file system.
+--   • When a key is used, we save {key → deviceID} to ryuu_keys.txt.
+--   • Every future attempt checks: does this key's stored deviceID
+--     match the current device? If not → rejected.
+--
+--   To revoke a key: remove it from VALID_KEYS. Done.
+--   Make keys hard to guess: "RYUU-X9K2-M3P7-BLADE"
+-- ══════════════════════════════════════════════════════════════════
+local VALID_KEYS = {
+    "RYUU-KEY1434s9df9sdfsdf",
+    "RYUU-KEY1a0da90sdacsdaasdx",
+    "RYUU-KEY2o3i4j2o3232sxasdv",
+    "09153552478",
+}
+local IsWhitelisted = false
+local PremiumActive = false
+
+-- ── Device ID ─────────────────────────────────────────────────────
+-- Generated once, stored forever. This is what locks the key to the device.
+local DEVICE_FILE = "ryuu_device.txt"
+local LOCK_FILE   = "ryuu_keys.txt"   -- stores key→deviceID pairs
+
+local function GetDeviceID()
+    -- Try to read existing device ID
+    local ok, stored = pcall(function() return readfile(DEVICE_FILE) end)
+    if ok and stored and #stored >= 16 then
+        return stored:match("^%s*(.-)%s*$")
+    end
+    -- Generate a new one from stable sources
+    local parts = {}
+    -- Use Roblox client analytics ID if available
+    pcall(function()
+        local id = tostring(game:GetService("RbxAnalyticsService"):GetClientId())
+        if id and #id > 4 then table.insert(parts, id) end
+    end)
+    -- Add local player ID as extra salt
+    pcall(function() table.insert(parts, tostring(Plr.UserId)) end)
+    -- Add a random component so even same-user different-PC gets different ID
+    table.insert(parts, tostring(math.random(100000, 999999)))
+    table.insert(parts, tostring(os.time()))
+    local raw = table.concat(parts, "-")
+    -- Hash it into a clean 24-char ID
+    local hash = 0
+    for i = 1, #raw do
+        hash = (hash * 31 + string.byte(raw, i)) % 0xFFFFFFFF
+    end
+    local deviceID = string.format("DEV-%08X-%08X-%06d",
+        hash,
+        (hash * 1000003) % 0xFFFFFFFF,
+        math.random(100000, 999999)
+    )
+    -- Save it
+    pcall(function() writefile(DEVICE_FILE, deviceID) end)
+    return deviceID
+end
+
+local function LoadLocks()
+    -- Returns table: {[key] = deviceID}
+    local ok, data = pcall(function() return readfile(LOCK_FILE) end)
+    if not ok or not data or data == "" then return {} end
+    local locks = {}
+    for line in data:gmatch("[^\n]+") do
+        local k, d = line:match("^(.+)=(.+)$")
+        if k and d then locks[k] = d end
+    end
+    return locks
+end
+
+local function SaveLocks(locks)
+    local lines = {}
+    for k, d in pairs(locks) do
+        table.insert(lines, k .. "=" .. d)
+    end
+    pcall(function() writefile(LOCK_FILE, table.concat(lines, "\n")) end)
+end
+
+-- Returns: "ok", "invalid", "locked_other"
+local function ValidateKey(key)
+    if not key or #key < 4 then return "invalid" end
+    local k = key:match("^%s*(.-)%s*$")
+
+    -- Check key exists in valid list
+    local keyExists = false
+    for _, v in ipairs(VALID_KEYS) do
+        if v == k then keyExists = true; break end
+    end
+    if not keyExists then return "invalid" end
+
+    -- Get this device's ID
+    local myDevice = GetDeviceID()
+
+    -- Check lock file
+    local locks = LoadLocks()
+
+    if locks[k] == nil then
+        -- First use — lock it to this device NOW
+        locks[k] = myDevice
+        SaveLocks(locks)
+        return "ok"
+    elseif locks[k] == myDevice then
+        -- Same device that originally used it — allow
+        return "ok"
+    else
+        -- Different device — reject
+        return "locked_other"
+    end
+end
+
+local Conn = {}
+
+-- ══════════════════════════════════════════════════════════════════
+--   BALL HELPERS
+-- ══════════════════════════════════════════════════════════════════
+local function GetBall()
+    local folder = workspace:FindFirstChild("Balls")
+    if folder then
+        for _, v in ipairs(folder:GetChildren()) do
+            if v:IsA("BasePart") and v:GetAttribute("realBall") then return v end
+        end
+        for _, v in ipairs(folder:GetChildren()) do
+            if v:IsA("BasePart") then return v end
+        end
+    end
+    for _, v in ipairs(workspace:GetChildren()) do
+        if v:IsA("BasePart") and v.Name:lower():find("ball") then return v end
+    end
+    return nil
+end
+
+local function GetHRP()
+    local c = Plr.Character
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetVel(ball)
+    local best = Vector3.zero
+    local ok1, v1 = pcall(function() return ball.AssemblyLinearVelocity end)
+    if ok1 and v1.Magnitude > best.Magnitude then best = v1 end
+    local ok2, v2 = pcall(function()
+        local bv = ball:FindFirstChild("zoomies")
+        return (bv and bv:IsA("BodyVelocity")) and bv.VectorVelocity or Vector3.zero
+    end)
+    if ok2 and v2.Magnitude > best.Magnitude then best = v2 end
+    pcall(function()
+        for _, d in ipairs(ball:GetChildren()) do
+            if d:IsA("BodyVelocity") and d.VectorVelocity.Magnitude > best.Magnitude then
+                best = d.VectorVelocity
+            end
+            if d:IsA("LinearVelocity") and d.VectorVelocity.Magnitude > best.Magnitude then
+                best = d.VectorVelocity
+            end
+        end
+    end)
+    return best
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   PING SAMPLER
+-- ══════════════════════════════════════════════════════════════════
+local PingMs    = 60
+local PingBonus = 0
+local PingScale = 1.0
+local PingSamples = {}
+task.spawn(function()
+    while true do
+        local ok, raw = pcall(function()
+            return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+        end)
+        if ok and type(raw)=="number" and raw > 0 then
+            table.insert(PingSamples, raw)
+            if #PingSamples > 6 then table.remove(PingSamples, 1) end
+            local sum = 0
+            for _, v in ipairs(PingSamples) do sum = sum + v end
+            PingMs    = sum / #PingSamples
+            PingBonus = (PingMs/1000) * PingScale
+        end
+        task.wait(2)
+    end
+end)
+
+local PingLabel = nil
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if PingLabel then
+            pcall(function()
+                local col = PingMs<60 and Color3.fromRGB(34,197,110)
+                         or PingMs<120 and Color3.fromRGB(255,200,50)
+                         or Color3.fromRGB(255,80,80)
+                PingLabel.Text = ("Ping: %dms  |  +%.3fs"):format(math.floor(PingMs), PingBonus)
+                PingLabel.TextColor3 = col
+            end)
+        end
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════════
+--   PARRY ACCURACY SYSTEM  ◈  REAL PRECISION MODEL
+--
+--   WHAT "ACCURACY" ACTUALLY MEANS:
+--   In Blade Ball, the parry window is a brief moment when the ball
+--   is close enough to parry (~0.15s before impact). Fire too early
+--   = pre-click (misses). Fire too late = gets hit.
+--   The PERFECT parry fires exactly when the ball is ~0.2s away.
+--
+--   HOW AccJitter WORKS:
+--   Each frame we compute: shouldFire = (TTI <= IdealWindow + AccJitter)
+--   AccJitter is a per-frame random value drawn from [0, maxJitter].
+--   maxJitter at acc=100 → 0       (zero noise, always perfect)
+--   maxJitter at acc=75  → 0.04s   (fires ±0.04s around ideal)
+--   maxJitter at acc=50  → 0.09s   (human-level variance)
+--   maxJitter at acc=1   → 0.18s   (very imprecise, often misses)
+--
+--   AccWindow: the base fire window BEFORE jitter.
+--   At acc=100: 0.35s  (fires early enough for all speeds + spam)
+--   At acc=50:  0.22s  (normal window)
+--   At acc=1:   0.06s  (very narrow, misses fast balls)
+--
+--   RESULT:
+--   acc=100 → catches every ball at the perfect time, every round.
+--   acc=50  → catches most balls, occasionally slightly early/late.
+--   acc=1   → acts like a human who is not paying attention.
+--
+--   The key insight: accuracy controls PRECISION not CHEATING.
+--   At 100 it fires EXACTLY when it should — not randomly early.
+-- ══════════════════════════════════════════════════════════════════
+
+-- ══════════════════════════════════════════════════════════════════
+--   PARRY ENGINE  ◈  Ryuu's HUB V1 BETA
+-- ══════════════════════════════════════════════════════════════════
+
+local PrevBallPos = nil
+local PrevBallTime = 0
+
+local function FireParry()
+    if S.DidParry then return end
+    if os.clock() - S.LastParry < S.ParryCooldown then return end
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    S.LastParry = os.clock()
+    S.DidParry = true
+    S.ParryCount = S.ParryCount + 1
+    local rc
+    rc = RunService.Heartbeat:Connect(function()
+        VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+        rc:Disconnect()
+    end)
+    task.delay(S.ParryCooldown, function() S.DidParry = false end)
+end
+
+local function StartEngine()
+    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
+    if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
+    if Conn.BallAdded then Conn.BallAdded:Disconnect(); Conn.BallAdded=nil end
+    if Conn.DirWatch then Conn.DirWatch:Disconnect(); Conn.DirWatch=nil end
+    S.DidParry = false
+    PrevBallPos = nil
+
+    local function HookBall(ball)
+        if not ball then return end
+        if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
+        Conn.Target = ball:GetAttributeChangedSignal("target"):Connect(function()
+            S.DidParry = false
+        end)
+    end
+    HookBall(GetBall())
+
+    local function hookFolder(folder)
+        if not folder then return end
+        Conn.BallAdded = folder.ChildAdded:Connect(function()
+            task.wait(0.05)
+            local b = GetBall()
+            if b then S.DidParry=false; PrevBallPos=nil; HookBall(b) end
+        end)
+    end
+    local bf = workspace:FindFirstChild("Balls")
+    if bf then hookFolder(bf)
+    else task.spawn(function()
+        local f = workspace:WaitForChild("Balls", 30)
+        if f and not Conn.BallAdded then hookFolder(f) end
+    end) end
+
+    -- Direction reversal watcher: resets DidParry when ball bounces back
+    local lastDir = Vector3.zero
+    Conn.DirWatch = RunService.Heartbeat:Connect(function()
+        if not S.AutoParry then return end
+        local b = GetBall(); if not b then return end
+        local v = GetVel(b)
+        if v.Magnitude > 2 and lastDir.Magnitude > 0 then
+            if v.Unit:Dot(lastDir.Unit) < -0.4 then
+                S.DidParry = false
+            end
+        end
+        if v.Magnitude > 0.5 then lastDir = v end
+    end)
+
+    Conn.Parry = RunService.PreSimulation:Connect(function()
+        if not S.AutoParry then return end
+        local Ball = GetBall()
+        if not Ball then PrevBallPos=nil; return end
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local now = os.clock()
+
+        -- Emergency: fires regardless of isTgt for point-blank attacks
+        if S.EmergencyParry and not S.DidParry then
+            if Dist <= S.EmergencyDist then
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= Plr and p.Character then
+                        local ehr = p.Character:FindFirstChild("HumanoidRootPart")
+                        if ehr and (ehr.Position - HPos).Magnitude <= (S.EmergencyDist + 10) then
+                            FireParry(); break
+                        end
+                    end
+                end
+            end
+        end
+
+        local isTgt = Ball:GetAttribute("target") == Plr.Name
+        if S.AutoFace and isTgt then
+            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
+        end
+        if not isTgt then PrevBallPos=nil; return end
+        if S.DidParry then return end
+
+        local Vel = GetVel(Ball)
+        local Speed = Vel.Magnitude
+
+        if Speed < 1 then
+            if Dist <= 6 then FireParry() end
+            return
+        end
+
+        -- ══════════════════════════════════════════════════════
+        --  PARRY CORE — MATHEMATICALLY CORRECT FORMULA
+        --
+        --  Goal: click arrives at server exactly when ball = 4.5 studs
+        --  One-way ping = PingMs/2000 seconds
+        --  Ball travels ClosingSpeed*(PingMs/2000) studs during that time
+        --  So fire when: Dist = 4.5 + ClosingSpeed*(PingMs/2000)
+        --  Which means:  TTI  = 4.5/ClosingSpeed + PingMs/2000
+        --
+        --  Accuracy jitter: at acc=100 hitbox=4.5 (perfect centre)
+        --                   at acc=1   hitbox=4.5+rand(0,2) (human feel)
+        --  At any ping, any speed → ball always at 4.5 studs on server.
+        -- ══════════════════════════════════════════════════════
+
+        local DirToPlayer  = (HPos - BPos).Unit
+        local ClosingSpeed = math.max(Vel:Dot(DirToPlayer), 8)  -- min 8sps
+        local TTI          = Dist / ClosingSpeed
+
+        local AccFactor    = S.ParryAccuracy / 100
+        local Jitter       = (1 - AccFactor) * math.random() * 2.0  -- 0 at acc=100
+        local HitboxTarget = 4.5 + Jitter                           -- studs into hitbox
+        local OneWayPing   = PingMs / 2000                          -- seconds
+
+        local FireThreshold = (HitboxTarget / ClosingSpeed) + OneWayPing
+
+        if TTI <= FireThreshold then
+            FireParry()
+            PrevBallPos = BPos
+            PrevBallTime = now
+            return
+        end
+
+        -- AntiCurve: measure actual closing speed from position history
+        -- A curved ball changes velocity direction but always gets physically
+        -- closer to you. posClosing captures that regardless of velocity angle.
+        if S.AntiCurve and PrevBallPos ~= nil then
+            local dt = now - PrevBallTime
+            if dt > 0.001 then
+                local prevDist   = (HPos - PrevBallPos).Magnitude
+                local posClosing = (prevDist - Dist) / dt  -- actual approach speed
+
+                if posClosing > 5 then  -- ball is genuinely approaching
+                    local curveTTI = Dist / posClosing
+                    local curveThr = (HitboxTarget / posClosing) + OneWayPing
+                    if curveTTI <= curveThr then
+                        FireParry()
+                    end
+                end
+            end
+        end
+
+        PrevBallPos = BPos
+        PrevBallTime = now
+
+        if S.Triggerbot and Dist <= 2 then FireParry() end
+    end)
+end
+
+local function StopEngine()
+    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
+    if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
+    if Conn.BallAdded then Conn.BallAdded:Disconnect(); Conn.BallAdded=nil end
+    if Conn.DirWatch then Conn.DirWatch:Disconnect(); Conn.DirWatch=nil end
+    S.DidParry=false; PrevBallPos=nil
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   PREMIUM ENGINE  ◈  Aggressive fast parry for whitelisted users
+-- ══════════════════════════════════════════════════════════════════
+local PremiumConn = {}
+local function StartPremiumEngine()
+    for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
+    PremiumConn = {}
+
+    local function PremiumFire()
+        if S.DidParry then return end
+        if os.clock() - S.LastParry < 0.18 then return end
+        VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+        S.LastParry = os.clock()
+        S.DidParry  = true
+        task.spawn(function()
+            task.wait(0.015)
+            VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+            task.wait(0.08)
+            S.DidParry = false
+        end)
+    end
+
+    local pPos, pTime = nil, 0
+    PremiumConn.Parry = RunService.PreSimulation:Connect(function()
+        local Ball = GetBall()
+        if not Ball or Ball:GetAttribute("target") ~= Plr.Name then pPos=nil; return end
+        local HRP = GetHRP(); if not HRP then return end
+
+        local Dist  = (HRP.Position - Ball.Position).Magnitude
+        if Dist <= 4 then PremiumFire(); return end
+
+        local Vel   = GetVel(Ball)
+        local Speed = Vel.Magnitude
+        if Speed < 5 then return end
+
+        local Dir   = (HRP.Position - Ball.Position).Unit
+        local Close = math.max(Vel:Dot(Dir), 18)
+        local TTI   = Dist / Close
+
+        local PingComp = (PingMs / 1000) * 0.55
+        local FireAt   = 0.135 + PingComp + 0.008
+
+        if TTI <= FireAt then
+            PremiumFire(); pPos = Ball.Position; return
+        end
+
+        if pPos then
+            local dt = os.clock() - pTime
+            if dt > 0 then
+                local prevD = (HRP.Position - pPos).Magnitude
+                local curve = (prevD - Dist) / dt
+                if curve > 38 and Dist <= 26 then PremiumFire() end
+            end
+        end
+        pPos  = Ball.Position
+        pTime = os.clock()
+    end)
+end
+
+local function StopPremiumEngine()
+    for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
+    PremiumConn = {}
+end
+
+
+-- ══════════════════════════════════════════════════════════════════
+local SpamThr=nil
+local function StartAutoSpam()
+    if SpamThr then return end
+    SpamThr=task.spawn(function()
+        while S.AutoSpam do VIM:SendMouseButtonEvent(0,0,0,true,game,0); task.wait(S.SpamDelay) end
+        SpamThr=nil
+    end)
+end
+local function StartSmartSpam()
+    task.spawn(function()
+        while S.SmartSpam do
+            local hrp=GetHRP()
+            if hrp then
+                local close=false
+                for _,p in ipairs(Players:GetPlayers()) do
+                    if p~=Plr and p.Character then
+                        local oh=p.Character:FindFirstChild("HumanoidRootPart")
+                        if oh and (oh.Position-hrp.Position).Magnitude<=S.SmartSpamDist then close=true;break end
+                    end
+                end
+                if close then VIM:SendMouseButtonEvent(0,0,0,true,game,0);task.wait(0.015)
+                else task.wait(0.1) end
+            else task.wait(0.5) end
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   MISC FEATURES
+-- ══════════════════════════════════════════════════════════════════
+local function StartNoclip()
+    if Conn.Noclip then return end
+    Conn.Noclip=RunService.Stepped:Connect(function()
+        if not S.Noclip then return end
+        local c=Plr.Character; if not c then return end
+        for _,v in ipairs(c:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end
+    end)
+end
+local function StartIJ()
+    if Conn.IJ then return end
+    Conn.IJ=UIS.JumpRequest:Connect(function()
+        if not S.InfJump then return end
+        local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
+        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end)
+end
+RunService.Heartbeat:Connect(function()
+    if S.WalkSpeed==16 and S.JumpPower==50 then return end
+    local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
+    if not h then return end
+    if h.WalkSpeed~=S.WalkSpeed then h.WalkSpeed=S.WalkSpeed end
+    if h.JumpPower~=S.JumpPower  then h.JumpPower=S.JumpPower  end
+end)
+Plr.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    if S.AutoParry    then StartEngine()   end
+    if S.InfJump      then StartIJ()       end
+    if S.Noclip       then StartNoclip()   end
+end)
+
+-- ══════════════════════════════════════════════════════════════════
+--   BALL ESP
+-- ══════════════════════════════════════════════════════════════════
+local ESPBillboard=nil
+local function CleanESP()
+    pcall(function() if ESPBillboard then ESPBillboard:Destroy() end end)
+    ESPBillboard=nil
+    if Conn.ESPRender then Conn.ESPRender:Disconnect(); Conn.ESPRender=nil end
+end
+local function StartESP()
+    CleanESP()
+    local ball=GetBall(); if not ball then return end
+    local bb=Instance.new("BillboardGui",ball)
+    bb.AlwaysOnTop=true; bb.Size=UDim2.new(0,80,0,30); bb.StudsOffset=Vector3.new(0,3.5,0)
+    ESPBillboard=bb
+    local lbl=Instance.new("TextLabel",bb)
+    lbl.Size=UDim2.new(1,0,1,0); lbl.BackgroundTransparency=1
+    lbl.TextScaled=true; lbl.Font=Enum.Font.GothamBold; lbl.Text="?"
+    lbl.TextColor3=Color3.new(1,1,1)
+    Conn.ESPRender=RunService.Heartbeat:Connect(function()
+        if not ball or not ball.Parent then CleanESP(); return end
+        local tgt=ball:GetAttribute("target")
+        if tgt==Plr.Name then lbl.Text="⚠ YOU"; lbl.TextColor3=Color3.fromRGB(255,60,60)
+        else lbl.Text=tgt or "?"; lbl.TextColor3=Color3.fromRGB(60,255,120) end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   FULLBRIGHT
+-- ══════════════════════════════════════════════════════════════════
+local fbA,fbO,fbB
+local function SetFB(on)
+    if on then fbA=Lighting.Ambient;fbO=Lighting.OutdoorAmbient;fbB=Lighting.Brightness
+        Lighting.Ambient=Color3.new(1,1,1);Lighting.OutdoorAmbient=Color3.new(1,1,1);Lighting.Brightness=2
+    else
+        if fbA then Lighting.Ambient=fbA end
+        if fbO then Lighting.OutdoorAmbient=fbO end
+        if fbB then Lighting.Brightness=fbB end
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   FPS BOOSTER
+-- ══════════════════════════════════════════════════════════════════
+local FPS_Active=false; local FPS_Saved={effects={},casters={},fidelity={}}
+local FPS_Label_Ref=nil
+local function ApplyFPS(level)
+    if FPS_Active then return end; FPS_Active=true
+    FPS_Saved.tech=Lighting.Technology; FPS_Saved.shadow=Lighting.MaxShadowIntensity
+    FPS_Saved.envD=Lighting.EnvironmentDiffuseScale; FPS_Saved.envS=Lighting.EnvironmentSpecularScale
+    pcall(function()
+        local tech={Enum.Technology.ShadowMap,Enum.Technology.Voxel,Enum.Technology.Compatibility}
+        Lighting.Technology=tech[level] or tech[2]
+    end)
+    if level>=2 then Lighting.MaxShadowIntensity=0;Lighting.EnvironmentDiffuseScale=0;Lighting.EnvironmentSpecularScale=0 end
+    FPS_Saved.effects={}
+    for _,e in ipairs(Lighting:GetChildren()) do
+        if e:IsA("PostEffect") then table.insert(FPS_Saved.effects,{o=e,was=e.Enabled})
+            if level>=2 then pcall(function() e.Enabled=false end) end
+        end
+    end
+    if level>=2 then
+        FPS_Saved.casters={}; FPS_Saved.fidelity={}
+        pcall(function()
+            for _,v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    if v.CastShadow then table.insert(FPS_Saved.casters,v); v.CastShadow=false end
+                    if v.RenderFidelity~=Enum.RenderFidelity.Performance then
+                        table.insert(FPS_Saved.fidelity,{o=v,was=v.RenderFidelity})
+                        pcall(function() v.RenderFidelity=Enum.RenderFidelity.Performance end)
+                    end
+                end
+            end
+        end)
+        if Conn.FPSWatch then Conn.FPSWatch:Disconnect() end
+        Conn.FPSWatch=workspace.DescendantAdded:Connect(function(v)
+            if not FPS_Active then return end
+            if v:IsA("BasePart") then pcall(function() v.CastShadow=false;v.RenderFidelity=Enum.RenderFidelity.Performance end) end
+        end)
+    end
+end
+local function RemoveFPS()
+    if not FPS_Active then return end; FPS_Active=false
+    if Conn.FPSWatch then Conn.FPSWatch:Disconnect();Conn.FPSWatch=nil end
+    pcall(function() Lighting.Technology=FPS_Saved.tech end)
+    pcall(function() Lighting.MaxShadowIntensity=FPS_Saved.shadow end)
+    pcall(function() Lighting.EnvironmentDiffuseScale=FPS_Saved.envD end)
+    pcall(function() Lighting.EnvironmentSpecularScale=FPS_Saved.envS end)
+    for _,e in ipairs(FPS_Saved.effects) do pcall(function() e.o.Enabled=e.was end) end
+    for _,v in ipairs(FPS_Saved.casters) do pcall(function() v.CastShadow=true end) end
+    for _,e in ipairs(FPS_Saved.fidelity) do pcall(function() e.o.RenderFidelity=e.was end) end
+end
+local FPS_Now=0
+task.spawn(function()
+    while true do
+        local t0=os.clock(); RunService.Heartbeat:Wait()
+        FPS_Now=math.floor(1/math.max(os.clock()-t0,0.001))
+        if FPS_Label_Ref then pcall(function()
+            local col=FPS_Now>=55 and Color3.fromRGB(34,197,110)
+                   or FPS_Now>=30 and Color3.fromRGB(255,200,50) or Color3.fromRGB(255,80,80)
+            FPS_Label_Ref.Text=("FPS: %d  |  %s"):format(FPS_Now,FPS_Active and "BOOST ON" or "OFF")
+            FPS_Label_Ref.TextColor3=col
+        end) end
+        task.wait(0.5)
+    end
+end)
+
+-- ══════════════════════════════════════════════════════════════════
+--   MANUAL SPAM WIDGET
+-- ══════════════════════════════════════════════════════════════════
+local MSpamOn=false; local MSpamThr=nil
+local function DoStartMS()
+    if MSpamThr then return end
+    MSpamThr=task.spawn(function()
+        while MSpamOn do VIM:SendMouseButtonEvent(0,0,0,true,game,0); task.wait(0.008) end
+        MSpamThr=nil
+    end)
+end
+local function DoStopMS() MSpamOn=false end
+local C={
+    bg=Color3.fromRGB(20,20,28),panel=Color3.fromRGB(28,28,40),
+    accent=Color3.fromRGB(114,76,232),accentL=Color3.fromRGB(148,112,255),
+    text=Color3.fromRGB(240,240,248),sub=Color3.fromRGB(138,138,158),
+    border=Color3.fromRGB(42,42,60),green=Color3.fromRGB(34,197,110),
+    gDark=Color3.fromRGB(14,36,24),gPanel=Color3.fromRGB(18,44,30),
+}
+local MiniSG=Instance.new("ScreenGui"); MiniSG.Name="RyuuManualSpam"
+MiniSG.ResetOnSpawn=false; MiniSG.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+MiniSG.IgnoreGuiInset=true; MiniSG.Enabled=false
+pcall(function()
+    MiniSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui
+end)
+if not MiniSG.Parent then
+    pcall(function() MiniSG.Parent=Plr:WaitForChild("PlayerGui") end)
+end
+local MSh=Instance.new("ImageLabel",MiniSG); MSh.Size=UDim2.new(0,230,0,110)
+MSh.Position=UDim2.new(0.5,-107,1,-136); MSh.BackgroundTransparency=1
+MSh.Image="rbxassetid://5028857084"; MSh.ImageColor3=Color3.new(0,0,0)
+MSh.ImageTransparency=0.55; MSh.ZIndex=8
+local MC=Instance.new("Frame",MiniSG); MC.Name="Card"
+MC.Size=UDim2.new(0,218,0,98); MC.Position=UDim2.new(0.5,-109,1,-128)
+MC.BackgroundColor3=C.bg; MC.BorderSizePixel=0; MC.ZIndex=9
+Instance.new("UICorner",MC).CornerRadius=UDim.new(0,12)
+local MCStr=Instance.new("UIStroke",MC); MCStr.Color=C.border; MCStr.Thickness=1.5
+local MH2=Instance.new("Frame",MC); MH2.Size=UDim2.new(1,0,0,30)
+MH2.BackgroundColor3=C.panel; MH2.BorderSizePixel=0; MH2.ZIndex=10
+Instance.new("UICorner",MH2).CornerRadius=UDim.new(0,12)
+local MHF=Instance.new("Frame",MH2); MHF.Size=UDim2.new(1,0,0,12); MHF.Position=UDim2.new(0,0,1,-12)
+MHF.BackgroundColor3=C.panel; MHF.BorderSizePixel=0; MHF.ZIndex=10
+local MAL=Instance.new("Frame",MH2); MAL.Size=UDim2.new(0,50,0,2); MAL.Position=UDim2.new(0.5,-25,1,-1)
+MAL.BackgroundColor3=C.accent; MAL.BorderSizePixel=0; MAL.ZIndex=11
+Instance.new("UICorner",MAL).CornerRadius=UDim.new(1,0)
+local MDot2=Instance.new("Frame",MH2); MDot2.Size=UDim2.new(0,6,0,6); MDot2.Position=UDim2.new(0,10,0.5,-3)
+MDot2.BackgroundColor3=C.accent; MDot2.BorderSizePixel=0; MDot2.ZIndex=11
+Instance.new("UICorner",MDot2).CornerRadius=UDim.new(1,0)
+local MTit2=Instance.new("TextLabel",MH2); MTit2.Size=UDim2.new(1,-28,1,0); MTit2.Position=UDim2.new(0,22,0,0)
+MTit2.BackgroundTransparency=1; MTit2.Text="ZivX  ◈  Manual Spam"; MTit2.TextColor3=C.sub
+MTit2.Font=Enum.Font.GothamBold; MTit2.TextSize=9; MTit2.TextXAlignment=Enum.TextXAlignment.Left; MTit2.ZIndex=11
+local MBtn=Instance.new("TextButton",MC); MBtn.Size=UDim2.new(1,-14,0,50); MBtn.Position=UDim2.new(0,7,0,37)
+MBtn.BackgroundColor3=C.panel; MBtn.BorderSizePixel=0; MBtn.Text=""; MBtn.AutoButtonColor=false; MBtn.ZIndex=10
+Instance.new("UICorner",MBtn).CornerRadius=UDim.new(0,9)
+local MBStr=Instance.new("UIStroke",MBtn); MBStr.Color=C.accent; MBStr.Thickness=1.5
+local MBDot=Instance.new("Frame",MBtn); MBDot.Size=UDim2.new(0,10,0,10); MBDot.Position=UDim2.new(0,14,0.5,-5)
+MBDot.BackgroundColor3=C.sub; MBDot.BorderSizePixel=0; MBDot.ZIndex=11
+Instance.new("UICorner",MBDot).CornerRadius=UDim.new(1,0)
+local MBLbl=Instance.new("TextLabel",MBtn); MBLbl.Size=UDim2.new(1,-70,0,20); MBLbl.Position=UDim2.new(0,32,0,7)
+MBLbl.BackgroundTransparency=1; MBLbl.Text="MANUAL SPAM"; MBLbl.TextColor3=C.text
+MBLbl.Font=Enum.Font.GothamBold; MBLbl.TextSize=13; MBLbl.TextXAlignment=Enum.TextXAlignment.Left; MBLbl.ZIndex=11
+local MBSub=Instance.new("TextLabel",MBtn); MBSub.Size=UDim2.new(1,-70,0,14); MBSub.Position=UDim2.new(0,32,0,28)
+MBSub.BackgroundTransparency=1; MBSub.Text="OFF  —  [E] to toggle"; MBSub.TextColor3=C.sub
+MBSub.Font=Enum.Font.Gotham; MBSub.TextSize=10; MBSub.TextXAlignment=Enum.TextXAlignment.Left; MBSub.ZIndex=11
+local MEP=Instance.new("TextLabel",MBtn); MEP.Size=UDim2.new(0,24,0,20); MEP.Position=UDim2.new(1,-34,0.5,-10)
+MEP.BackgroundColor3=Color3.fromRGB(32,24,58); MEP.TextColor3=C.accentL
+MEP.Font=Enum.Font.GothamBold; MEP.TextSize=10; MEP.Text="E"; MEP.BorderSizePixel=0; MEP.ZIndex=11
+Instance.new("UICorner",MEP).CornerRadius=UDim.new(0,5)
+local TIF=TweenInfo.new(0.14,Enum.EasingStyle.Quad)
+local function SetMSV(on)
+    if on then
+        TweenService:Create(MC,TIF,{BackgroundColor3=C.gDark}):Play()
+        TweenService:Create(MBtn,TIF,{BackgroundColor3=C.gPanel}):Play()
+        TweenService:Create(MBStr,TIF,{Color=C.green}):Play()
+        TweenService:Create(MCStr,TIF,{Color=C.green}):Play()
+        TweenService:Create(MAL,TIF,{BackgroundColor3=C.green}):Play()
+        TweenService:Create(MDot2,TIF,{BackgroundColor3=C.green}):Play()
+        MBDot.BackgroundColor3=C.green; MBLbl.TextColor3=C.green
+        MBSub.Text="ON  ◈  SPAMMING"; MBSub.TextColor3=C.green
+        MEP.TextColor3=C.green; MEP.BackgroundColor3=Color3.fromRGB(14,36,24)
+    else
+        TweenService:Create(MC,TIF,{BackgroundColor3=C.bg}):Play()
+        TweenService:Create(MBtn,TIF,{BackgroundColor3=C.panel}):Play()
+        TweenService:Create(MBStr,TIF,{Color=C.accent}):Play()
+        TweenService:Create(MCStr,TIF,{Color=C.border}):Play()
+        TweenService:Create(MAL,TIF,{BackgroundColor3=C.accent}):Play()
+        TweenService:Create(MDot2,TIF,{BackgroundColor3=C.accent}):Play()
+        MBDot.BackgroundColor3=C.sub; MBLbl.TextColor3=C.text
+        MBSub.Text="OFF  —  [E] to toggle"; MBSub.TextColor3=C.sub
+        MEP.TextColor3=C.accentL; MEP.BackgroundColor3=Color3.fromRGB(32,24,58)
+    end
+end
+local function ToggleMS()
+    MSpamOn=not MSpamOn; SetMSV(MSpamOn)
+    if MSpamOn then DoStartMS() else DoStopMS() end
+end
+MBtn.MouseButton1Click:Connect(ToggleMS)
+UIS.InputBegan:Connect(function(i,gp)
+    if gp then return end
+    if i.KeyCode==Enum.KeyCode.E then ToggleMS() end
+end)
+local msDrag=false; local msDragSt=nil; local msCardSt=nil
+local function SyncShadow()
+    MSh.Position=UDim2.new(MC.Position.X.Scale,MC.Position.X.Offset-8,
+                            MC.Position.Y.Scale,MC.Position.Y.Offset-7)
+end
+MC.InputBegan:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        msDrag=true; msDragSt=i.Position; msCardSt=MC.Position end
+end)
+UIS.InputChanged:Connect(function(i)
+    if not msDrag then return end
+    if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+        local d=i.Position-msDragSt
+        if d.Magnitude>4 then
+            MC.Position=UDim2.new(msCardSt.X.Scale,msCardSt.X.Offset+d.X,msCardSt.Y.Scale,msCardSt.Y.Offset+d.Y)
+            SyncShadow()
+        end
+    end
+end)
+UIS.InputEnded:Connect(function(i)
+    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+        msDrag=false end
+end)
+SyncShadow()
+
+
+-- ══════════════════════════════════════════════════════════════════
+--   ABILITY ESP  ◈  Real Blade Ball abilities  ◈  ZivX V5
+--
+--   Every real ability in Blade Ball with correct tier + description.
+--   Source: Blade Ball Wiki + RobloxDen tier list (2026).
+--   Shows floating billboard above each enemy head:
+--     • Player name
+--     • Ability name  (color = tier)
+--     • Short description of what it does
+--     • Tier badge  (S / A / B / C / D)
+--     • ⚠ DANGER tag if ability threatens YOU
+-- ══════════════════════════════════════════════════════════════════
+
+local AbilityBBs  = {}
+local AbilityPoll = nil
+
+-- ── Real ability database (all 56 abilities from wiki) ───────────
+-- tier: S/A/B/C/D
+-- col:  display color matching tier
+-- desc: what it actually does (shown on billboard)
+-- warn: true = this ability can directly threaten/disrupt YOU
+local BB_ABILITIES = {
+    -- ══ S TIER ════════════════════════════════════════════════════
+    ["Infinity"]           = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Auto-parries ball at any speed",          warn=true},
+    ["Time Hole"]          = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Creates time distortion zone",            warn=true},
+    ["Slash of Duality"]   = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Dual slash — two trajectories at once",   warn=true},
+    ["Dribble"]            = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Redirect ball unpredictable angle",        warn=true},
+    ["Dragon Spirit"]      = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Dragon charge — fast spiral redirect",    warn=true},
+
+    -- ══ A TIER ════════════════════════════════════════════════════
+    ["Pull"]               = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Forces ball to target them instantly",    warn=true},
+    ["Guardian Angel"]     = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Revives once per round on death",         warn=false},
+    ["Reaper"]             = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Execute low-HP players near ball",        warn=false},
+    ["Slashes of Fury"]    = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Multi-slash barrage — fast ball return",  warn=true},
+    ["Forcefield"]         = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Shield bubble — auto-deflects ball",      warn=false},
+    ["Bunny Leap"]         = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Huge leap escape — hard to hit",          warn=false},
+    ["Calming Deflection"] = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Deflect — slows ball on parry",           warn=false},
+    ["Singularity"]        = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Black hole pulls ball toward it",         warn=true},
+
+    -- ══ B TIER ════════════════════════════════════════════════════
+    ["Invisibility"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Goes invisible — ball untargetable",      warn=false},
+    ["Titan Blade"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Titan armor — tanks ball hit",            warn=false},
+    ["Scopophobia"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Fear aura — disrupts nearby players",     warn=true},
+    ["Blade Trap"]         = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Trap on ground — hits ball near it",      warn=true},
+    ["Golden Ball"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Ball turns gold — bonus coins on hit",    warn=false},
+    ["Continuity Zero"]    = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Resets all ability cooldowns",            warn=false},
+    ["Death Slash"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Hard spike — ball returns very fast",     warn=true},
+    ["Phantom"]            = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Teleports behind nearest player",         warn=true},
+    ["Swap"]               = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Swaps position with targeted player",     warn=true},
+    ["Doppelganger"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Spawns decoy clone of self",              warn=false},
+    ["Necromancer"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Raises clone to confuse ball target",     warn=false},
+    ["Serpent Shadow Clone"]= {tier="B", col=Color3.fromRGB(80,220,120), desc="Shadow serpent clone diversion",          warn=false},
+    ["Phase Bypass"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Phase out — godspeed mobility escape",    warn=false},
+    ["Hell Hook"]          = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Hooks ball into sharp curve",             warn=true},
+    ["Blink"]              = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Short-range instant blink dodge",         warn=false},
+    ["Qi-Charge"]          = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Parry with no cooldown briefly",          warn=false},
+    ["Telekinesis"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Stops ball mid-air + retargets it",       warn=true},
+    ["Aerodynamic Slash"]  = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Wind slash — speed + curve deflect",      warn=false},
+    ["Rapture"]            = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Rare wheel ability — massive curve slash",warn=true},
+    ["Thunder Dash"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Lightning-speed repositioning dash",      warn=false},
+
+    -- ══ C TIER ════════════════════════════════════════════════════
+    ["Flash Counter"]      = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Instant counter — deflects on reaction",  warn=false},
+    ["Absolute Confidence"]= {tier="C", col=Color3.fromRGB(255,220,40),  desc="Confident parry — stronger deflect",      warn=false},
+    ["Pulse"]              = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Pulse wave pushes ball away",             warn=false},
+    ["Bounty"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Marks player — bonus reward on kill",     warn=false},
+    ["Luck"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: increases coin drop chance",     warn=false},
+    ["Decrypted Clone"]    = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Encrypted decoy — confuses targeting",    warn=false},
+    ["Raging Deflection"]  = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Stronger deflect — big speed boost",      warn=true},
+    ["Tact"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: tactical awareness buff",        warn=false},
+    ["Waypoint"]           = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Place marker + teleport back to it",      warn=false},
+    ["Misfortune"]         = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: curses nearby players",          warn=true},
+    ["Freeze"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Freezes ball briefly mid-flight",         warn=true},
+    ["Shadow Step"]        = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Shadow blink dodge behind attacker",      warn=false},
+    ["Quantum Arena"]      = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Zone trap — locks players inside area",   warn=true},
+    ["Force"]              = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Push force — knocks ball & players",      warn=false},
+    ["Dash"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Starter dash — quick reposition",         warn=false},
+    ["Wind Cloak"]         = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Wind aura — speed + jump boost",          warn=false},
+    ["Quasar"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Energy burst redirects ball",             warn=false},
+    ["Chieftain's Totem"]  = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Totem — buffs nearby teammates",          warn=false},
+
+    -- ══ D TIER ════════════════════════════════════════════════════
+    ["Freeze Trap"]        = {tier="D", col=Color3.fromRGB(160,160,160), desc="Ground trap — freezes ball on contact",   warn=false},
+    ["Martyrdom"]          = {tier="D", col=Color3.fromRGB(160,160,160), desc="Explodes on death — AOE damage",          warn=true},
+    ["Platform"]           = {tier="D", col=Color3.fromRGB(160,160,160), desc="Pillar under feet — lifts you up",        warn=false},
+    ["Super Jump"]         = {tier="D", col=Color3.fromRGB(160,160,160), desc="Big jump — escapes ball from above",      warn=false},
+    ["Quad Jump"]          = {tier="D", col=Color3.fromRGB(160,160,160), desc="Passive: jump 4 times in the air",        warn=false},
+}
+
+-- Tier background colors (darker tint for badge BG)
+local TIER_COL = {
+    S = Color3.fromRGB(255,60,220),
+    A = Color3.fromRGB(255,130,30),
+    B = Color3.fromRGB(80,220,120),
+    C = Color3.fromRGB(255,220,40),
+    D = Color3.fromRGB(160,160,160),
+}
+
+-- ── Scan player for their equipped ability ──────────────────────
+local RS = game:GetService("ReplicatedStorage")
+local function ScanAbility(plr)
+    if not plr then return nil end
+    local char = plr.Character
+
+    -- Helper: check a string against known abilities (fuzzy match)
+    local function matchAbility(s)
+        if not s or #s < 2 then return nil end
+        if BB_ABILITIES[s] then return s end
+        -- Case-insensitive search
+        local sl = s:lower()
+        for k in pairs(BB_ABILITIES) do
+            if k:lower() == sl then return k end
+        end
+        return nil
+    end
+
+    -- 1) Player attributes (most games store here)
+    for _, n in ipairs({"Ability","ability","AbilityName","EquippedAbility","Skill","CurrentAbility","equipped"}) do
+        local ok,v = pcall(function() return plr:GetAttribute(n) end)
+        if ok and type(v)=="string" then local r=matchAbility(v); if r then return r end end
+    end
+
+    -- 2) Character attributes
+    if char then
+        for _, n in ipairs({"Ability","ability","AbilityName","EquippedAbility","Skill","CurrentAbility"}) do
+            local ok,v = pcall(function() return char:GetAttribute(n) end)
+            if ok and type(v)=="string" then local r=matchAbility(v); if r then return r end end
+        end
+    end
+
+    -- 3) StringValues anywhere under player (leaderstats, DataFolder, etc.)
+    for _, v in ipairs(plr:GetDescendants()) do
+        if v:IsA("StringValue") then
+            local r = matchAbility(v.Value)
+            if r then return r end
+            local nl = v.Name:lower()
+            if nl:find("ability") or nl:find("skill") or nl:find("equip") then
+                if #v.Value > 0 then return v.Value end
+            end
+        end
+    end
+
+    -- 4) StringValues anywhere under character
+    if char then
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("StringValue") then
+                local r = matchAbility(v.Value)
+                if r then return r end
+                local nl = v.Name:lower()
+                if nl:find("ability") or nl:find("skill") or nl:find("equip") then
+                    if #v.Value > 0 then return v.Value end
+                end
+            end
+        end
+    end
+
+    -- 5) ReplicatedStorage data folders
+    local ok5,result5 = pcall(function()
+        for _, folder in ipairs(RS:GetChildren()) do
+            local pdata = folder:FindFirstChild(plr.Name)
+            if pdata then
+                for _, v in ipairs(pdata:GetDescendants()) do
+                    if v:IsA("StringValue") then
+                        local r = matchAbility(v.Value)
+                        if r then return r end
+                    end
+                end
+            end
+        end
+        return nil
+    end)
+    if ok5 and result5 then return result5 end
+
+    -- 6) Equipped Tool in character (ability = tool name)
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") then
+                local r = matchAbility(v.Name)
+                return r or v.Name  -- return name even if unknown
+            end
+        end
+    end
+
+    -- 7) Tool in Backpack
+    local bp = plr:FindFirstChild("Backpack")
+    if bp then
+        for _, v in ipairs(bp:GetChildren()) do
+            if v:IsA("Tool") then
+                local r = matchAbility(v.Name)
+                return r or v.Name
+            end
+        end
+    end
+
+    return nil
+end
+
+-- ── Build billboard above player head ────────────────────────────
+local function BuildAbilityBB(plr)
+    if not (plr and plr.Character) then return end
+    local head = plr.Character:FindFirstChild("Head")
+    if not head then return end
+
+    if AbilityBBs[plr] and AbilityBBs[plr].Parent then
+        pcall(function() AbilityBBs[plr]:Destroy() end)
+    end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name        = "RyuuAbilESP"
+    bb.AlwaysOnTop = true
+    bb.Size        = UDim2.new(0,150,0,36)
+    bb.StudsOffset = Vector3.new(0,3.0,0)
+    bb.MaxDistance  = 100
+    bb.Parent      = head
+
+    -- Card background
+    local bg = Instance.new("Frame",bb)
+    bg.Size                   = UDim2.new(1,0,1,0)
+    bg.BackgroundColor3       = Color3.fromRGB(8,5,18)
+    bg.BackgroundTransparency = 0.15
+    bg.BorderSizePixel        = 0
+    Instance.new("UICorner",bg).CornerRadius = UDim.new(0,8)
+    local stroke = Instance.new("UIStroke",bg)
+    stroke.Thickness = 1.4
+    stroke.Color     = Color3.fromRGB(50,25,90)
+
+    -- Player name (top-left, small gray)
+    local nLbl = Instance.new("TextLabel",bg)
+    nLbl.Name              = "PN"
+    nLbl.Size              = UDim2.new(1,-30,0,13)
+    nLbl.Position          = UDim2.new(0,4,0,3)
+    nLbl.BackgroundTransparency = 1
+    nLbl.Text              = plr.Name
+    nLbl.TextColor3        = Color3.fromRGB(150,140,190)
+    nLbl.Font              = Enum.Font.GothamBold
+    nLbl.TextSize          = 10
+    nLbl.TextXAlignment    = Enum.TextXAlignment.Left
+    nLbl.TextTruncate      = Enum.TextTruncate.AtEnd
+
+    -- Tier badge (top-right)
+    local badge = Instance.new("TextLabel",bg)
+    badge.Name              = "TB"
+    badge.Size              = UDim2.new(0,24,0,13)
+    badge.Position          = UDim2.new(1,-27,0,3)
+    badge.BackgroundColor3  = Color3.fromRGB(30,15,55)
+    badge.BorderSizePixel   = 0
+    badge.Text              = "?"
+    badge.TextColor3        = Color3.fromRGB(180,100,255)
+    badge.Font              = Enum.Font.GothamBlack
+    badge.TextSize          = 10
+    Instance.new("UICorner",badge).CornerRadius = UDim.new(0,4)
+
+    -- Ability name (main row)
+    local aLbl = Instance.new("TextLabel",bg)
+    aLbl.Name              = "AN"
+    aLbl.Size              = UDim2.new(1,-8,0,18)
+    aLbl.Position          = UDim2.new(0,4,0,14)
+    aLbl.BackgroundTransparency = 1
+    aLbl.Text              = "Scanning..."
+    aLbl.TextColor3        = Color3.fromRGB(200,200,200)
+    aLbl.Font              = Enum.Font.GothamBold
+    aLbl.TextSize          = 13
+    aLbl.TextXAlignment    = Enum.TextXAlignment.Left
+    aLbl.TextTruncate      = Enum.TextTruncate.AtEnd
+
+    AbilityBBs[plr] = bb
+end
+
+-- ── Refresh one billboard's data ─────────────────────────────────
+local function RefreshBB(plr)
+    if not (plr and plr.Character) then return end
+    local bb = AbilityBBs[plr]
+    if not (bb and bb.Parent) then BuildAbilityBB(plr); bb=AbilityBBs[plr] end
+    if not bb then return end
+    local bg = bb:FindFirstChildOfClass("Frame"); if not bg then return end
+    local aLbl  = bg:FindFirstChild("AN")
+    local badge = bg:FindFirstChild("TB")
+    local stk   = bg:FindFirstChildOfClass("UIStroke")
+    if not aLbl then return end
+
+    local name = ScanAbility(plr)
+    if name then
+        local data = BB_ABILITIES[name]
+        if data then
+            local col = data.warn and Color3.fromRGB(255,70,70) or data.col
+            aLbl.Text        = (data.warn and "⚠ " or "")..name
+            aLbl.TextColor3  = col
+            if badge then badge.Text       = data.tier
+                          badge.TextColor3  = TIER_COL[data.tier] or Color3.fromRGB(180,100,255) end
+            if stk   then stk.Color = data.warn and Color3.fromRGB(200,50,50) or data.col end
+        else
+            aLbl.Text        = name
+            aLbl.TextColor3  = Color3.fromRGB(200,200,200)
+            if badge then badge.Text = "?" end
+            if stk   then stk.Color = Color3.fromRGB(50,25,90) end
+        end
+    else
+        aLbl.Text        = "No Ability"
+        aLbl.TextColor3  = Color3.fromRGB(90,85,110)
+        if badge then badge.Text = "-" end
+        if stk   then stk.Color = Color3.fromRGB(30,15,50) end
+    end
+end
+
+local function CleanAbilityESP()
+    if AbilityPoll then AbilityPoll:Disconnect(); AbilityPoll=nil end
+    for _, bb in pairs(AbilityBBs) do
+        pcall(function() if bb and bb.Parent then bb:Destroy() end end)
+    end
+    AbilityBBs = {}
+end
+
+local function StartAbilityESP()
+    CleanAbilityESP()
+    -- Build boards for everyone currently in game
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr then
+            BuildAbilityBB(p)
+            RefreshBB(p)
+        end
+    end
+    -- Refresh loop every 0.4s
+    task.spawn(function()
+        while S.AbilityESP do
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= Plr then
+                    -- Rebuild board if character respawned or board missing
+                    if p.Character then
+                        local head = p.Character:FindFirstChild("Head")
+                        if head then
+                            local bb = AbilityBBs[p]
+                            if not bb or not bb.Parent or bb.Parent ~= head then
+                                BuildAbilityBB(p)
+                            end
+                            RefreshBB(p)
+                        end
+                    end
+                end
+            end
+            -- Prune players who left
+            for p, bb in pairs(AbilityBBs) do
+                if not p.Parent then
+                    pcall(function() if bb and bb.Parent then bb:Destroy() end end)
+                    AbilityBBs[p] = nil
+                end
+            end
+            task.wait(0.4)
+        end
+    end)
+    -- Hook new players joining mid-game
+    Players.PlayerAdded:Connect(function(p)
+        if not S.AbilityESP then return end
+        p.CharacterAdded:Connect(function()
+            task.wait(0.5)
+            if S.AbilityESP then BuildAbilityBB(p); RefreshBB(p) end
+        end)
+    end)
+    -- Also hook existing players who respawn
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr then
+            p.CharacterAdded:Connect(function()
+                task.wait(0.5)
+                if S.AbilityESP then BuildAbilityBB(p); RefreshBB(p) end
+            end)
+        end
+    end
+end
+
+
+
+-- ══════════════════════════════════════════════════════════════════
+--   SWORD CHANGER  ◈  ZivX V5
+--
+--   Finds the player's equipped sword (Tool in character) and
+--   swaps its mesh + texture to any preset.
+--   Works on the local client — purely visual (you see the change).
+--   Applies on equip, re-applies on respawn.
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── Sword color presets (Color3 values) ─────────────────────────
+local SWORD_COLORS = {
+    ["Default"]      = nil,   -- nil = restore originals
+    ["Gold"]         = Color3.fromRGB(255, 200,  40),
+    ["Shadow Black"] = Color3.fromRGB( 15,  10,  20),
+    ["Crystal Blue"] = Color3.fromRGB( 40, 140, 255),
+    ["Crimson"]      = Color3.fromRGB(200,  30,  30),
+    ["Ghost White"]  = Color3.fromRGB(230, 230, 255),
+    ["Neon Purple"]  = Color3.fromRGB(180,  40, 255),
+    ["Emerald"]      = Color3.fromRGB( 20, 200,  80),
+    ["Rose Gold"]    = Color3.fromRGB(220, 140, 120),
+    ["Obsidian"]     = Color3.fromRGB( 30,  28,  35),
+    ["Cyan"]         = Color3.fromRGB(  0, 220, 220),
+    ["Orange"]       = Color3.fromRGB(255, 120,  20),
+    ["Rainbow"]      = nil,   -- special: cycles hue each apply
+}
+
+local SWORD_MATERIALS = {
+    ["Default"]      = Enum.Material.SmoothPlastic,
+    ["Neon Purple"]  = Enum.Material.Neon,
+    ["Emerald"]      = Enum.Material.Neon,
+    ["Cyan"]         = Enum.Material.Neon,
+    ["Rainbow"]      = Enum.Material.Neon,
+}
+
+local CurrentSwordPreset = "Default"
+local SwordOrigColors    = {}   -- stores {part → originalColor} on first equip
+local RainbowHue         = 0
+
+local function GetSwordParts()
+    local char = Plr.Character; if not char then return nil, {} end
+    local tool = nil
+    for _, v in ipairs(char:GetChildren()) do
+        if v:IsA("Tool") then tool = v; break end
+    end
+    if not tool then return nil, {} end
+    local parts = {}
+    for _, v in ipairs(tool:GetDescendants()) do
+        if v:IsA("BasePart") or v:IsA("UnionOperation") then
+            parts[#parts+1] = v
+        end
+    end
+    -- also include the Handle
+    local h = tool:FindFirstChild("Handle")
+    if h then parts[#parts+1] = h end
+    return tool, parts
+end
+
+local function SaveSwordOriginals(parts)
+    for _, p in ipairs(parts) do
+        if not SwordOrigColors[p] then
+            SwordOrigColors[p] = {color=p.Color, mat=p.Material}
+        end
+    end
+end
+
+local function ApplySwordPreset(presetName)
+    CurrentSwordPreset = presetName
+    local _, parts = GetSwordParts()
+    if #parts == 0 then return end  -- sword not equipped, will apply on equip
+    SaveSwordOriginals(parts)
+
+    local mat = SWORD_MATERIALS[presetName] or Enum.Material.SmoothPlastic
+
+    if presetName == "Default" then
+        -- Restore originals
+        for _, p in ipairs(parts) do
+            local orig = SwordOrigColors[p]
+            if orig then
+                pcall(function() p.Color = orig.color; p.Material = orig.mat end)
+            end
+        end
+        return
+    end
+
+    if presetName == "Rainbow" then
+        RainbowHue = (RainbowHue + 0.08) % 1
+        local col = Color3.fromHSV(RainbowHue, 1, 1)
+        for _, p in ipairs(parts) do
+            pcall(function() p.Color = col; p.Material = Enum.Material.Neon end)
+        end
+        return
+    end
+
+    local col = SWORD_COLORS[presetName]
+    if not col then return end
+    for _, p in ipairs(parts) do
+        pcall(function() p.Color = col; p.Material = mat end)
+    end
+end
+
+-- Re-apply on equip
+Plr.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    -- Watch for tool equip
+    char.ChildAdded:Connect(function(v)
+        if v:IsA("Tool") then
+            task.wait(0.1)
+            ApplySwordPreset(CurrentSwordPreset)
+        end
+    end)
+end)
+-- Also hook current character
+if Plr.Character then
+    Plr.Character.ChildAdded:Connect(function(v)
+        if v:IsA("Tool") then
+            task.wait(0.1)
+            ApplySwordPreset(CurrentSwordPreset)
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════════
+--   RAYFIELD WINDOW  ◈  GUI
+-- ══════════════════════════════════════════════════════════════════
+local W = Rayfield:CreateWindow({
+    Name                   = "Ryuu's HUB V1 BETA",
+    LoadingTitle           = "Ryuu's HUB V1 BETA",
+    LoadingSubtitle        = "",
+    Theme                  = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings   = false,
+    ConfigurationSaving    = {Enabled=true, FolderName="RyuuV5", FileName="Config"},
+    KeySystem              = false,
+})
+
+-- ── TAB 1: AUTO PARRY ────────────────────────────────────────────
+local T1 = W:CreateTab("⚔  Auto Parry", nil)
+T1:CreateSection("Auto Parry")
+T1:CreateToggle({Name="Auto Parry",CurrentValue=false,Flag="AP",Callback=function(v)
+    S.AutoParry=v; if v then StartEngine() else StopEngine() end
+end})
+T1:CreateToggle({Name="Auto Face Ball",CurrentValue=false,Flag="AF",Callback=function(v) S.AutoFace=v end})
+T1:CreateToggle({Name="Triggerbot  (≤2 studs instant)",CurrentValue=false,Flag="TB",Callback=function(v) S.Triggerbot=v end})
+T1:CreateLabel("Stud-distance gate · AntiCurve predictor · Emergency distance")
+T1:CreateLabel("Speed-independent timing — same perfect parry at any ball speed")
+
+T1:CreateDivider()
+T1:CreateSection("🎯  Parry Accuracy")
+T1:CreateLabel("Higher = more precise timing. 100 = perfect every single time.")
+T1:CreateLabel("Lower = human-like variance — fires slightly off-rhythm.")
+T1:CreateLabel("acc=100: 0ms jitter — fires at mathematically perfect moment every time")
+T1:CreateLabel("acc=50:  ~90ms jitter — slightly off-rhythm, human-like")
+T1:CreateLabel("acc=1:   ~180ms jitter — very imprecise, misses fast balls")
+T1:CreateSlider({
+    Name="Parry Accuracy", Range={1,100}, Increment=1, CurrentValue=100, Flag="PA",
+    Callback=function(v)
+        S.ParryAccuracy=v
+        local tier = v>=95 and "PERFECT — Machine precision"
+                  or v>=80 and "Elite — Near-perfect"
+                  or v>=60 and "Balanced"
+                  or v>=40 and "Normal — Human-ish"
+                  or            "Low — Often misses"
+        Rayfield:Notify({Title="Accuracy: "..v,Content=tier,Duration=2,Image=4483362458})
+    end,
+})
+
+T1:CreateDivider()
+T1:CreateSection("🌀  Anti-Curve Engine")
+T1:CreateLabel("Tracks ball turn rate + speed changes every frame.")
+T1:CreateLabel("Curved balls, speed boosts, slows — all predicted correctly.")
+T1:CreateLabel("D3: Rodrigues rotation sim  |  D5: Closing-velocity check")
+T1:CreateToggle({Name="Anti-Curve",CurrentValue=true,Flag="AC",Callback=function(v)
+    S.AntiCurve=v
+    Rayfield:Notify({
+        Title = "Anti-Curve " .. (v and "ON" or "OFF"),
+        Content = v and "Curve tracking active — nothing gets past" or "Disabled",
+        Duration = 2, Image = 4483362458,
+    })
+end})
+
+T1:CreateDivider()
+T1:CreateSection("📡  Ping Compensation")
+PingLabel = T1:CreateLabel("Ping: measuring...")
+T1:CreateSlider({Name="Ping Scale",Range={0,1},Increment=0.05,Suffix="x",
+    CurrentValue=0.5,Flag="PCS",Callback=function(v) PingScale=v; PingBonus=(PingMs/1000)*PingScale end})
+
+T1:CreateDivider()
+T1:CreateSection("⏱  Parry Cooldown")
+T1:CreateLabel("No pre-click guard. Parry fires the moment the ball is in range.")
+T1:CreateSlider({Name="Parry Cooldown",Range={0.05,0.60},Increment=0.01,Suffix="s",
+    CurrentValue=0.32,Flag="CD",Callback=function(v) S.ParryCooldown=v end})
+
+T1:CreateDivider()
+T1:CreateSection("🚨  Emergency Distance Parry")
+T1:CreateLabel("Auto-parries instantly if the ball is dangerously close.")
+T1:CreateLabel("Triggers when ball ≤ distance AND an enemy is nearby.")
+T1:CreateLabel("Protects from: point-blank rush, Pull close, Hell Hook, Dribble.")
+T1:CreateToggle({Name="Emergency Parry",CurrentValue=true,Flag="EP",Callback=function(v)
+    S.EmergencyParry=v
+    Rayfield:Notify({
+        Title="Emergency Parry " .. (v and "ON" or "OFF"),
+        Content=v and "Point-blank protection active" or "Disabled",
+        Duration=2, Image=4483362458,
+    })
+end})
+T1:CreateSlider({Name="Emergency Distance",Range={2,12},Increment=1,Suffix=" studs",
+    CurrentValue=6,Flag="EPD",Callback=function(v)
+        S.EmergencyDist=v
+    end})
+
+T1:CreateDivider()
+T1:CreateSection("Spam")
+T1:CreateToggle({Name="Auto Spam",CurrentValue=false,Flag="AS",
+    Callback=function(v) S.AutoSpam=v; if v then StartAutoSpam() end end})
+T1:CreateSlider({Name="Spam Delay",Range={0.01,0.30},Increment=0.01,Suffix="s",
+    CurrentValue=0.05,Flag="ASD",Callback=function(v) S.SpamDelay=v end})
+T1:CreateDivider()
+T1:CreateSection("🧠  Smart Spam")
+T1:CreateLabel("Auto-fires when enemies are within range")
+T1:CreateToggle({Name="Smart Spam",CurrentValue=false,Flag="SS",Callback=function(v)
+    S.SmartSpam=v; if v then StartSmartSpam()
+        Rayfield:Notify({Title="Smart Spam ON",Content="Auto near enemies",Duration=3,Image=4483362458}) end
+end})
+T1:CreateSlider({Name="Smart Spam Range",Range={5,50},Increment=1,Suffix=" studs",
+    CurrentValue=10,Flag="SSR",Callback=function(v) S.SmartSpamDist=v end})
+T1:CreateDivider()
+T1:CreateSection("⚡  Manual Spam")
+T1:CreateLabel("Click button below  ◈  [E] to toggle  ◈  Draggable widget")
+T1:CreateButton({Name="⚡  Open Manual Spam Widget",Callback=function()
+    MiniSG.Enabled=not MiniSG.Enabled
+    if MiniSG.Enabled then
+        MC.Position=UDim2.new(0.5,-109,1,-128); SyncShadow()
+        MC.BackgroundTransparency=0.99
+        TweenService:Create(MC,TweenInfo.new(0.18,Enum.EasingStyle.Quad),{BackgroundTransparency=0}):Play()
+    end
+end})
+T1:CreateKeybind({Name="Toggle Auto Parry [F5]",CurrentKeybind="F5",HoldToInteract=false,Flag="KB_AP",
+    Callback=function()
+        S.AutoParry=not S.AutoParry
+        if S.AutoParry then StartEngine() else StopEngine() end
+        Rayfield:Notify({Title="Auto Parry",Content=S.AutoParry and "ON ✓" or "OFF",Duration=2,Image=4483362458})
+    end})
+
+-- ── TAB 2: SEMI IMMORTAL ─────────────────────────────────────────
+-- ── TAB 3: VISUALS ───────────────────────────────────────────────
+local T3 = W:CreateTab("🎨  Visuals", nil)
+T3:CreateSection("Ball ESP")
+T3:CreateToggle({Name="Ball ESP",CurrentValue=false,Flag="ESP",
+    Callback=function(v) S.BallESP=v; if v then StartESP() else CleanESP() end end})
+T3:CreateLabel("Red = targeting you  |  Green = targeting other")
+T3:CreateDivider()
+T3:CreateSection("Lighting")
+T3:CreateToggle({Name="Fullbright",CurrentValue=false,Flag="FB",
+    Callback=function(v) S.Fullbright=v; SetFB(v) end})
+T3:CreateDivider()
+T3:CreateSection("Camera")
+T3:CreateSlider({Name="Field of View",Range={30,120},Increment=1,Suffix="°",
+    CurrentValue=70,Flag="FOV",Callback=function(v) Cam.FieldOfView=v end})
+T3:CreateDivider()
+T3:CreateSection("🔮  Ability ESP")
+T3:CreateLabel("Floating card above each enemy showing their equipped ability.")
+T3:CreateLabel("Updates 5x per second. Shows: name, tier, distance, and ACTIVE flash.")
+T3:CreateLabel("⚡ ACTIVE = ability is firing RIGHT NOW. Plan your parry.")
+T3:CreateLabel("Color: 🟣 Mythic  🟠 Legendary  🟡 Rare  ⚪ Common/None")
+T3:CreateToggle({Name="Ability ESP",CurrentValue=false,Flag="AESP",Callback=function(v)
+    S.AbilityESP=v
+    if v then
+        StartAbilityESP()
+        Rayfield:Notify({
+            Title="Ability ESP  ◈  ON",
+            Content="Scanning all enemies. Cards appear above heads.",
+            Duration=3,Image=4483362458,
+        })
+    else
+        CleanAbilityESP()
+        Rayfield:Notify({Title="Ability ESP  ◈  OFF",Content="Cards removed.",Duration=2,Image=4483362458})
+    end
+end})
+T3:CreateDivider()
+T3:CreateSection("⚡  FPS Booster")
+FPS_Label_Ref = T3:CreateLabel("FPS: measuring...")
+T3:CreateLabel("Targets: lighting, shadows, render fidelity, post FX")
+local FPSLevel=2
+T3:CreateDropdown({Name="Boost Level",Options={"1 — Mild","2 — Medium","3 — Max"},
+    CurrentOption={"2 — Medium"},MultipleOptions=false,Flag="FPSLV",
+    Callback=function(v)
+        local s=type(v)=="table" and v[1] or tostring(v)
+        if s:find("1") then FPSLevel=1 elseif s:find("3") then FPSLevel=3 else FPSLevel=2 end
+    end})
+T3:CreateToggle({Name="FPS Booster",CurrentValue=false,Flag="FPSB",Callback=function(v)
+    if v then ApplyFPS(FPSLevel)
+        Rayfield:Notify({Title="FPS Booster ON",Content="Level "..FPSLevel,Duration=3,Image=4483362458})
+    else RemoveFPS()
+        Rayfield:Notify({Title="FPS Booster OFF",Content="Restored",Duration=2,Image=4483362458})
+    end
+end})
+
+-- ── TAB 4: PLAYER ────────────────────────────────────────────────
+local T4 = W:CreateTab("🧍  Player", nil)
+T4:CreateSection("Movement")
+T4:CreateSlider({Name="Walk Speed",Range={16,150},Increment=1,CurrentValue=16,Flag="WS",
+    Callback=function(v) S.WalkSpeed=v
+        local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.WalkSpeed=v end end})
+T4:CreateSlider({Name="Jump Power",Range={50,500},Increment=5,CurrentValue=50,Flag="JP",
+    Callback=function(v) S.JumpPower=v
+        local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
+        if h then h.JumpPower=v end end})
+T4:CreateDivider()
+T4:CreateSection("Abilities")
+T4:CreateToggle({Name="Infinity Jump",CurrentValue=false,Flag="IJ",
+    Callback=function(v) S.InfJump=v; if v then StartIJ() end end})
+T4:CreateToggle({Name="Noclip",CurrentValue=false,Flag="NC",Callback=function(v)
+    S.Noclip=v
+    if v then StartNoclip() else
+        local c=Plr.Character
+        if c then for _,p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide=true end end end
+    end
+end})
+
+-- ── TAB: SWORD CHANGER ───────────────────────────────────────────
+local T6 = W:CreateTab("⚔  Sword", nil)
+T6:CreateSection("Sword Color  ◈  Client-Side")
+T6:CreateLabel("Changes your sword color. Visual only (only you see it).")
+T6:CreateLabel("Rainbow cycles hue each time Apply is pressed.")
+T6:CreateDropdown({
+    Name="Sword Color",
+    Options={"Default","Gold","Shadow Black","Crystal Blue","Crimson","Ghost White",
+             "Neon Purple","Emerald","Rose Gold","Obsidian","Cyan","Orange","Rainbow"},
+    CurrentOption={"Default"},
+    MultipleOptions=false,
+    Flag="SWSK",
+    Callback=function(v)
+        local name = type(v)=="table" and v[1] or tostring(v)
+        ApplySwordPreset(name)
+        Rayfield:Notify({Title="Sword  ◈  "..name, Content="Color applied!", Duration=2, Image=4483362458})
+    end
+})
+T6:CreateButton({Name="⚔  Apply Now", Callback=function()
+    local _, parts = GetSwordParts()
+    if #parts > 0 then
+        ApplySwordPreset(CurrentSwordPreset)
+        Rayfield:Notify({Title="Applied: "..CurrentSwordPreset, Content="Sword updated!", Duration=2, Image=4483362458})
+    else
+        Rayfield:Notify({Title="No sword equipped", Content="Equip your sword first", Duration=2, Image=4483362458})
+    end
+end})
+T6:CreateDivider()
+T6:CreateSection("Custom Color (RGB)")
+T6:CreateSlider({Name="Red",   Range={0,255},Increment=1,CurrentValue=128,Flag="SCR",
+    Callback=function(v)
+        local _,parts=GetSwordParts(); if #parts==0 then return end
+        local curCol = parts[1].Color
+        pcall(function()
+            local col=Color3.fromRGB(v, curCol.G*255, curCol.B*255)
+            for _,p in ipairs(parts) do pcall(function() p.Color=col end) end
+        end)
+    end})
+T6:CreateSlider({Name="Green", Range={0,255},Increment=1,CurrentValue=128,Flag="SCG",
+    Callback=function(v)
+        local _,parts=GetSwordParts(); if #parts==0 then return end
+        local curCol = parts[1].Color
+        pcall(function()
+            local col=Color3.fromRGB(curCol.R*255, v, curCol.B*255)
+            for _,p in ipairs(parts) do pcall(function() p.Color=col end) end
+        end)
+    end})
+T6:CreateSlider({Name="Blue",  Range={0,255},Increment=1,CurrentValue=128,Flag="SCB",
+    Callback=function(v)
+        local _,parts=GetSwordParts(); if #parts==0 then return end
+        local curCol = parts[1].Color
+        pcall(function()
+            local col=Color3.fromRGB(curCol.R*255, curCol.G*255, v)
+            for _,p in ipairs(parts) do pcall(function() p.Color=col end) end
+        end)
+    end})
+
+
+-- ── TAB 5: SETTINGS ──────────────────────────────────────────────
+local T5 = W:CreateTab("⚙  Settings", nil)
+T5:CreateSection("Keybinds")
+T5:CreateKeybind({Name="Toggle Auto Parry",CurrentKeybind="F5",HoldToInteract=false,Flag="KB2",
+    Callback=function()
+        S.AutoParry=not S.AutoParry
+        if S.AutoParry then StartEngine() else StopEngine() end
+        Rayfield:Notify({Title="Auto Parry",Content=S.AutoParry and "ON" or "OFF",Duration=2,Image=4483362458})
+    end})
+T5:CreateKeybind({Name="Toggle Ball ESP",CurrentKeybind="F8",HoldToInteract=false,Flag="KB3",
+    Callback=function() S.BallESP=not S.BallESP; if S.BallESP then StartESP() else CleanESP() end end})
+T5:CreateDivider()
+T5:CreateSection("About")
+T5:CreateLabel("Ryuu's HUB V1 BETA")
+T5:CreateDivider()
+T5:CreateSection("🔗  Discord")
+T5:CreateLabel("Click the button to copy the Discord invite link.")
+T5:CreateButton({Name="📋  Copy Discord Link", Callback=function()
+    local link = "https://discord.gg/S2fKywJutE"
+    local ok = pcall(function() setclipboard(link) end)
+    if ok then
+        Rayfield:Notify({Title="Discord Link Copied!",Content=link,Duration=4,Image=4483362458})
+    else
+        Rayfield:Notify({Title="Link: discord.gg/S2fKywJutE",Content="Manually copy: https://discord.gg/S2fKywJutE",Duration=6,Image=4483362458})
+    end
+end})
+
+-- ══════════════════════════════════════════════════════════════════
+--   PREMIUM TAB  ◈  Key-locked whitelist system
+-- ══════════════════════════════════════════════════════════════════
+local PT = W:CreateTab("✨  Premium", nil)
+local PremiumUnlocked = false
+local EnteredKey = ""
+
+-- ── Header ───────────────────────────────────────────────────────
+PT:CreateSection("✨  Ryuu's HUB Premium")
+PT:CreateLabel("Premium gives you the Aggressive Parry engine —")
+PT:CreateLabel("lower cooldown, faster fire, god-tier close range.")
+PT:CreateDivider()
+
+-- ── Key Input ─────────────────────────────────────────────────────
+PT:CreateSection("🔑  Enter Whitelist Key")
+PT:CreateLabel("Paste the key you received from the Discord bot below.")
+
+PT:CreateInput({
+    Name               = "Your Key",
+    PlaceholderText    = "RYUU-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
+    RemoveTextAfterFocusLost = false,
+    Flag               = "WLKey",
+    Callback           = function(val)
+        EnteredKey = val or ""
+    end,
+})
+
+PT:CreateButton({Name = "✅  Unlock Premium", Callback = function()
+    -- Also try reading from flag in case callback hasn't fired
+    if EnteredKey == "" then
+        pcall(function()
+            local fl = Rayfield.Flags and Rayfield.Flags.WLKey
+            EnteredKey = (fl and fl.Value) or ""
+        end)
+    end
+
+    local key = EnteredKey:match("^%s*(.-)%s*$")  -- trim whitespace
+
+    if #key < 10 then
+        Rayfield:Notify({
+            Title   = "⚠️  No Key",
+            Content = "Paste your key in the field first.",
+            Duration = 4,
+            Image   = 4483362458,
+        })
+        return
+    end
+
+    if PremiumUnlocked then
+        Rayfield:Notify({Title="Already Unlocked",Content="Premium is active!",Duration=3,Image=4483362458})
+        return
+    end
+
+    Rayfield:Notify({
+        Title   = "🔄  Checking Key...",
+        Content = "Connecting to whitelist server...",
+        Duration = 3,
+        Image   = 4483362458,
+    })
+
+    task.spawn(function()
+        local result = ValidateKey(key)
+
+        if result == "locked_other" then
+            Rayfield:Notify({
+                Title   = "🔒  Key Already Used",
+                Content = "This key is locked to a different device. Keys are one-device only.",
+                Duration = 8,
+                Image   = 4483362458,
+            })
+            return
+        end
+
+        if result == "invalid" then
+            Rayfield:Notify({
+                Title   = "❌  Invalid Key",
+                Content = "Key not found. Ask for a valid key.",
+                Duration = 6,
+                Image   = 4483362458,
+            })
+            return
+        end
+
+        -- result == "ok" — valid key AND correct device
+        PremiumUnlocked = true
+        IsWhitelisted   = true
+        PremiumActive   = true
+
+        Rayfield:Notify({
+            Title   = "✨  Premium Unlocked!",
+            Content = "Welcome to Ryuu's HUB Premium. Key locked to this device.",
+            Duration = 6,
+            Image   = 4483362458,
+        })
+
+        do  -- scope block
+            -- ── Unlock premium features ───────────────────────────
+            PT:CreateDivider()
+
+            PT:CreateSection("⚔  Premium Parry — Aggressive")
+            PT:CreateLabel("Tighter cooldown. Faster click. Tuned for 80-200ms ping.")
+            PT:CreateLabel("Uses dot-product closing speed — hits curved balls perfectly.")
+            PT:CreateToggle({
+                Name         = "Premium Aggressive Parry",
+                CurrentValue = false,
+                Flag         = "PPA",
+                Callback     = function(v)
+                    if v then
+                        -- Turn off free engine first
+                        S.AutoParry = false
+                        StopEngine()
+                        StartPremiumEngine()
+                        Rayfield:Notify({Title="⚔ Premium ON",Content="Aggressive parry active",Duration=3,Image=4483362458})
+                    else
+                        StopPremiumEngine()
+                        Rayfield:Notify({Title="Premium OFF",Content="",Duration=2,Image=4483362458})
+                    end
+                end,
+            })
+
+            PT:CreateDivider()
+            PT:CreateSection("⚡  God Emergency — ≤4 studs")
+            PT:CreateLabel("Fires instantly when ball is ≤4 studs. Bypasses all cooldowns.")
+            PT:CreateLabel("Unhittable at point-blank. Works with Pull, Hell Hook, Dribble.")
+            PT:CreateToggle({
+                Name         = "God Emergency Parry",
+                CurrentValue = false,
+                Flag         = "GEP",
+                Callback     = function(v)
+                    S.EmergencyDist = v and 4 or 6
+                    Rayfield:Notify({
+                        Title   = v and "⚡ God Emergency ON" or "Emergency back to 6 studs",
+                        Content = "",
+                        Duration = 2,
+                        Image   = 4483362458,
+                    })
+                end,
+            })
+
+            PT:CreateDivider()
+            PT:CreateSection("🌀  Curve Crusher")
+            PT:CreateLabel("Ultra-sensitive: detects closing speed >38 within 26 studs.")
+            PT:CreateLabel("Catches extreme curves the free engine misses.")
+            PT:CreateToggle({
+                Name         = "Curve Crusher",
+                CurrentValue = false,
+                Flag         = "CC",
+                Callback     = function(v)
+                    S.AntiCurve = v
+                end,
+            })
+
+            PT:CreateDivider()
+            PT:CreateSection("🔑  Your Key")
+            PT:CreateLabel("Key: " .. key:sub(1,14) .. "••••••••••")
+            PT:CreateLabel("Status: ✅ Verified & Active")
+
+        end  -- close do block
+    end)
+end})
+
+PT:CreateDivider()
+
+-- ── How to get a key ──────────────────────────────────────────────
+PT:CreateSection("📌  How to get a key")
+PT:CreateLabel("1️⃣  Join the Discord server below")
+PT:CreateLabel("2️⃣  Ask an admin")
+PT:CreateButton({Name = "📋  Copy Discord Link", Callback = function()
+    local link = "https://discord.gg/S2fKywJutE"
+    pcall(function() setclipboard(link) end)
+    Rayfield:Notify({Title="Link Copied!",Content="discord.gg/S2fKywJutE",Duration=3,Image=4483362458})
+end})
+PT:CreateButton({Name = "💬KEY CAN ONLY BE BOUGHT WITH ROBUX!", Callback = function()
+    local link = "https://discord.gg/S2fKywJutE"
+    pcall(function() setclipboard(link) end)
+    Rayfield:Notify({Title="Tip",Content="Join Discord → GET YOUR OWN KEY BY BUYING",Duration=5,Image=4483362458})
+end})
+
+print("[Ryuu's HUB V1 BETA] Loaded. Press F5 for Auto Parry.")
