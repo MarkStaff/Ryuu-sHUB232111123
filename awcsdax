@@ -349,9 +349,10 @@ local S = {
 --   Make keys hard to guess: "RYUU-X9K2-M3P7-BLADE"
 -- ══════════════════════════════════════════════════════════════════
 local VALID_KEYS = {
-    "RYUU-KEY1-CHANGEME",
-    "RYUU-KEY2-CHANGEME",
-    "RYUU-KEY3-CHANGEME",
+    "RYUU-KEY1434s9df9sdfsdf",
+    "RYUU-KEY1a0da90sdacsdaasdx",
+    "RYUU-KEY2o3i4j2o3232sxasdv",
+    "09153552478",
 }
 local IsWhitelisted = false
 local PremiumActive = false
