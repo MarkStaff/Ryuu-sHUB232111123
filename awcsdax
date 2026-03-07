@@ -544,9 +544,21 @@ local function StartEngine()
         local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
 
+        -- ANTI PRE-CLICK: only fire if ball is getting closer (dist shrinking)
+        -- Uses last stored position to confirm ball is closing, not retreating.
+        if PrevBallPos ~= nil and Speed > 1 then
+            local prevDist = (HPos - PrevBallPos).Magnitude
+            if Dist >= prevDist - 0.01 then
+                -- ball not closing — update pos but don't fire yet
+                PrevBallPos = BPos; PrevBallTime = now
+                pushFreeHist(Dist, now)
+                return
+            end
+        end
+
         -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 10.0 then FireParry() end
+            if Dist <= 11.0 then FireParry() end
             return
         end
 
@@ -564,8 +576,8 @@ local function StartEngine()
         end
 
         -- FIX 2+3: Full ping compensation, bigger hitbox
-        local hbox = 10.0  -- LATE FIX: bumped to 10
-        local pingComp = (PingMs / 500) * effectiveSpeed  -- FIX 2: was /2000
+        local hbox = 11.0
+        local pingComp = (PingMs / 1000) * effectiveSpeed  -- FIX 2: was /2000
         local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
@@ -589,7 +601,7 @@ local function StartEngine()
         if S.AntiCurve then
             local sc = smoothFreeClosing(Dist, now)
             if sc > 2 then  -- FIX 4
-                local curveFireAt = hbox + (PingMs / 500) * sc
+                local curveFireAt = hbox + (PingMs / 1000) * sc
                 if Dist <= curveFireAt then
                     FireParry()
                 end
@@ -762,6 +774,16 @@ local function StartPremiumEngine()
         if not isTgt then posHist={}; speedHist={}; posHistQuad={}; return end
         if S.DidParry then return end
 
+        -- ANTI PRE-CLICK: only fire if ball is actually closing in on player
+        if #posHist >= 2 then
+            local prev = posHist[#posHist]
+            local prevDist = prev.d
+            if Dist >= prevDist - 0.01 and Speed > 1 then
+                pushHist(Dist, now); pushQuadHist(BPos, now)
+                return
+            end
+        end
+
         -- Slow/stationary ball
         if Speed < 1 then
             if Dist <= 12.0 then PremiumFire() end
@@ -784,7 +806,7 @@ local function StartPremiumEngine()
 
         -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
         local hbox = P.HitboxTarget or 12.0
-        local pingComp = (PingMin / 500) * effectiveSpeed  -- adaptive min ping
+        local pingComp = (PingMin / 1000) * effectiveSpeed  -- adaptive min ping
         local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
@@ -804,7 +826,7 @@ local function StartPremiumEngine()
         if P.CurveCrusher or S.AntiCurve then
             local sc = smoothClosing(Dist, now)
             if sc > 1.5 then
-                local curveFireAt = hbox + (PingMin / 500) * sc
+                local curveFireAt = hbox + (PingMin / 1000) * sc
                 if Dist <= curveFireAt then
                     PremiumFire(); return
                 end
@@ -2149,3 +2171,240 @@ PT:CreateButton({Name="Check Premium Status", Callback=function()
         Rayfield:Notify({Title="🔒 Not Unlocked",Content="Enter your key above.",Duration=4,Image=4483362458})
     end
 end})
+
+PT:CreateDivider()
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM ABILITY ESP ◈ Clean + Performance Optimised
+-- ══════════════════════════════════════════════════════════════════
+local PremAbilityBBs    = {}
+local PremAbilityRunning = false
+
+local TIER_COLORS = {
+    S = Color3.fromRGB(255, 60, 220),
+    A = Color3.fromRGB(255, 130, 30),
+    B = Color3.fromRGB(80,  220, 120),
+    C = Color3.fromRGB(255, 220, 40),
+    D = Color3.fromRGB(160, 160, 160),
+}
+
+-- Ability icon image IDs. 0 = no image yet, shows tier letter fallback.
+-- The auto-scanner below tries to find real IDs from the game at runtime.
+local ABILITY_IMAGES = {
+    ["Infinity"]=0,["Time Hole"]=0,["Slash of Duality"]=0,["Dribble"]=0,
+    ["Dragon Spirit"]=0,["Pull"]=0,["Guardian Angel"]=0,["Reaper"]=0,
+    ["Slashes of Fury"]=0,["Forcefield"]=0,["Bunny Leap"]=0,
+    ["Calming Deflection"]=0,["Singularity"]=0,["Invisibility"]=0,
+    ["Titan Blade"]=0,["Scopophobia"]=0,["Blade Trap"]=0,["Golden Ball"]=0,
+    ["Continuity Zero"]=0,["Death Slash"]=0,["Phantom"]=0,["Swap"]=0,
+    ["Doppelganger"]=0,["Necromancer"]=0,["Serpent Shadow Clone"]=0,
+    ["Phase Bypass"]=0,["Hell Hook"]=0,["Blink"]=0,["Qi-Charge"]=0,
+    ["Telekinesis"]=0,["Aerodynamic Slash"]=0,["Rapture"]=0,
+    ["Thunder Dash"]=0,["Flash Counter"]=0,["Absolute Confidence"]=0,
+    ["Pulse"]=0,["Bounty"]=0,["Luck"]=0,["Decrypted Clone"]=0,
+    ["Raging Deflection"]=0,["Tact"]=0,["Waypoint"]=0,["Misfortune"]=0,
+    ["Freeze"]=0,["Shadow Step"]=0,["Quantum Arena"]=0,["Force"]=0,
+    ["Dash"]=0,["Wind Cloak"]=0,["Quasar"]=0,["Chieftain's Totem"]=0,
+    ["Freeze Trap"]=0,["Martyrdom"]=0,["Platform"]=0,
+    ["Super Jump"]=0,["Quad Jump"]=0,
+}
+
+-- Auto-scan the game for ability icon images at runtime
+task.spawn(function()
+    task.wait(3)
+    local function scan(root)
+        pcall(function()
+            for _, obj in ipairs(root:GetDescendants()) do
+                if (obj:IsA("ImageLabel") or obj:IsA("ImageButton")) and obj.Image ~= "" then
+                    local id = tonumber(obj.Image:match("rbxassetid://(%d+)"))
+                    if id and id > 0 then
+                        local p = obj.Parent
+                        while p and p ~= root do
+                            if ABILITY_IMAGES[p.Name] == 0 then
+                                ABILITY_IMAGES[p.Name] = id
+                            end
+                            p = p.Parent
+                        end
+                    end
+                end
+            end
+        end)
+    end
+    scan(game:GetService("ReplicatedStorage"))
+    scan(workspace)
+    pcall(function() scan(game:GetService("StarterGui")) end)
+end)
+
+local function PremBuildBB(plr)
+    if not (plr and plr.Character) then return end
+    local head = plr.Character:FindFirstChild("Head"); if not head then return end
+    local old = PremAbilityBBs[plr]
+    if old and old.bb and old.bb.Parent then pcall(function() old.bb:Destroy() end) end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name="RyuuPremAbilESP"; bb.AlwaysOnTop=true
+    bb.Size=UDim2.new(0,148,0,44); bb.StudsOffset=Vector3.new(0,3.2,0)
+    bb.MaxDistance=80; bb.ClipsDescendants=false; bb.Parent=head
+
+    local bg=Instance.new("Frame",bb)
+    bg.Size=UDim2.new(1,0,1,0); bg.BackgroundColor3=Color3.fromRGB(6,4,14)
+    bg.BackgroundTransparency=0.08; bg.BorderSizePixel=0
+    Instance.new("UICorner",bg).CornerRadius=UDim.new(0,10)
+    local stroke=Instance.new("UIStroke",bg)
+    stroke.Name="S"; stroke.Thickness=1.2
+    stroke.Color=Color3.fromRGB(60,30,110); stroke.Transparency=0
+
+    local nL=Instance.new("TextLabel",bg); nL.Name="N"
+    nL.Size=UDim2.new(1,-52,0,16); nL.Position=UDim2.new(0,4,0,3)
+    nL.BackgroundTransparency=1; nL.Text=plr.Name
+    nL.TextColor3=Color3.fromRGB(130,120,160); nL.Font=Enum.Font.Gotham
+    nL.TextSize=10; nL.TextXAlignment=Enum.TextXAlignment.Left
+    nL.TextTruncate=Enum.TextTruncate.AtEnd
+
+    local aL=Instance.new("TextLabel",bg); aL.Name="A"
+    aL.Size=UDim2.new(1,-52,0,18); aL.Position=UDim2.new(0,4,0,21)
+    aL.BackgroundTransparency=1; aL.Text="—"
+    aL.TextColor3=Color3.fromRGB(180,180,200); aL.Font=Enum.Font.GothamBold
+    aL.TextSize=12; aL.TextXAlignment=Enum.TextXAlignment.Left
+    aL.TextTruncate=Enum.TextTruncate.AtEnd
+
+    -- Icon badge: 36x36 square, shows ability image or tier letter fallback
+    local ib=Instance.new("Frame",bg); ib.Name="IB"
+    ib.Size=UDim2.new(0,36,0,36); ib.Position=UDim2.new(1,-40,0.5,-18)
+    ib.BackgroundColor3=Color3.fromRGB(18,10,36); ib.BorderSizePixel=0
+    Instance.new("UICorner",ib).CornerRadius=UDim.new(0,7)
+    local iStroke=Instance.new("UIStroke",ib)
+    iStroke.Name="IS"; iStroke.Thickness=1.2; iStroke.Color=Color3.fromRGB(80,40,160)
+
+    local img=Instance.new("ImageLabel",ib); img.Name="IMG"
+    img.Size=UDim2.new(1,-4,1,-4); img.Position=UDim2.new(0,2,0,2)
+    img.BackgroundTransparency=1; img.Image=""
+    img.ScaleType=Enum.ScaleType.Fit; img.ImageTransparency=1
+    Instance.new("UICorner",img).CornerRadius=UDim.new(0,5)
+
+    local tf=Instance.new("TextLabel",ib); tf.Name="TF"
+    tf.Size=UDim2.new(1,0,1,0); tf.BackgroundTransparency=1
+    tf.Text="?"; tf.TextColor3=Color3.fromRGB(160,90,255)
+    tf.Font=Enum.Font.GothamBlack; tf.TextSize=14
+
+    PremAbilityBBs[plr]={bb=bb, lastAbility="__NONE__"}
+end
+
+local function PremRefreshBB(plr)
+    if not (plr and plr.Character) then return end
+    local entry=PremAbilityBBs[plr]; if not entry then return end
+    local head=plr.Character:FindFirstChild("Head"); if not head then return end
+    if not entry.bb or not entry.bb.Parent or entry.bb.Parent~=head then
+        PremBuildBB(plr); entry=PremAbilityBBs[plr]; if not entry then return end
+    end
+    local abilityName=ScanAbility(plr)
+    local displayName=abilityName or "No Ability"
+    if entry.lastAbility==displayName then return end
+    entry.lastAbility=displayName
+
+    local bg=entry.bb:FindFirstChildOfClass("Frame"); if not bg then return end
+    local aL=bg:FindFirstChild("A"); if not aL then return end
+    local sk=bg:FindFirstChild("S")
+    local ib=bg:FindFirstChild("IB"); if not ib then return end
+    local img=ib:FindFirstChild("IMG")
+    local tf=ib:FindFirstChild("TF")
+    local iSk=ib:FindFirstChild("IS")
+
+    local data=abilityName and BB_ABILITIES[abilityName]
+    if data then
+        local tc=TIER_COLORS[data.tier] or Color3.fromRGB(160,90,255)
+        local warn=data.warn
+        aL.Text=(warn and "⚠ " or "")..abilityName
+        aL.TextColor3=warn and Color3.fromRGB(255,70,70) or tc
+        if sk then sk.Color=warn and Color3.fromRGB(200,40,40)
+            or Color3.fromRGB(math.floor(tc.R*128),math.floor(tc.G*128),math.floor(tc.B*128)) end
+        if iSk then iSk.Color=warn and Color3.fromRGB(200,40,40) or tc end
+        -- Show image or tier letter
+        local imgId=ABILITY_IMAGES[abilityName]
+        if imgId and imgId>0 then
+            if img then img.Image="rbxassetid://"..imgId; img.ImageTransparency=0
+                img.ImageColor3=warn and Color3.fromRGB(255,180,180) or Color3.new(1,1,1) end
+            if tf then tf.Visible=false end
+        else
+            if img then img.ImageTransparency=1 end
+            if tf then tf.Visible=true; tf.Text=data.tier
+                tf.TextColor3=warn and Color3.fromRGB(255,100,100) or tc end
+        end
+    else
+        aL.Text=abilityName or "No Ability"; aL.TextColor3=Color3.fromRGB(80,75,100)
+        if sk then sk.Color=Color3.fromRGB(30,18,55) end
+        if img then img.ImageTransparency=1 end
+        if iSk then iSk.Color=Color3.fromRGB(50,30,90) end
+        if tf then tf.Visible=true; tf.Text="?"; tf.TextColor3=Color3.fromRGB(80,75,100) end
+    end
+end
+
+
+local function StartPremAbilityESP()
+    PremAbilityRunning = true
+    -- Build boards for everyone already in
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character then PremBuildBB(p) end
+    end
+    -- Single shared polling loop — much cheaper than per-player loops
+    task.spawn(function()
+        while PremAbilityRunning do
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= Plr then
+                    PremRefreshBB(p)
+                end
+            end
+            -- Prune players who left
+            for p, entry in pairs(PremAbilityBBs) do
+                if not p.Parent then
+                    pcall(function() if entry.bb and entry.bb.Parent then entry.bb:Destroy() end end)
+                    PremAbilityBBs[p] = nil
+                end
+            end
+            task.wait(0.6)  -- lighter interval than free's 0.4
+        end
+    end)
+    -- Hook new players / respawns
+    Players.PlayerAdded:Connect(function(p)
+        if not PremAbilityRunning then return end
+        p.CharacterAdded:Connect(function()
+            task.wait(0.4)
+            if PremAbilityRunning then PremBuildBB(p) end
+        end)
+    end)
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr then
+            p.CharacterAdded:Connect(function()
+                task.wait(0.4)
+                if PremAbilityRunning then PremBuildBB(p) end
+            end)
+        end
+    end
+end
+
+local function StopPremAbilityESP()
+    PremAbilityRunning = false
+    for _, entry in pairs(PremAbilityBBs) do
+        pcall(function() if entry.bb and entry.bb.Parent then entry.bb:Destroy() end end)
+    end
+    PremAbilityBBs = {}
+end
+
+-- ── Premium tab toggle ────────────────────────────────────────────
+PT:CreateSection("👁 Premium Ability ESP")
+PT:CreateLabel("Cleaner cards · Dirty-flag updates · No frame drops")
+PT:CreateLabel("⚠ Red border = dangerous ability targeting you")
+PT:CreateToggle({Name="Premium Ability ESP", CurrentValue=false, Flag="PAESP",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        if v then
+            StartPremAbilityESP()
+            Rayfield:Notify({Title="👁 Ability ESP ON",Content="Clean cards active.",Duration=3,Image=4483362458})
+        else
+            StopPremAbilityESP()
+            Rayfield:Notify({Title="👁 Ability ESP OFF",Content="Cards removed.",Duration=2,Image=4483362458})
+        end
+    end})
