@@ -55,298 +55,130 @@ end)
 if not IntroSG.Parent then
     pcall(function() IntroSG.Parent = Plr:WaitForChild("PlayerGui") end)
 end
--- ── Fullscreen dark bg ──────────────────────────────────────────
+-- ── Background ─────────────────────────────────────────────────
 local IBG = Instance.new("Frame", IntroSG)
 IBG.Size = UDim2.new(1,0,1,0)
-IBG.BackgroundColor3 = Color3.fromRGB(2,1,6)
+IBG.BackgroundColor3 = Color3.fromRGB(3,1,8)
 IBG.BorderSizePixel = 0
 
--- ── Outer glow vignette ─────────────────────────────────────────
-local Vig = Instance.new("Frame", IBG)
-Vig.Size = UDim2.new(1,0,1,0)
-Vig.BackgroundTransparency = 1
-Vig.BorderSizePixel = 0
-Vig.ZIndex = 2
-local VigGrad = Instance.new("UIGradient", Vig)
-VigGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(80,20,180)),
-    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(20,5,50)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-}
-VigGrad.Rotation = 45
-
--- ── Outer ring — large circle ────────────────────────────────────
-local ORing = Instance.new("Frame", IBG)
-ORing.AnchorPoint = Vector2.new(0.5,0.5)
-ORing.Position = UDim2.new(0.5,0,0.5,-20)
-ORing.Size = UDim2.new(0,0,0,0)
-ORing.BackgroundTransparency = 1
-ORing.BorderSizePixel = 0
-ORing.ZIndex = 3
-Instance.new("UICorner", ORing).CornerRadius = UDim.new(1,0)
-local ORingStroke = Instance.new("UIStroke", ORing)
-ORingStroke.Thickness = 1.5
-ORingStroke.Color = Color3.fromRGB(110,30,220)
-ORingStroke.Transparency = 0
+-- ── Ring ─────────────────────────────────────────────────────────
+local Ring = Instance.new("Frame", IBG)
+Ring.AnchorPoint = Vector2.new(0.5,0.5)
+Ring.Position = UDim2.new(0.5,0,0.46,0)
+Ring.Size = UDim2.new(0,0,0,0)
+Ring.BackgroundTransparency = 1
+Ring.BorderSizePixel = 0
+Ring.ZIndex = 2
+Instance.new("UICorner", Ring).CornerRadius = UDim.new(1,0)
+local RingStroke = Instance.new("UIStroke", Ring)
+RingStroke.Thickness = 1.5
+RingStroke.Color = Color3.fromRGB(130,50,255)
 
 -- ── Inner ring ───────────────────────────────────────────────────
-local IRing = Instance.new("Frame", IBG)
-IRing.AnchorPoint = Vector2.new(0.5,0.5)
-IRing.Position = UDim2.new(0.5,0,0.5,-20)
-IRing.Size = UDim2.new(0,0,0,0)
-IRing.BackgroundTransparency = 1
-IRing.BorderSizePixel = 0
-IRing.ZIndex = 3
-Instance.new("UICorner", IRing).CornerRadius = UDim.new(1,0)
-local IRingStroke = Instance.new("UIStroke", IRing)
-IRingStroke.Thickness = 1
-IRingStroke.Color = Color3.fromRGB(160,60,255)
-IRingStroke.Transparency = 0.3
+local Ring2 = Instance.new("Frame", IBG)
+Ring2.AnchorPoint = Vector2.new(0.5,0.5)
+Ring2.Position = UDim2.new(0.5,0,0.46,0)
+Ring2.Size = UDim2.new(0,0,0,0)
+Ring2.BackgroundTransparency = 1
+Ring2.BorderSizePixel = 0
+Ring2.ZIndex = 2
+Instance.new("UICorner", Ring2).CornerRadius = UDim.new(1,0)
+local Ring2Stroke = Instance.new("UIStroke", Ring2)
+Ring2Stroke.Thickness = 1
+Ring2Stroke.Color = Color3.fromRGB(180,90,255)
+Ring2Stroke.Transparency = 0.4
 
--- ── Dragon arc 1 (top-left sweep) ────────────────────────────────
-local Arc1 = Instance.new("Frame", IBG)
-Arc1.AnchorPoint = Vector2.new(0.5,0.5)
-Arc1.Position = UDim2.new(0.5,0,0.5,-20)
-Arc1.Size = UDim2.new(0,280,0,280)
-Arc1.BackgroundTransparency = 1
-Arc1.BorderSizePixel = 0
-Arc1.ZIndex = 4
-Arc1.Rotation = -40
-Instance.new("UICorner", Arc1).CornerRadius = UDim.new(1,0)
-local Arc1Stroke = Instance.new("UIStroke", Arc1)
-Arc1Stroke.Thickness = 2.5
-Arc1Stroke.Color = Color3.fromRGB(160,60,255)
-Arc1Stroke.Transparency = 0
-local Arc1Grad = Instance.new("UIGradient", Arc1Stroke)
-Arc1Grad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(160,60,255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-}
-
--- ── Dragon arc 2 (bottom-right sweep) ────────────────────────────
-local Arc2 = Instance.new("Frame", IBG)
-Arc2.AnchorPoint = Vector2.new(0.5,0.5)
-Arc2.Position = UDim2.new(0.5,0,0.5,-20)
-Arc2.Size = UDim2.new(0,220,0,220)
-Arc2.BackgroundTransparency = 1
-Arc2.BorderSizePixel = 0
-Arc2.ZIndex = 4
-Arc2.Rotation = 140
-Instance.new("UICorner", Arc2).CornerRadius = UDim.new(1,0)
-local Arc2Stroke = Instance.new("UIStroke", Arc2)
-Arc2Stroke.Thickness = 2
-Arc2Stroke.Color = Color3.fromRGB(130,40,220)
-Arc2Stroke.Transparency = 0.2
-
--- ── Dragon arc 3 (inner coil) ─────────────────────────────────────
-local Arc3 = Instance.new("Frame", IBG)
-Arc3.AnchorPoint = Vector2.new(0.5,0.5)
-Arc3.Position = UDim2.new(0.5,0,0.5,-20)
-Arc3.Size = UDim2.new(0,160,0,160)
-Arc3.BackgroundTransparency = 1
-Arc3.BorderSizePixel = 0
-Arc3.ZIndex = 4
-Arc3.Rotation = 60
-Instance.new("UICorner", Arc3).CornerRadius = UDim.new(1,0)
-local Arc3Stroke = Instance.new("UIStroke", Arc3)
-Arc3Stroke.Thickness = 1.5
-Arc3Stroke.Color = Color3.fromRGB(200,100,255)
-Arc3Stroke.Transparency = 0.4
-
--- ── Vertical energy spike (the sword line in the logo) ────────────
-local Spike = Instance.new("Frame", IBG)
-Spike.AnchorPoint = Vector2.new(0.5,0.5)
-Spike.Position = UDim2.new(0.5,0,0.5,-20)
-Spike.Size = UDim2.new(0,2,0,0)
-Spike.BackgroundColor3 = Color3.fromRGB(220,160,255)
-Spike.BorderSizePixel = 0
-Spike.ZIndex = 6
-local SpikeGrad = Instance.new("UIGradient", Spike)
-SpikeGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255)),
-}
-SpikeGrad.Rotation = 90
-
--- Spike glow halo
-local SpikeGlow = Instance.new("Frame", IBG)
-SpikeGlow.AnchorPoint = Vector2.new(0.5,0.5)
-SpikeGlow.Position = UDim2.new(0.5,0,0.5,-20)
-SpikeGlow.Size = UDim2.new(0,12,0,0)
-SpikeGlow.BackgroundColor3 = Color3.fromRGB(120,40,220)
-SpikeGlow.BackgroundTransparency = 0.6
-SpikeGlow.BorderSizePixel = 0
-SpikeGlow.ZIndex = 5
-local SpikeGlowGrad = Instance.new("UIGradient", SpikeGlow)
-SpikeGlowGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160,60,255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-}
-SpikeGlowGrad.Rotation = 90
-
--- ── Centre energy orb ────────────────────────────────────────────
+-- ── Centre orb ───────────────────────────────────────────────────
 local Orb = Instance.new("Frame", IBG)
 Orb.AnchorPoint = Vector2.new(0.5,0.5)
-Orb.Position = UDim2.new(0.5,0,0.5,-20)
+Orb.Position = UDim2.new(0.5,0,0.46,0)
 Orb.Size = UDim2.new(0,0,0,0)
-Orb.BackgroundColor3 = Color3.fromRGB(160,60,255)
-Orb.BackgroundTransparency = 0.2
+Orb.BackgroundColor3 = Color3.fromRGB(150,60,255)
+Orb.BackgroundTransparency = 0.3
 Orb.BorderSizePixel = 0
-Orb.ZIndex = 5
+Orb.ZIndex = 3
 Instance.new("UICorner", Orb).CornerRadius = UDim.new(1,0)
-local OrbGrad = Instance.new("UIGradient", Orb)
-OrbGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,220,255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160,60,255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(40,10,100)),
-}
-OrbGrad.Rotation = 45
 
 -- ── RYUU title ───────────────────────────────────────────────────
 local ITitle = Instance.new("TextLabel", IBG)
 ITitle.AnchorPoint = Vector2.new(0.5,0.5)
-ITitle.Position = UDim2.new(0.5,0,0.5,70)
-ITitle.Size = UDim2.new(0,300,0,60)
+ITitle.Position = UDim2.new(0.5,0,0.52,0)
+ITitle.Size = UDim2.new(0,300,0,70)
 ITitle.BackgroundTransparency = 1
 ITitle.Text = "RYUU"
 ITitle.Font = Enum.Font.GothamBlack
-ITitle.TextSize = 58
+ITitle.TextSize = 62
 ITitle.TextColor3 = Color3.fromRGB(255,255,255)
 ITitle.TextTransparency = 1
-ITitle.ZIndex = 7
+ITitle.ZIndex = 4
 local ITG = Instance.new("UIGradient", ITitle)
 ITG.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0,  Color3.fromRGB(200,120,255)),
-    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(1,  Color3.fromRGB(200,120,255)),
+    ColorSequenceKeypoint.new(0,  Color3.fromRGB(180,90,255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(1,  Color3.fromRGB(180,90,255)),
 }
 ITG.Rotation = 90
 
--- ── — SCRIPT — subtitle ──────────────────────────────────────────
+-- ── Subtitle ─────────────────────────────────────────────────────
 local ISub = Instance.new("TextLabel", IBG)
 ISub.AnchorPoint = Vector2.new(0.5,0.5)
-ISub.Position = UDim2.new(0.5,0,0.5,124)
-ISub.Size = UDim2.new(0,280,0,20)
+ISub.Position = UDim2.new(0.5,0,0.62,0)
+ISub.Size = UDim2.new(0,260,0,20)
 ISub.BackgroundTransparency = 1
-ISub.Text = "— H U B —"
+ISub.Text = "— S C R I P T —"
 ISub.Font = Enum.Font.GothamBold
-ISub.TextSize = 12
-ISub.TextColor3 = Color3.fromRGB(160,100,255)
+ISub.TextSize = 11
+ISub.TextColor3 = Color3.fromRGB(150,90,255)
 ISub.TextTransparency = 1
-ISub.ZIndex = 7
-ISub.TextLetterSpacing = 3
+ISub.ZIndex = 4
 
 -- ── Loading label ─────────────────────────────────────────────────
 local ILbl = Instance.new("TextLabel", IBG)
 ILbl.AnchorPoint = Vector2.new(0.5,0.5)
-ILbl.Position = UDim2.new(0.5,0,0.5,154)
+ILbl.Position = UDim2.new(0.5,0,0.72,0)
 ILbl.Size = UDim2.new(0,200,0,18)
 ILbl.BackgroundTransparency = 1
 ILbl.Text = "Loading..."
 ILbl.Font = Enum.Font.Gotham
 ILbl.TextSize = 11
-ILbl.TextColor3 = Color3.fromRGB(100,60,180)
-ILbl.TextTransparency = 0
-ILbl.ZIndex = 7
+ILbl.TextColor3 = Color3.fromRGB(90,55,160)
+ILbl.ZIndex = 4
 
--- ── V1 BETA tag ──────────────────────────────────────────────────
-local IYear = Instance.new("TextLabel", IBG)
-IYear.AnchorPoint = Vector2.new(0.5,1)
-IYear.Position = UDim2.new(0.5,0,1,-16)
-IYear.Size = UDim2.new(0,200,0,14)
-IYear.BackgroundTransparency = 1
-IYear.Text = "V1 BETA"
-IYear.Font = Enum.Font.Gotham
-IYear.TextSize = 10
-IYear.TextColor3 = Color3.fromRGB(70,40,120)
-IYear.ZIndex = 7
+-- ── IStroke alias (used by post-load READY pulse) ─────────────────
+local IStroke = RingStroke
 
--- ── IStroke alias so the original post-load code still works ─────
-local IStroke = ORingStroke  -- reuse outer ring stroke for READY pulse
+-- ── Run animation ─────────────────────────────────────────────────
+-- Phase 1: orb pops, ring expands (sequential, reliable)
+TweenService:Create(Orb, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Size=UDim2.new(0,50,0,50)}):Play()
+TweenService:Create(Ring, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Size=UDim2.new(0,260,0,260)}):Play()
+task.wait(0.1)
+TweenService:Create(Ring2, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Size=UDim2.new(0,200,0,200)}):Play()
+TweenService:Create(Orb, TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+    {Size=UDim2.new(0,20,0,20), BackgroundTransparency=0.7}):Play()
+task.wait(0.25)
 
--- ── ANIMATE INTRO ─────────────────────────────────────────────────
+-- Phase 2: RYUU slams in
+ITitle.Position = UDim2.new(0.5,0,0.56,0)
+TweenService:Create(ITitle, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Position=UDim2.new(0.5,0,0.52,0), TextTransparency=0}):Play()
+task.wait(0.18)
+
+-- Phase 3: subtitle fades in
+TweenService:Create(ISub, TweenInfo.new(0.25), {TextTransparency=0}):Play()
+
+-- Gentle ring pulse while loading
 task.spawn(function()
-    -- Phase 1: spike shoots down (0.0s)
-    TweenService:Create(Spike, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,2,0,340)}):Play()
-    TweenService:Create(SpikeGlow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,12,0,340)}):Play()
-    task.wait(0.18)
-
-    -- Phase 2: outer ring expands
-    TweenService:Create(ORing, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,320,0,320)}):Play()
-    task.wait(0.07)
-    TweenService:Create(IRing, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,260,0,260)}):Play()
-    task.wait(0.07)
-
-    -- Phase 3: dragon arcs spin in
-    Arc1.Rotation = -140
-    TweenService:Create(Arc1, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Rotation=-40, Size=UDim2.new(0,280,0,280)}):Play()
-    Arc1Stroke.Transparency = 1
-    TweenService:Create(Arc1Stroke, TweenInfo.new(0.4), {Transparency=0}):Play()
-    task.wait(0.08)
-    Arc2.Rotation = 40
-    TweenService:Create(Arc2, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Rotation=140, Size=UDim2.new(0,220,0,220)}):Play()
-    Arc2Stroke.Transparency = 1
-    TweenService:Create(Arc2Stroke, TweenInfo.new(0.4), {Transparency=0.2}):Play()
-    task.wait(0.06)
-    Arc3.Rotation = -60
-    TweenService:Create(Arc3, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Rotation=60, Size=UDim2.new(0,160,0,160)}):Play()
-    Arc3Stroke.Transparency = 1
-    TweenService:Create(Arc3Stroke, TweenInfo.new(0.3), {Transparency=0.4}):Play()
-
-    -- Phase 4: energy orb pulses
-    TweenService:Create(Orb, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,60,0,60)}):Play()
-    task.wait(0.25)
-    TweenService:Create(Orb, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,30,0,30), BackgroundTransparency=0.6}):Play()
-
-    -- Phase 5: RYUU slams in
-    ITitle.Position = UDim2.new(0.5,0,0.5,100)
-    TweenService:Create(ITitle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Position=UDim2.new(0.5,0,0.5,70), TextTransparency=0}):Play()
-    task.wait(0.12)
-
-    -- Phase 6: subtitle fades in
-    TweenService:Create(ISub, TweenInfo.new(0.3), {TextTransparency=0}):Play()
-
-    -- Phase 7: gentle arc rotation loop
-    task.spawn(function()
-        while IntroSG and IntroSG.Parent do
-            TweenService:Create(Arc1, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {Rotation=-20}):Play()
-            TweenService:Create(Arc2, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {Rotation=160}):Play()
-            task.wait(3)
-            TweenService:Create(Arc1, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {Rotation=-40}):Play()
-            TweenService:Create(Arc2, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {Rotation=140}):Play()
-            task.wait(3)
-        end
-    end)
-
-    -- Phase 8: spike glow pulse
-    task.spawn(function()
-        while IntroSG and IntroSG.Parent do
-            TweenService:Create(SpikeGlow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {BackgroundTransparency=0.85}):Play()
-            task.wait(0.8)
-            TweenService:Create(SpikeGlow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                {BackgroundTransparency=0.45}):Play()
-            task.wait(0.8)
-        end
-    end)
+    while IntroSG and IntroSG.Parent do
+        TweenService:Create(RingStroke, TweenInfo.new(1, Enum.EasingStyle.Sine),
+            {Transparency=0.5}):Play()
+        task.wait(1)
+        TweenService:Create(RingStroke, TweenInfo.new(1, Enum.EasingStyle.Sine),
+            {Transparency=0}):Play()
+        task.wait(1)
+    end
 end)
 
 task.spawn(function()
@@ -362,6 +194,7 @@ task.spawn(function()
         task.wait(0.3)
     end
 end)
+
 local RF_URLS = {
     "https://sirius.menu/rayfield",
     "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
@@ -500,7 +333,7 @@ local S = {
 -- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
 local VALID_KEYS = {
-     "RYUU-KEY1434s9df9sdfsdf",
+    "RYUU-KEY1434s9df9sdfsdf",
     "RYUU-KEY1a0da90sdacsdaasdx",
     "RYUU-KEY2o3i4j2o3232sxasdv",
     "09153552478",
@@ -1966,141 +1799,65 @@ local function PlayUnlockAnimation()
     -- Dark overlay
     local Overlay = Instance.new("Frame", AnimSG)
     Overlay.Size = UDim2.new(1,0,1,0)
-    Overlay.BackgroundColor3 = Color3.fromRGB(2,1,6)
+    Overlay.BackgroundColor3 = Color3.fromRGB(3,1,8)
     Overlay.BackgroundTransparency = 1
     Overlay.BorderSizePixel = 0
     Overlay.ZIndex = 1
-    TweenService:Create(Overlay, TweenInfo.new(0.25), {BackgroundTransparency=0}):Play()
-    task.wait(0.3)
+    TweenService:Create(Overlay, TweenInfo.new(0.3), {BackgroundTransparency=0}):Play()
+    task.wait(0.35)
 
-    -- Outer ring burst
-    local UR1 = Instance.new("Frame", AnimSG)
-    UR1.AnchorPoint = Vector2.new(0.5,0.5)
-    UR1.Position = UDim2.new(0.5,0,0.44,0)
-    UR1.Size = UDim2.new(0,0,0,0)
-    UR1.BackgroundTransparency = 1
-    UR1.BorderSizePixel = 0
-    UR1.ZIndex = 2
-    Instance.new("UICorner", UR1).CornerRadius = UDim.new(1,0)
-    local UR1S = Instance.new("UIStroke", UR1)
-    UR1S.Thickness = 2; UR1S.Color = Color3.fromRGB(130,40,255)
-    TweenService:Create(UR1, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,380,0,380)}):Play()
-    TweenService:Create(UR1S, TweenInfo.new(0.5), {Transparency=1}):Play()
-
-    local UR2 = Instance.new("Frame", AnimSG)
-    UR2.AnchorPoint = Vector2.new(0.5,0.5)
-    UR2.Position = UDim2.new(0.5,0,0.44,0)
-    UR2.Size = UDim2.new(0,0,0,0)
-    UR2.BackgroundTransparency = 1
-    UR2.BorderSizePixel = 0
-    UR2.ZIndex = 2
-    Instance.new("UICorner", UR2).CornerRadius = UDim.new(1,0)
-    local UR2S = Instance.new("UIStroke", UR2)
-    UR2S.Thickness = 1.5; UR2S.Color = Color3.fromRGB(200,120,255)
-    task.wait(0.06)
-    TweenService:Create(UR2, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,280,0,280)}):Play()
-    TweenService:Create(UR2S, TweenInfo.new(0.5), {Transparency=1}):Play()
-
-    -- Spike shoots down
-    local USp = Instance.new("Frame", AnimSG)
-    USp.AnchorPoint = Vector2.new(0.5,0.5)
-    USp.Position = UDim2.new(0.5,0,0.44,0)
-    USp.Size = UDim2.new(0,2,0,0)
-    USp.BackgroundColor3 = Color3.fromRGB(220,160,255)
-    USp.BorderSizePixel = 0
-    USp.ZIndex = 5
-    local USpGrad = Instance.new("UIGradient", USp)
-    USpGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255)),
-    }
-    USpGrad.Rotation = 90
-    TweenService:Create(USp, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,2,0,260)}):Play()
-
-    -- Dragon arc 1
-    local UA1 = Instance.new("Frame", AnimSG)
-    UA1.AnchorPoint = Vector2.new(0.5,0.5)
-    UA1.Position = UDim2.new(0.5,0,0.44,0)
-    UA1.Size = UDim2.new(0,220,0,220)
-    UA1.BackgroundTransparency = 1
-    UA1.BorderSizePixel = 0
-    UA1.ZIndex = 4
-    UA1.Rotation = -160
-    Instance.new("UICorner", UA1).CornerRadius = UDim.new(1,0)
-    local UA1S = Instance.new("UIStroke", UA1)
-    UA1S.Thickness = 2.5; UA1S.Color = Color3.fromRGB(160,60,255); UA1S.Transparency = 1
-    local UA1SG = Instance.new("UIGradient", UA1S)
-    UA1SG.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(160,60,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-    }
-    TweenService:Create(UA1, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Rotation=-40}):Play()
-    TweenService:Create(UA1S, TweenInfo.new(0.35), {Transparency=0}):Play()
-    task.wait(0.06)
-
-    -- Dragon arc 2
-    local UA2 = Instance.new("Frame", AnimSG)
-    UA2.AnchorPoint = Vector2.new(0.5,0.5)
-    UA2.Position = UDim2.new(0.5,0,0.44,0)
-    UA2.Size = UDim2.new(0,170,0,170)
-    UA2.BackgroundTransparency = 1
-    UA2.BorderSizePixel = 0
-    UA2.ZIndex = 4
-    UA2.Rotation = 40
-    Instance.new("UICorner", UA2).CornerRadius = UDim.new(1,0)
-    local UA2S = Instance.new("UIStroke", UA2)
-    UA2S.Thickness = 2; UA2S.Color = Color3.fromRGB(130,40,220); UA2S.Transparency = 1
-    TweenService:Create(UA2, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Rotation=150}):Play()
-    TweenService:Create(UA2S, TweenInfo.new(0.35), {Transparency=0.15}):Play()
-
-    -- Centre orb implodes then explodes
-    local UOrb = Instance.new("Frame", AnimSG)
-    UOrb.AnchorPoint = Vector2.new(0.5,0.5)
-    UOrb.Position = UDim2.new(0.5,0,0.44,0)
-    UOrb.Size = UDim2.new(0,80,0,80)
-    UOrb.BackgroundColor3 = Color3.fromRGB(140,50,240)
-    UOrb.BackgroundTransparency = 0.4
-    UOrb.BorderSizePixel = 0
-    UOrb.ZIndex = 5
-    Instance.new("UICorner", UOrb).CornerRadius = UDim.new(1,0)
-    TweenService:Create(UOrb, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        {Size=UDim2.new(0,10,0,10), BackgroundTransparency=0}):Play()
-    task.wait(0.22)
-    TweenService:Create(UOrb, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,50,0,50), BackgroundTransparency=0.6}):Play()
-    task.wait(0.15)
-
-    -- RYUU title appears above card
-    local URyuu = Instance.new("TextLabel", AnimSG)
-    URyuu.AnchorPoint = Vector2.new(0.5,0.5)
-    URyuu.Position = UDim2.new(0.5,0,0.27,0)
-    URyuu.Size = UDim2.new(0,300,0,55)
-    URyuu.BackgroundTransparency = 1
-    URyuu.Text = "RYUU"
-    URyuu.Font = Enum.Font.GothamBlack
-    URyuu.TextSize = 52
-    URyuu.TextColor3 = Color3.fromRGB(255,255,255)
-    URyuu.TextTransparency = 1
-    URyuu.ZIndex = 6
-    local URyuuG = Instance.new("UIGradient", URyuu)
-    URyuuG.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0,  Color3.fromRGB(200,120,255)),
-        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(1,  Color3.fromRGB(200,120,255)),
-    }
-    URyuuG.Rotation = 90
-    URyuu.Position = UDim2.new(0.5,0,0.31,0)
-    TweenService:Create(URyuu, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Position=UDim2.new(0.5,0,0.27,0), TextTransparency=0}):Play()
+    -- Ring burst
+    local Ring = Instance.new("Frame", AnimSG)
+    Ring.AnchorPoint = Vector2.new(0.5,0.5)
+    Ring.Position = UDim2.new(0.5,0,0.42,0)
+    Ring.Size = UDim2.new(0,0,0,0)
+    Ring.BackgroundTransparency = 1
+    Ring.BorderSizePixel = 0
+    Ring.ZIndex = 2
+    Instance.new("UICorner", Ring).CornerRadius = UDim.new(1,0)
+    local RS = Instance.new("UIStroke", Ring)
+    RS.Thickness = 2; RS.Color = Color3.fromRGB(140,50,255)
+    TweenService:Create(Ring, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,240,0,240)}):Play()
     task.wait(0.1)
+
+    -- Inner ring
+    local Ring2 = Instance.new("Frame", AnimSG)
+    Ring2.AnchorPoint = Vector2.new(0.5,0.5)
+    Ring2.Position = UDim2.new(0.5,0,0.42,0)
+    Ring2.Size = UDim2.new(0,0,0,0)
+    Ring2.BackgroundTransparency = 1
+    Ring2.BorderSizePixel = 0
+    Ring2.ZIndex = 2
+    Instance.new("UICorner", Ring2).CornerRadius = UDim.new(1,0)
+    local RS2 = Instance.new("UIStroke", Ring2)
+    RS2.Thickness = 1; RS2.Color = Color3.fromRGB(200,120,255); RS2.Transparency = 0.3
+    TweenService:Create(Ring2, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,185,0,185)}):Play()
+    task.wait(0.1)
+
+    -- RYUU label
+    local RyuuLbl = Instance.new("TextLabel", AnimSG)
+    RyuuLbl.AnchorPoint = Vector2.new(0.5,0.5)
+    RyuuLbl.Position = UDim2.new(0.5,0,0.42,0)
+    RyuuLbl.Size = UDim2.new(0,260,0,60)
+    RyuuLbl.BackgroundTransparency = 1
+    RyuuLbl.Text = "RYUU"
+    RyuuLbl.Font = Enum.Font.GothamBlack
+    RyuuLbl.TextSize = 54
+    RyuuLbl.TextColor3 = Color3.fromRGB(255,255,255)
+    RyuuLbl.TextTransparency = 1
+    RyuuLbl.ZIndex = 3
+    local RG = Instance.new("UIGradient", RyuuLbl)
+    RG.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(180,90,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(180,90,255)),
+    }
+    RG.Rotation = 90
+    TweenService:Create(RyuuLbl, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {TextTransparency=0}):Play()
+    task.wait(0.2)
 
     -- Card slides up
     local Card = Instance.new("Frame", AnimSG)
@@ -2109,123 +1866,80 @@ local function PlayUnlockAnimation()
     Card.Size = UDim2.new(0,0,0,0)
     Card.BackgroundColor3 = Color3.fromRGB(10,5,24)
     Card.BorderSizePixel = 0
-    Card.ZIndex = 6
-    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,16)
-    local CardStroke = Instance.new("UIStroke", Card)
-    CardStroke.Thickness = 1.5; CardStroke.Color = Color3.fromRGB(160,60,255)
-    local CardGrad = Instance.new("UIGradient", Card)
-    CardGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(22,8,52)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10,5,24)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(22,8,52)),
-    }
-    CardGrad.Rotation = 135
-    TweenService:Create(Card, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size=UDim2.new(0,300,0,110)}):Play()
-    task.wait(0.18)
+    Card.ZIndex = 4
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,14)
+    local CS = Instance.new("UIStroke", Card)
+    CS.Thickness = 1.5; CS.Color = Color3.fromRGB(150,60,255)
+    TweenService:Create(Card, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,280,0,100)}):Play()
+    task.wait(0.2)
 
-    local Heading = Instance.new("TextLabel", Card)
-    Heading.Size = UDim2.new(1,-16,0,28)
-    Heading.Position = UDim2.new(0,8,0,14)
-    Heading.BackgroundTransparency = 1
-    Heading.Text = "PREMIUM UNLOCKED"
-    Heading.Font = Enum.Font.GothamBlack
-    Heading.TextSize = 22
-    Heading.TextTransparency = 1
-    Heading.ZIndex = 7
-    local HG = Instance.new("UIGradient", Heading)
+    -- Heading
+    local H = Instance.new("TextLabel", Card)
+    H.Size = UDim2.new(1,-16,0,26)
+    H.Position = UDim2.new(0,8,0,14)
+    H.BackgroundTransparency = 1
+    H.Text = "PREMIUM UNLOCKED"
+    H.Font = Enum.Font.GothamBlack
+    H.TextSize = 20
+    H.TextTransparency = 1
+    H.ZIndex = 5
+    local HG = Instance.new("UIGradient", H)
     HG.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(200,120,255)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(200,120,255)),
     }
-    TweenService:Create(Heading, TweenInfo.new(0.25), {TextTransparency=0}):Play()
+    TweenService:Create(H, TweenInfo.new(0.22), {TextTransparency=0}):Play()
 
-    local UDiv = Instance.new("Frame", Card)
-    UDiv.Size = UDim2.new(0.7,0,0,1)
-    UDiv.Position = UDim2.new(0.15,0,0,50)
-    UDiv.BackgroundColor3 = Color3.fromRGB(100,40,200)
-    UDiv.BorderSizePixel = 0
-    UDiv.ZIndex = 7
+    local Div = Instance.new("Frame", Card)
+    Div.Size = UDim2.new(0.7,0,0,1)
+    Div.Position = UDim2.new(0.15,0,0,48)
+    Div.BackgroundColor3 = Color3.fromRGB(100,40,200)
+    Div.BorderSizePixel = 0; Div.ZIndex = 5
 
     local Sub = Instance.new("TextLabel", Card)
     Sub.Size = UDim2.new(1,-16,0,16)
-    Sub.Position = UDim2.new(0,8,0,58)
+    Sub.Position = UDim2.new(0,8,0,56)
     Sub.BackgroundTransparency = 1
     Sub.Text = "All premium features are now active"
     Sub.Font = Enum.Font.Gotham
     Sub.TextSize = 11
-    Sub.TextColor3 = Color3.fromRGB(160,110,240)
-    Sub.TextTransparency = 1
-    Sub.ZIndex = 7
-    TweenService:Create(Sub, TweenInfo.new(0.25), {TextTransparency=0}):Play()
+    Sub.TextColor3 = Color3.fromRGB(155,100,240)
+    Sub.TextTransparency = 1; Sub.ZIndex = 5
+    TweenService:Create(Sub, TweenInfo.new(0.22), {TextTransparency=0}):Play()
 
     local Tag = Instance.new("TextLabel", Card)
-    Tag.Size = UDim2.new(1,-16,0,14)
-    Tag.Position = UDim2.new(0,8,1,-20)
+    Tag.Size = UDim2.new(1,0,0,14)
+    Tag.Position = UDim2.new(0,0,1,-18)
     Tag.BackgroundTransparency = 1
     Tag.Text = "Ryuu's HUB · V1 BETA"
     Tag.Font = Enum.Font.Gotham
     Tag.TextSize = 9
     Tag.TextColor3 = Color3.fromRGB(70,45,120)
-    Tag.TextTransparency = 1
-    Tag.ZIndex = 7
-    TweenService:Create(Tag, TweenInfo.new(0.25), {TextTransparency=0}):Play()
-
-    -- Shimmer sweep across card
-    task.wait(0.1)
-    local Shimmer = Instance.new("Frame", Card)
-    Shimmer.Size = UDim2.new(0,50,1,0)
-    Shimmer.Position = UDim2.new(-0.2,0,0,0)
-    Shimmer.BackgroundTransparency = 0.7
-    Shimmer.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    Shimmer.BorderSizePixel = 0
-    Shimmer.ZIndex = 8
-    Instance.new("UICorner", Shimmer).CornerRadius = UDim.new(0,4)
-    local ShimG = Instance.new("UIGradient", Shimmer)
-    ShimG.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-    }
-    ShimG.Rotation = 90
-    TweenService:Create(Shimmer, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-        {Position=UDim2.new(1.1,0,0,0)}):Play()
+    Tag.TextTransparency = 1; Tag.ZIndex = 5
+    TweenService:Create(Tag, TweenInfo.new(0.22), {TextTransparency=0}):Play()
 
     -- Stroke pulse
-    TweenService:Create(CardStroke, TweenInfo.new(0.2),
-        {Color=Color3.fromRGB(255,200,255), Thickness=2.5}):Play()
+    TweenService:Create(CS, TweenInfo.new(0.2), {Color=Color3.fromRGB(255,200,255), Thickness=2.5}):Play()
     task.wait(0.25)
-    TweenService:Create(CardStroke, TweenInfo.new(0.4),
-        {Color=Color3.fromRGB(160,60,255), Thickness=1.5}):Play()
-
-    -- Gentle arc rotation during hold
-    task.spawn(function()
-        TweenService:Create(UA1, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Rotation=-20}):Play()
-        TweenService:Create(UA2, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-            {Rotation=165}):Play()
-    end)
+    TweenService:Create(CS, TweenInfo.new(0.35), {Color=Color3.fromRGB(150,60,255), Thickness=1.5}):Play()
 
     task.wait(1.8)
 
-    -- Fade out everything
-    local fadeT = TweenInfo.new(0.35, Enum.EasingStyle.Quad)
-    TweenService:Create(URyuu,      fadeT, {TextTransparency=1}):Play()
-    TweenService:Create(Heading,    fadeT, {TextTransparency=1}):Play()
-    TweenService:Create(Sub,        fadeT, {TextTransparency=1}):Play()
-    TweenService:Create(Tag,        fadeT, {TextTransparency=1}):Play()
-    TweenService:Create(Card,       fadeT, {BackgroundTransparency=1}):Play()
-    TweenService:Create(CardStroke, fadeT, {Transparency=1}):Play()
-    TweenService:Create(UOrb,       fadeT, {BackgroundTransparency=1}):Play()
-    TweenService:Create(UA1S,       fadeT, {Transparency=1}):Play()
-    TweenService:Create(UA2S,       fadeT, {Transparency=1}):Play()
-    TweenService:Create(USp,        fadeT, {BackgroundTransparency=1}):Play()
-    TweenService:Create(Overlay,    TweenInfo.new(0.4), {BackgroundTransparency=1}):Play()
+    -- Fade out
+    local ft = TweenInfo.new(0.3)
+    for _, obj in ipairs({H, Sub, Tag, RyuuLbl}) do
+        TweenService:Create(obj, ft, {TextTransparency=1}):Play()
+    end
+    TweenService:Create(Card,    ft, {BackgroundTransparency=1}):Play()
+    TweenService:Create(CS,      ft, {Transparency=1}):Play()
+    TweenService:Create(RS,      ft, {Transparency=1}):Play()
+    TweenService:Create(RS2,     ft, {Transparency=1}):Play()
+    TweenService:Create(Overlay, TweenInfo.new(0.35), {BackgroundTransparency=1}):Play()
     task.wait(0.4)
     pcall(function() AnimSG:Destroy() end)
 end
-
 -- RemovePremiumLock is a no-op now (no overlay to remove)
 local function RemovePremiumLock() end
 
@@ -3618,6 +3332,9 @@ end
 -- Makes the ball glow bright neon when targeting YOU specifically.
 -- Normal color otherwise. Impossible to lose track of.
 local SBH = {conn=nil, color=nil, mat=nil}
+local TA = {conn=nil, last=""}
+local AB = {conn=nil, last=0}
+local PS  = {sound=nil, conn=nil, last=0}
 local function StartSilentBallHighlight()
     if SBH.conn then SBH.conn:Disconnect() end
     SBH.conn = RunService.Heartbeat:Connect(function()
@@ -3657,7 +3374,6 @@ end
 -- ── 11. TARGET ALERT ─────────────────────────────────────────────
 -- Pops a screen notification the instant the ball switches to target YOU.
 -- Shows who passed it and the ball speed at time of targeting.
-local TA = {conn=nil, last=""}
 local function StartTargetAlert()
     if TA.conn then TA.conn:Disconnect() end
     TA.last = ""
@@ -3687,7 +3403,6 @@ end
 -- ── 12. ANTI-BLOCK (spam prevention bypass) ──────────────────────
 -- Auto-detects when your parry key is eaten (e.g. clicked too fast)
 -- and re-fires once with a 0.05s delay to push it through.
-local AB = {conn=nil, last=0}
 local function StartAntiBlock()
     if AB.conn then AB.conn:Disconnect() end
     local prevCount = S.ParryCount
@@ -3717,7 +3432,6 @@ end
 -- ── 13. PARRY SOUND ALERT ────────────────────────────────────────
 -- Plays a local beep sound on successful parry so you can hear
 -- your own parry rate without watching the counter.
-local PS = {sound=nil, conn=nil, last=0}
 local function SetupParrySound()
     PS.sound = Instance.new("Sound")
     PS.sound.SoundId = "rbxassetid://6042053626"
