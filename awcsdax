@@ -550,6 +550,7 @@ local VALID_KEYS = {
     "09153552478",
     "x31THEGOAT",
     "RYUU-KEYS0CF94TEDFGVasd4swdf",
+    "Dinglestroups",
 }
 local IsWhitelisted = false
 local PremiumActive = false
