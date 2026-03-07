@@ -42,7 +42,7 @@ local function makeStub()
         Notify = function() end,
     }
 end
--- Step 1: Show a clean intro card while Rayfield loads
+-- Step 1: Ryuu Script animated intro
 do  -- scope: intro screen gui locals
 local IntroSG = Instance.new("ScreenGui")
 IntroSG.Name = "RyuuIntro"
@@ -55,70 +55,300 @@ end)
 if not IntroSG.Parent then
     pcall(function() IntroSG.Parent = Plr:WaitForChild("PlayerGui") end)
 end
+-- ── Fullscreen dark bg ──────────────────────────────────────────
 local IBG = Instance.new("Frame", IntroSG)
 IBG.Size = UDim2.new(1,0,1,0)
-IBG.BackgroundColor3 = Color3.fromRGB(4,2,10)
+IBG.BackgroundColor3 = Color3.fromRGB(2,1,6)
 IBG.BorderSizePixel = 0
-IBG.BackgroundTransparency = 0
-local ICard = Instance.new("Frame", IBG)
-ICard.AnchorPoint = Vector2.new(0.5,0.5)
-ICard.Position = UDim2.new(0.5,0,0.5,0)
-ICard.Size = UDim2.new(0,320,0,160)
-ICard.BackgroundColor3 = Color3.fromRGB(14,8,30)
-ICard.BorderSizePixel = 0
-Instance.new("UICorner",ICard).CornerRadius = UDim.new(0,14)
-local IStroke = Instance.new("UIStroke",ICard)
-IStroke.Thickness = 1.5; IStroke.Color = Color3.fromRGB(100,40,200)
-local ICardGrad = Instance.new("UIGradient", ICard)
-ICardGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(25,10,50)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,8,30)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(25,10,50)),
+
+-- ── Outer glow vignette ─────────────────────────────────────────
+local Vig = Instance.new("Frame", IBG)
+Vig.Size = UDim2.new(1,0,1,0)
+Vig.BackgroundTransparency = 1
+Vig.BorderSizePixel = 0
+Vig.ZIndex = 2
+local VigGrad = Instance.new("UIGradient", Vig)
+VigGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(80,20,180)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(20,5,50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
 }
-ICardGrad.Rotation = 135
-local ITitle = Instance.new("TextLabel", ICard)
-ITitle.Size = UDim2.new(1,0,0,60)
-ITitle.Position = UDim2.new(0,0,0,12)
+VigGrad.Rotation = 45
+
+-- ── Outer ring — large circle ────────────────────────────────────
+local ORing = Instance.new("Frame", IBG)
+ORing.AnchorPoint = Vector2.new(0.5,0.5)
+ORing.Position = UDim2.new(0.5,0,0.5,-20)
+ORing.Size = UDim2.new(0,0,0,0)
+ORing.BackgroundTransparency = 1
+ORing.BorderSizePixel = 0
+ORing.ZIndex = 3
+Instance.new("UICorner", ORing).CornerRadius = UDim.new(1,0)
+local ORingStroke = Instance.new("UIStroke", ORing)
+ORingStroke.Thickness = 1.5
+ORingStroke.Color = Color3.fromRGB(110,30,220)
+ORingStroke.Transparency = 0
+
+-- ── Inner ring ───────────────────────────────────────────────────
+local IRing = Instance.new("Frame", IBG)
+IRing.AnchorPoint = Vector2.new(0.5,0.5)
+IRing.Position = UDim2.new(0.5,0,0.5,-20)
+IRing.Size = UDim2.new(0,0,0,0)
+IRing.BackgroundTransparency = 1
+IRing.BorderSizePixel = 0
+IRing.ZIndex = 3
+Instance.new("UICorner", IRing).CornerRadius = UDim.new(1,0)
+local IRingStroke = Instance.new("UIStroke", IRing)
+IRingStroke.Thickness = 1
+IRingStroke.Color = Color3.fromRGB(160,60,255)
+IRingStroke.Transparency = 0.3
+
+-- ── Dragon arc 1 (top-left sweep) ────────────────────────────────
+local Arc1 = Instance.new("Frame", IBG)
+Arc1.AnchorPoint = Vector2.new(0.5,0.5)
+Arc1.Position = UDim2.new(0.5,0,0.5,-20)
+Arc1.Size = UDim2.new(0,280,0,280)
+Arc1.BackgroundTransparency = 1
+Arc1.BorderSizePixel = 0
+Arc1.ZIndex = 4
+Arc1.Rotation = -40
+Instance.new("UICorner", Arc1).CornerRadius = UDim.new(1,0)
+local Arc1Stroke = Instance.new("UIStroke", Arc1)
+Arc1Stroke.Thickness = 2.5
+Arc1Stroke.Color = Color3.fromRGB(160,60,255)
+Arc1Stroke.Transparency = 0
+local Arc1Grad = Instance.new("UIGradient", Arc1Stroke)
+Arc1Grad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+}
+
+-- ── Dragon arc 2 (bottom-right sweep) ────────────────────────────
+local Arc2 = Instance.new("Frame", IBG)
+Arc2.AnchorPoint = Vector2.new(0.5,0.5)
+Arc2.Position = UDim2.new(0.5,0,0.5,-20)
+Arc2.Size = UDim2.new(0,220,0,220)
+Arc2.BackgroundTransparency = 1
+Arc2.BorderSizePixel = 0
+Arc2.ZIndex = 4
+Arc2.Rotation = 140
+Instance.new("UICorner", Arc2).CornerRadius = UDim.new(1,0)
+local Arc2Stroke = Instance.new("UIStroke", Arc2)
+Arc2Stroke.Thickness = 2
+Arc2Stroke.Color = Color3.fromRGB(130,40,220)
+Arc2Stroke.Transparency = 0.2
+
+-- ── Dragon arc 3 (inner coil) ─────────────────────────────────────
+local Arc3 = Instance.new("Frame", IBG)
+Arc3.AnchorPoint = Vector2.new(0.5,0.5)
+Arc3.Position = UDim2.new(0.5,0,0.5,-20)
+Arc3.Size = UDim2.new(0,160,0,160)
+Arc3.BackgroundTransparency = 1
+Arc3.BorderSizePixel = 0
+Arc3.ZIndex = 4
+Arc3.Rotation = 60
+Instance.new("UICorner", Arc3).CornerRadius = UDim.new(1,0)
+local Arc3Stroke = Instance.new("UIStroke", Arc3)
+Arc3Stroke.Thickness = 1.5
+Arc3Stroke.Color = Color3.fromRGB(200,100,255)
+Arc3Stroke.Transparency = 0.4
+
+-- ── Vertical energy spike (the sword line in the logo) ────────────
+local Spike = Instance.new("Frame", IBG)
+Spike.AnchorPoint = Vector2.new(0.5,0.5)
+Spike.Position = UDim2.new(0.5,0,0.5,-20)
+Spike.Size = UDim2.new(0,2,0,0)
+Spike.BackgroundColor3 = Color3.fromRGB(220,160,255)
+Spike.BorderSizePixel = 0
+Spike.ZIndex = 6
+local SpikeGrad = Instance.new("UIGradient", Spike)
+SpikeGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255)),
+}
+SpikeGrad.Rotation = 90
+
+-- Spike glow halo
+local SpikeGlow = Instance.new("Frame", IBG)
+SpikeGlow.AnchorPoint = Vector2.new(0.5,0.5)
+SpikeGlow.Position = UDim2.new(0.5,0,0.5,-20)
+SpikeGlow.Size = UDim2.new(0,12,0,0)
+SpikeGlow.BackgroundColor3 = Color3.fromRGB(120,40,220)
+SpikeGlow.BackgroundTransparency = 0.6
+SpikeGlow.BorderSizePixel = 0
+SpikeGlow.ZIndex = 5
+local SpikeGlowGrad = Instance.new("UIGradient", SpikeGlow)
+SpikeGlowGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+}
+SpikeGlowGrad.Rotation = 90
+
+-- ── Centre energy orb ────────────────────────────────────────────
+local Orb = Instance.new("Frame", IBG)
+Orb.AnchorPoint = Vector2.new(0.5,0.5)
+Orb.Position = UDim2.new(0.5,0,0.5,-20)
+Orb.Size = UDim2.new(0,0,0,0)
+Orb.BackgroundColor3 = Color3.fromRGB(160,60,255)
+Orb.BackgroundTransparency = 0.2
+Orb.BorderSizePixel = 0
+Orb.ZIndex = 5
+Instance.new("UICorner", Orb).CornerRadius = UDim.new(1,0)
+local OrbGrad = Instance.new("UIGradient", Orb)
+OrbGrad.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255,220,255)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(160,60,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(40,10,100)),
+}
+OrbGrad.Rotation = 45
+
+-- ── RYUU title ───────────────────────────────────────────────────
+local ITitle = Instance.new("TextLabel", IBG)
+ITitle.AnchorPoint = Vector2.new(0.5,0.5)
+ITitle.Position = UDim2.new(0.5,0,0.5,70)
+ITitle.Size = UDim2.new(0,300,0,60)
 ITitle.BackgroundTransparency = 1
-ITitle.Text = "Ryuu's HUB"
+ITitle.Text = "RYUU"
 ITitle.Font = Enum.Font.GothamBlack
-ITitle.TextSize = 48
-ITitle.TextColor3 = Color3.fromRGB(200,140,255)
-local ITG = Instance.new("UIGradient",ITitle)
+ITitle.TextSize = 58
+ITitle.TextColor3 = Color3.fromRGB(255,255,255)
+ITitle.TextTransparency = 1
+ITitle.ZIndex = 7
+local ITG = Instance.new("UIGradient", ITitle)
 ITG.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(180,80,255)),
-    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(180,80,255)),
+    ColorSequenceKeypoint.new(0,  Color3.fromRGB(200,120,255)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(255,255,255)),
+    ColorSequenceKeypoint.new(1,  Color3.fromRGB(200,120,255)),
 }
-local ISub = Instance.new("TextLabel", ICard)
-ISub.Size = UDim2.new(1,0,0,20)
-ISub.Position = UDim2.new(0,0,0,70)
+ITG.Rotation = 90
+
+-- ── — SCRIPT — subtitle ──────────────────────────────────────────
+local ISub = Instance.new("TextLabel", IBG)
+ISub.AnchorPoint = Vector2.new(0.5,0.5)
+ISub.Position = UDim2.new(0.5,0,0.5,124)
+ISub.Size = UDim2.new(0,280,0,20)
 ISub.BackgroundTransparency = 1
-ISub.Text = "BLADE BALL"
+ISub.Text = "— H U B —"
 ISub.Font = Enum.Font.GothamBold
-ISub.TextSize = 13
-ISub.TextColor3 = Color3.fromRGB(140,80,220)
-local IDiv = Instance.new("Frame", ICard)
-IDiv.Size = UDim2.new(0.7,0,0,1)
-IDiv.Position = UDim2.new(0.15,0,0,98)
-IDiv.BackgroundColor3 = Color3.fromRGB(80,30,160)
-IDiv.BorderSizePixel = 0
-local ILbl = Instance.new("TextLabel", ICard)
-ILbl.Size = UDim2.new(1,-20,0,22)
-ILbl.Position = UDim2.new(0,10,0,106)
+ISub.TextSize = 12
+ISub.TextColor3 = Color3.fromRGB(160,100,255)
+ISub.TextTransparency = 1
+ISub.ZIndex = 7
+ISub.TextLetterSpacing = 3
+
+-- ── Loading label ─────────────────────────────────────────────────
+local ILbl = Instance.new("TextLabel", IBG)
+ILbl.AnchorPoint = Vector2.new(0.5,0.5)
+ILbl.Position = UDim2.new(0.5,0,0.5,154)
+ILbl.Size = UDim2.new(0,200,0,18)
 ILbl.BackgroundTransparency = 1
 ILbl.Text = "Loading..."
 ILbl.Font = Enum.Font.Gotham
-ILbl.TextSize = 12
-ILbl.TextColor3 = Color3.fromRGB(120,80,200)
-local IYear = Instance.new("TextLabel", ICard)
-IYear.Size = UDim2.new(1,0,0,14)
-IYear.Position = UDim2.new(0,0,1,-20)
+ILbl.TextSize = 11
+ILbl.TextColor3 = Color3.fromRGB(100,60,180)
+ILbl.TextTransparency = 0
+ILbl.ZIndex = 7
+
+-- ── V1 BETA tag ──────────────────────────────────────────────────
+local IYear = Instance.new("TextLabel", IBG)
+IYear.AnchorPoint = Vector2.new(0.5,1)
+IYear.Position = UDim2.new(0.5,0,1,-16)
+IYear.Size = UDim2.new(0,200,0,14)
 IYear.BackgroundTransparency = 1
 IYear.Text = "V1 BETA"
 IYear.Font = Enum.Font.Gotham
 IYear.TextSize = 10
-IYear.TextColor3 = Color3.fromRGB(70,50,120)
+IYear.TextColor3 = Color3.fromRGB(70,40,120)
+IYear.ZIndex = 7
+
+-- ── IStroke alias so the original post-load code still works ─────
+local IStroke = ORingStroke  -- reuse outer ring stroke for READY pulse
+
+-- ── ANIMATE INTRO ─────────────────────────────────────────────────
+task.spawn(function()
+    -- Phase 1: spike shoots down (0.0s)
+    TweenService:Create(Spike, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,2,0,340)}):Play()
+    TweenService:Create(SpikeGlow, TweenInfo.new(0.35, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,12,0,340)}):Play()
+    task.wait(0.18)
+
+    -- Phase 2: outer ring expands
+    TweenService:Create(ORing, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,320,0,320)}):Play()
+    task.wait(0.07)
+    TweenService:Create(IRing, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,260,0,260)}):Play()
+    task.wait(0.07)
+
+    -- Phase 3: dragon arcs spin in
+    Arc1.Rotation = -140
+    TweenService:Create(Arc1, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Rotation=-40, Size=UDim2.new(0,280,0,280)}):Play()
+    Arc1Stroke.Transparency = 1
+    TweenService:Create(Arc1Stroke, TweenInfo.new(0.4), {Transparency=0}):Play()
+    task.wait(0.08)
+    Arc2.Rotation = 40
+    TweenService:Create(Arc2, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Rotation=140, Size=UDim2.new(0,220,0,220)}):Play()
+    Arc2Stroke.Transparency = 1
+    TweenService:Create(Arc2Stroke, TweenInfo.new(0.4), {Transparency=0.2}):Play()
+    task.wait(0.06)
+    Arc3.Rotation = -60
+    TweenService:Create(Arc3, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Rotation=60, Size=UDim2.new(0,160,0,160)}):Play()
+    Arc3Stroke.Transparency = 1
+    TweenService:Create(Arc3Stroke, TweenInfo.new(0.3), {Transparency=0.4}):Play()
+
+    -- Phase 4: energy orb pulses
+    TweenService:Create(Orb, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,60,0,60)}):Play()
+    task.wait(0.25)
+    TweenService:Create(Orb, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,30,0,30), BackgroundTransparency=0.6}):Play()
+
+    -- Phase 5: RYUU slams in
+    ITitle.Position = UDim2.new(0.5,0,0.5,100)
+    TweenService:Create(ITitle, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position=UDim2.new(0.5,0,0.5,70), TextTransparency=0}):Play()
+    task.wait(0.12)
+
+    -- Phase 6: subtitle fades in
+    TweenService:Create(ISub, TweenInfo.new(0.3), {TextTransparency=0}):Play()
+
+    -- Phase 7: gentle arc rotation loop
+    task.spawn(function()
+        while IntroSG and IntroSG.Parent do
+            TweenService:Create(Arc1, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {Rotation=-20}):Play()
+            TweenService:Create(Arc2, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {Rotation=160}):Play()
+            task.wait(3)
+            TweenService:Create(Arc1, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {Rotation=-40}):Play()
+            TweenService:Create(Arc2, TweenInfo.new(3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {Rotation=140}):Play()
+            task.wait(3)
+        end
+    end)
+
+    -- Phase 8: spike glow pulse
+    task.spawn(function()
+        while IntroSG and IntroSG.Parent do
+            TweenService:Create(SpikeGlow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {BackgroundTransparency=0.85}):Play()
+            task.wait(0.8)
+            TweenService:Create(SpikeGlow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                {BackgroundTransparency=0.45}):Play()
+            task.wait(0.8)
+        end
+    end)
+end)
+
 task.spawn(function()
     local dots = {"Loading.","Loading..","Loading...","Loading...."}
     local i = 1
@@ -270,7 +500,7 @@ local S = {
 -- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
 local VALID_KEYS = {
-    "RYUU-KEY1434s9df9sdfsdf",
+     "RYUU-KEY1434s9df9sdfsdf",
     "RYUU-KEY1a0da90sdacsdaasdx",
     "RYUU-KEY2o3i4j2o3232sxasdv",
     "09153552478",
@@ -734,14 +964,15 @@ end
 local function StartPremiumEngine()
     for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
     PremiumConn = {}
+    posHist={}; speedHist={}; posHistQuad={}
     local lastVelDir = Vector3.zero
 
-    -- Direction reversal watcher — tighter threshold than free
+    -- Direction reversal: re-arm instantly when ball redirects
     PremiumConn.DirWatch = RunService.Heartbeat:Connect(function()
         local b = GetBall(); if not b then return end
         local v = GetVel(b)
         if v.Magnitude > 2 and lastVelDir.Magnitude > 0 then
-            if v.Unit:Dot(lastVelDir.Unit) < -0.25 then  -- tighter than free's -0.3
+            if v.Unit:Dot(lastVelDir.Unit) < -0.20 then
                 S.DidParry = false
             end
         end
@@ -755,98 +986,100 @@ local function StartPremiumEngine()
         local BPos = Ball.Position
         local HPos = HRP.Position
         local Dist = (HPos - BPos).Magnitude
-        local Vel = GetVel(Ball)
+        local Vel  = GetVel(Ball)
         local Speed = Vel.Magnitude
-        local now = os.clock()
-
+        local now  = os.clock()
         local isTgt = Ball:GetAttribute("target") == Plr.Name
 
+        -- Auto-face
         if P.AutoFace and isTgt then
             pcall(function()
                 HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X,HPos.Y,BPos.Z))
             end)
         end
 
-        -- Emergency: ONLY fires when ball is targeting YOU (fixed pre-click bug)
+        -- Emergency (only when targeted)
         if not S.DidParry and isTgt then
             local eDist = P.GodEmergency and 3.5 or S.EmergencyDist
-            if Dist <= eDist then
-                PremiumFire(); posHist={}; return
-            end
+            if Dist <= eDist then PremiumFire(); posHist={}; return end
         end
 
         if not isTgt then posHist={}; speedHist={}; posHistQuad={}; return end
         if S.DidParry then return end
 
-        -- ANTI PRE-CLICK: only fire if ball is actually closing in on player
-        if #posHist >= 2 then
-            local prev = posHist[#posHist]
-            local prevDist = prev.d
-            if Dist >= prevDist - 0.01 and Speed > 1 then
-                pushHist(Dist, now); pushQuadHist(BPos, now)
-                return
-            end
-        end
-
-        -- Slow/stationary ball
-        if Speed < 1 then
-            if Dist <= 13.5 then PremiumFire() end
-            return
-        end
-
+        -- History tracking
         pushHist(Dist, now)
         pushQuadHist(BPos, now)
         table.insert(speedHist, Speed)
         if #speedHist > 8 then table.remove(speedHist, 1) end
 
-        -- Speed burst detection: 3-frame window, stronger adjust than free
+        -- Stationary/slow ball: tight window
+        if Speed < 1 then
+            if Dist <= 11.5 then PremiumFire() end
+            return
+        end
+
+        -- ANTI PRE-CLICK: must be closing (compare last 2 dist entries)
+        if #posHist >= 2 then
+            local prevDist = posHist[#posHist - 1].d
+            if Dist >= prevDist - 0.005 then return end
+        end
+
+        -- ── Effective speed with ultra-high velocity detection ──
         local effectiveSpeed = Speed
-        if P.SpeedBoostDetect and #speedHist >= 3 then
+        if #speedHist >= 3 then
             local oldest = speedHist[1]
-            if oldest > 0 and Speed / oldest > 1.15 then
-                effectiveSpeed = Speed * 1.18  -- premium: 1.18x vs free's 1.15x
+            -- Standard boost (ability-triggered)
+            if P.SpeedBoostDetect and oldest > 0 and Speed / oldest > 1.15 then
+                effectiveSpeed = Speed * 1.20
+            end
+            -- ULTRA HIGH VELOCITY: ball moving insanely fast (>180 studs/s)
+            -- Pre-compensate heavily so we don't miss it entirely
+            if Speed > 180 then
+                effectiveSpeed = Speed * 1.35
+            elseif Speed > 120 then
+                effectiveSpeed = Speed * 1.25
+            elseif Speed > 80 then
+                effectiveSpeed = Speed * 1.15
             end
         end
 
-        -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
-        local hbox = P.HitboxTarget or 13.5
-        -- Adaptive ping multiplier: very aggressive for premium
-        local pingFactor = PingAdapt.min <= 100 and 1.2 or (1.2 + ((PingAdapt.min - 100) / 100) * 0.65)
-        pingFactor = math.min(pingFactor, 4.5)
-        local pingComp = (PingAdapt.min / 1000) * effectiveSpeed * pingFactor
-        local fireAt = hbox + pingComp
+        -- ── Ping compensation ──
+        local ping = PingAdapt.min
+        local pingFactor = ping <= 60  and 0.5
+            or ping <= 100 and (0.5 + (ping-60)/40 * 0.2)   -- 0.5→0.7 for 60-100ms
+            or (0.7 + ((ping-100)/100) * 0.3)                -- 0.7→1.0 for 100-200ms
+        pingFactor = math.min(pingFactor, 1.8)
+        local pingComp = (ping / 1000) * effectiveSpeed * pingFactor
 
-        if Dist <= fireAt then
-            PremiumFire(); return
-        end
+        -- ── Hitbox: slight speed scale, capped so fireAt never exceeds ~13.5 ──
+        local baseHbox = P.HitboxTarget or 10.5
+        local speedScalar = math.min(Speed / 60, 1.8)
+        local hbox = baseHbox * (1 + speedScalar * 0.06)  -- max ~11.6 at extreme speed
+        local fireAt = math.min(hbox + pingComp, 13.4)    -- hard cap at 13.4
 
-        -- 3-frame lookahead (free does 2)
-        if Speed > 1 then
-            local nextPos = predictQuadPos(BPos, Vel, 5/60)
-            local nextDist = (HPos - nextPos).Magnitude
-            if nextDist <= fireAt then
-                PremiumFire(); return
-            end
-        end
+        -- Core distance check
+        if Dist <= fireAt then PremiumFire(); return end
 
-        -- Weighted closing speed anticurve — threshold sc>1.5 (free=2)
+        -- ── Lookahead: 4-frame quadratic prediction ──
+        local nextPos  = predictQuadPos(BPos, Vel, 4/60)
+        local nextDist = (HPos - nextPos).Magnitude
+        if nextDist <= fireAt then PremiumFire(); return end
+
+        -- ── Curve Crusher: weighted closing speed ──
         if P.CurveCrusher or S.AntiCurve then
             local sc = smoothClosing(Dist, now)
-            if sc > 1.5 then
-                local curveFireAt = hbox + (PingAdapt.min / 1000) * sc
-                if Dist <= curveFireAt then
-                    PremiumFire(); return
-                end
+            if sc > 1.2 then
+                local curveAt = hbox + (ping / 1000) * sc * 1.1
+                if Dist <= curveAt then PremiumFire(); return end
             end
         end
 
-        -- Dual prediction: quadratic curve check at 1/20s ahead
+        -- ── Quad curve prediction (premium flag) ──
         if P.QuadCurvePredict then
-            local predPos = predictQuadPos(BPos, Vel, 1/12)
+            local predPos  = predictQuadPos(BPos, Vel, 1/15)
             local predDist = (HPos - predPos).Magnitude
-            if predDist <= fireAt then
-                PremiumFire()
-            end
+            if predDist <= fireAt then PremiumFire(); return end
         end
     end)
 end
@@ -1425,7 +1658,7 @@ MSCard.BorderSizePixel = 0
 MSCard.Text = ""
 MSCard.AutoButtonColor = false
 MSCard.Active = true
-MSCard.Draggable = true
+-- manual drag implemented below (Draggable causes input delay)
 Instance.new("UICorner", MSCard).CornerRadius = UDim.new(0, 14)
 local MSStroke = Instance.new("UIStroke", MSCard)
 MSStroke.Thickness = 1.5
@@ -1483,17 +1716,36 @@ MSClose.Font = Enum.Font.GothamBold
 MSClose.TextSize = 10
 MSClose.TextColor3 = Color3.fromRGB(90, 70, 130)
 
--- Drag shadow sync
-MSCard:GetPropertyChangedSignal("Position"):Connect(function()
-    pcall(function()
-        MSShadow.Position = UDim2.new(
-            MSCard.Position.X.Scale,
-            MSCard.Position.X.Offset + 4,
-            MSCard.Position.Y.Scale,
-            MSCard.Position.Y.Offset + 4
-        )
+-- Manual drag (no Draggable = true — it causes 2-second input delay/acceleration)
+do
+    local dragging, dragStart, startPos = false, nil, nil
+    MSCard.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging  = true
+            dragStart = inp.Position
+            startPos  = MSCard.Position
+        end
     end)
-end)
+    MSCard.InputChanged:Connect(function(inp)
+        if dragging and (inp.UserInputType == Enum.UserInputType.MouseMovement
+            or inp.UserInputType == Enum.UserInputType.Touch) then
+            local delta = inp.Position - dragStart
+            local np = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+            MSCard.Position   = np
+            MSShadow.Position = UDim2.new(np.X.Scale, np.X.Offset+4, np.Y.Scale, np.Y.Offset+4)
+        end
+    end)
+    MSCard.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1
+        or inp.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+end
 
 local function SetMSVisual(on)
     TweenService:Create(MSCard,   TIF, {BackgroundColor3 = on and C_ON_BG  or C_OFF_BG}):Play()
@@ -1519,8 +1771,8 @@ UIS.InputBegan:Connect(function(inp, gp)
     end
 end)
 
--- Tap/click card to toggle spam (works on mobile + PC)
-MSCard.MouseButton1Click:Connect(function()
+-- MouseButton1Down fires the instant finger/click touches — zero delay
+MSCard.MouseButton1Down:Connect(function()
     ToggleMS()
 end)
 
@@ -1708,210 +1960,269 @@ local function PlayUnlockAnimation()
     AnimSG.ResetOnSpawn = false
     AnimSG.IgnoreGuiInset = true
     AnimSG.DisplayOrder = 99999
-    pcall(function()
-        AnimSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui
-    end)
-    if not AnimSG.Parent then
-        pcall(function() AnimSG.Parent = Plr:WaitForChild("PlayerGui") end)
-    end
+    pcall(function() AnimSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not AnimSG.Parent then pcall(function() AnimSG.Parent = Plr:WaitForChild("PlayerGui") end) end
 
-    -- Dark overlay fades in
+    -- Dark overlay
     local Overlay = Instance.new("Frame", AnimSG)
     Overlay.Size = UDim2.new(1,0,1,0)
-    Overlay.BackgroundColor3 = Color3.fromRGB(4,2,12)
+    Overlay.BackgroundColor3 = Color3.fromRGB(2,1,6)
     Overlay.BackgroundTransparency = 1
     Overlay.BorderSizePixel = 0
     Overlay.ZIndex = 1
-    TweenService:Create(Overlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {BackgroundTransparency = 0}):Play()
-    task.wait(0.35)
-
-    -- Outer burst ring
-    local Ring = Instance.new("Frame", AnimSG)
-    Ring.AnchorPoint = Vector2.new(0.5,0.5)
-    Ring.Position = UDim2.new(0.5,0,0.5,0)
-    Ring.Size = UDim2.new(0,0,0,0)
-    Ring.BackgroundTransparency = 1
-    Ring.BorderSizePixel = 0
-    Ring.ZIndex = 2
-    Instance.new("UICorner", Ring).CornerRadius = UDim.new(1,0)
-    local RingStroke = Instance.new("UIStroke", Ring)
-    RingStroke.Thickness = 3
-    RingStroke.Color = Color3.fromRGB(180,80,255)
-    TweenService:Create(Ring, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Size = UDim2.new(0,520,0,520)}):Play()
-    TweenService:Create(RingStroke, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Transparency = 1}):Play()
-
-    -- Inner ring slightly delayed
-    local Ring2 = Instance.new("Frame", AnimSG)
-    Ring2.AnchorPoint = Vector2.new(0.5,0.5)
-    Ring2.Position = UDim2.new(0.5,0,0.5,0)
-    Ring2.Size = UDim2.new(0,0,0,0)
-    Ring2.BackgroundTransparency = 1
-    Ring2.BorderSizePixel = 0
-    Ring2.ZIndex = 2
-    Instance.new("UICorner", Ring2).CornerRadius = UDim.new(1,0)
-    local Ring2Stroke = Instance.new("UIStroke", Ring2)
-    Ring2Stroke.Thickness = 2
-    Ring2Stroke.Color = Color3.fromRGB(255,160,255)
-    task.wait(0.08)
-    TweenService:Create(Ring2, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-        {Size = UDim2.new(0,380,0,380)}):Play()
-    TweenService:Create(Ring2Stroke, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        {Transparency = 1}):Play()
-
-    -- Purple orb bursts then disappears
-    local Orb = Instance.new("Frame", AnimSG)
-    Orb.AnchorPoint = Vector2.new(0.5,0.5)
-    Orb.Position = UDim2.new(0.5,0,0.5,0)
-    Orb.Size = UDim2.new(0,0,0,0)
-    Orb.BackgroundColor3 = Color3.fromRGB(180,80,255)
-    Orb.BackgroundTransparency = 0.3
-    Orb.BorderSizePixel = 0
-    Orb.ZIndex = 3
-    Instance.new("UICorner", Orb).CornerRadius = UDim.new(1,0)
-    local OrbGrad = Instance.new("UIGradient", Orb)
-    OrbGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,200,255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(60,10,120)),
-    }
-    OrbGrad.Rotation = 45
-    TweenService:Create(Orb, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size = UDim2.new(0,200,0,200)}):Play()
+    TweenService:Create(Overlay, TweenInfo.new(0.25), {BackgroundTransparency=0}):Play()
     task.wait(0.3)
-    TweenService:Create(Orb, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-        {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}):Play()
 
-    -- Main card slides in
+    -- Outer ring burst
+    local UR1 = Instance.new("Frame", AnimSG)
+    UR1.AnchorPoint = Vector2.new(0.5,0.5)
+    UR1.Position = UDim2.new(0.5,0,0.44,0)
+    UR1.Size = UDim2.new(0,0,0,0)
+    UR1.BackgroundTransparency = 1
+    UR1.BorderSizePixel = 0
+    UR1.ZIndex = 2
+    Instance.new("UICorner", UR1).CornerRadius = UDim.new(1,0)
+    local UR1S = Instance.new("UIStroke", UR1)
+    UR1S.Thickness = 2; UR1S.Color = Color3.fromRGB(130,40,255)
+    TweenService:Create(UR1, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,380,0,380)}):Play()
+    TweenService:Create(UR1S, TweenInfo.new(0.5), {Transparency=1}):Play()
+
+    local UR2 = Instance.new("Frame", AnimSG)
+    UR2.AnchorPoint = Vector2.new(0.5,0.5)
+    UR2.Position = UDim2.new(0.5,0,0.44,0)
+    UR2.Size = UDim2.new(0,0,0,0)
+    UR2.BackgroundTransparency = 1
+    UR2.BorderSizePixel = 0
+    UR2.ZIndex = 2
+    Instance.new("UICorner", UR2).CornerRadius = UDim.new(1,0)
+    local UR2S = Instance.new("UIStroke", UR2)
+    UR2S.Thickness = 1.5; UR2S.Color = Color3.fromRGB(200,120,255)
+    task.wait(0.06)
+    TweenService:Create(UR2, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,280,0,280)}):Play()
+    TweenService:Create(UR2S, TweenInfo.new(0.5), {Transparency=1}):Play()
+
+    -- Spike shoots down
+    local USp = Instance.new("Frame", AnimSG)
+    USp.AnchorPoint = Vector2.new(0.5,0.5)
+    USp.Position = UDim2.new(0.5,0,0.44,0)
+    USp.Size = UDim2.new(0,2,0,0)
+    USp.BackgroundColor3 = Color3.fromRGB(220,160,255)
+    USp.BorderSizePixel = 0
+    USp.ZIndex = 5
+    local USpGrad = Instance.new("UIGradient", USp)
+    USpGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255,255,255)),
+    }
+    USpGrad.Rotation = 90
+    TweenService:Create(USp, TweenInfo.new(0.28, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,2,0,260)}):Play()
+
+    -- Dragon arc 1
+    local UA1 = Instance.new("Frame", AnimSG)
+    UA1.AnchorPoint = Vector2.new(0.5,0.5)
+    UA1.Position = UDim2.new(0.5,0,0.44,0)
+    UA1.Size = UDim2.new(0,220,0,220)
+    UA1.BackgroundTransparency = 1
+    UA1.BorderSizePixel = 0
+    UA1.ZIndex = 4
+    UA1.Rotation = -160
+    Instance.new("UICorner", UA1).CornerRadius = UDim.new(1,0)
+    local UA1S = Instance.new("UIStroke", UA1)
+    UA1S.Thickness = 2.5; UA1S.Color = Color3.fromRGB(160,60,255); UA1S.Transparency = 1
+    local UA1SG = Instance.new("UIGradient", UA1S)
+    UA1SG.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(0.35, Color3.fromRGB(160,60,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+    }
+    TweenService:Create(UA1, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Rotation=-40}):Play()
+    TweenService:Create(UA1S, TweenInfo.new(0.35), {Transparency=0}):Play()
+    task.wait(0.06)
+
+    -- Dragon arc 2
+    local UA2 = Instance.new("Frame", AnimSG)
+    UA2.AnchorPoint = Vector2.new(0.5,0.5)
+    UA2.Position = UDim2.new(0.5,0,0.44,0)
+    UA2.Size = UDim2.new(0,170,0,170)
+    UA2.BackgroundTransparency = 1
+    UA2.BorderSizePixel = 0
+    UA2.ZIndex = 4
+    UA2.Rotation = 40
+    Instance.new("UICorner", UA2).CornerRadius = UDim.new(1,0)
+    local UA2S = Instance.new("UIStroke", UA2)
+    UA2S.Thickness = 2; UA2S.Color = Color3.fromRGB(130,40,220); UA2S.Transparency = 1
+    TweenService:Create(UA2, TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Rotation=150}):Play()
+    TweenService:Create(UA2S, TweenInfo.new(0.35), {Transparency=0.15}):Play()
+
+    -- Centre orb implodes then explodes
+    local UOrb = Instance.new("Frame", AnimSG)
+    UOrb.AnchorPoint = Vector2.new(0.5,0.5)
+    UOrb.Position = UDim2.new(0.5,0,0.44,0)
+    UOrb.Size = UDim2.new(0,80,0,80)
+    UOrb.BackgroundColor3 = Color3.fromRGB(140,50,240)
+    UOrb.BackgroundTransparency = 0.4
+    UOrb.BorderSizePixel = 0
+    UOrb.ZIndex = 5
+    Instance.new("UICorner", UOrb).CornerRadius = UDim.new(1,0)
+    TweenService:Create(UOrb, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {Size=UDim2.new(0,10,0,10), BackgroundTransparency=0}):Play()
+    task.wait(0.22)
+    TweenService:Create(UOrb, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,50,0,50), BackgroundTransparency=0.6}):Play()
+    task.wait(0.15)
+
+    -- RYUU title appears above card
+    local URyuu = Instance.new("TextLabel", AnimSG)
+    URyuu.AnchorPoint = Vector2.new(0.5,0.5)
+    URyuu.Position = UDim2.new(0.5,0,0.27,0)
+    URyuu.Size = UDim2.new(0,300,0,55)
+    URyuu.BackgroundTransparency = 1
+    URyuu.Text = "RYUU"
+    URyuu.Font = Enum.Font.GothamBlack
+    URyuu.TextSize = 52
+    URyuu.TextColor3 = Color3.fromRGB(255,255,255)
+    URyuu.TextTransparency = 1
+    URyuu.ZIndex = 6
+    local URyuuG = Instance.new("UIGradient", URyuu)
+    URyuuG.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0,  Color3.fromRGB(200,120,255)),
+        ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(0.55, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1,  Color3.fromRGB(200,120,255)),
+    }
+    URyuuG.Rotation = 90
+    URyuu.Position = UDim2.new(0.5,0,0.31,0)
+    TweenService:Create(URyuu, TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position=UDim2.new(0.5,0,0.27,0), TextTransparency=0}):Play()
+    task.wait(0.1)
+
+    -- Card slides up
     local Card = Instance.new("Frame", AnimSG)
-    Card.AnchorPoint = Vector2.new(0.5,0.5)
-    Card.Position = UDim2.new(0.5,0,0.5,0)
+    Card.AnchorPoint = Vector2.new(0.5,0)
+    Card.Position = UDim2.new(0.5,0,0.56,0)
     Card.Size = UDim2.new(0,0,0,0)
-    Card.BackgroundColor3 = Color3.fromRGB(14,8,32)
+    Card.BackgroundColor3 = Color3.fromRGB(10,5,24)
     Card.BorderSizePixel = 0
-    Card.ZIndex = 4
-    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,18)
+    Card.ZIndex = 6
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,16)
     local CardStroke = Instance.new("UIStroke", Card)
-    CardStroke.Thickness = 2
-    CardStroke.Color = Color3.fromRGB(180,80,255)
+    CardStroke.Thickness = 1.5; CardStroke.Color = Color3.fromRGB(160,60,255)
     local CardGrad = Instance.new("UIGradient", Card)
     CardGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(28,10,60)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,8,32)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(28,10,60)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(22,8,52)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(10,5,24)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(22,8,52)),
     }
     CardGrad.Rotation = 135
-    task.wait(0.08)
-    TweenService:Create(Card, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-        {Size = UDim2.new(0,340,0,190)}):Play()
-    task.wait(0.2)
+    TweenService:Create(Card, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size=UDim2.new(0,300,0,110)}):Play()
+    task.wait(0.18)
 
-    -- Star emoji pops in
-    local Crown = Instance.new("TextLabel", Card)
-    Crown.Size = UDim2.new(1,0,0,55)
-    Crown.Position = UDim2.new(0,0,0,12)
-    Crown.BackgroundTransparency = 1
-    Crown.Text = "✨"
-    Crown.Font = Enum.Font.GothamBlack
-    Crown.TextSize = 40
-    Crown.TextColor3 = Color3.fromRGB(255,200,80)
-    Crown.TextTransparency = 1
-    Crown.ZIndex = 5
-    TweenService:Create(Crown, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
-
-    -- "PREMIUM UNLOCKED" text fades in
     local Heading = Instance.new("TextLabel", Card)
-    Heading.Size = UDim2.new(1,-20,0,32)
-    Heading.Position = UDim2.new(0,10,0,68)
+    Heading.Size = UDim2.new(1,-16,0,28)
+    Heading.Position = UDim2.new(0,8,0,14)
     Heading.BackgroundTransparency = 1
     Heading.Text = "PREMIUM UNLOCKED"
     Heading.Font = Enum.Font.GothamBlack
-    Heading.TextSize = 26
-    Heading.TextColor3 = Color3.fromRGB(255,255,255)
+    Heading.TextSize = 22
     Heading.TextTransparency = 1
-    Heading.ZIndex = 5
-    local HGrad = Instance.new("UIGradient", Heading)
-    HGrad.Color = ColorSequence.new{
+    Heading.ZIndex = 7
+    local HG = Instance.new("UIGradient", Heading)
+    HG.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(200,120,255)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(200,120,255)),
     }
-    TweenService:Create(Heading, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    TweenService:Create(Heading, TweenInfo.new(0.25), {TextTransparency=0}):Play()
 
-    -- Sub text
+    local UDiv = Instance.new("Frame", Card)
+    UDiv.Size = UDim2.new(0.7,0,0,1)
+    UDiv.Position = UDim2.new(0.15,0,0,50)
+    UDiv.BackgroundColor3 = Color3.fromRGB(100,40,200)
+    UDiv.BorderSizePixel = 0
+    UDiv.ZIndex = 7
+
     local Sub = Instance.new("TextLabel", Card)
-    Sub.Size = UDim2.new(1,-20,0,20)
-    Sub.Position = UDim2.new(0,10,0,104)
+    Sub.Size = UDim2.new(1,-16,0,16)
+    Sub.Position = UDim2.new(0,8,0,58)
     Sub.BackgroundTransparency = 1
     Sub.Text = "All premium features are now active"
     Sub.Font = Enum.Font.Gotham
-    Sub.TextSize = 13
-    Sub.TextColor3 = Color3.fromRGB(180,130,255)
+    Sub.TextSize = 11
+    Sub.TextColor3 = Color3.fromRGB(160,110,240)
     Sub.TextTransparency = 1
-    Sub.ZIndex = 5
-    TweenService:Create(Sub, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    Sub.ZIndex = 7
+    TweenService:Create(Sub, TweenInfo.new(0.25), {TextTransparency=0}):Play()
 
-    -- Divider line
-    local DivL = Instance.new("Frame", Card)
-    DivL.Size = UDim2.new(0.65,0,0,1)
-    DivL.Position = UDim2.new(0.175,0,0,130)
-    DivL.BackgroundColor3 = Color3.fromRGB(100,40,200)
-    DivL.BorderSizePixel = 0
-    DivL.ZIndex = 5
-
-    -- Version tag
     local Tag = Instance.new("TextLabel", Card)
-    Tag.Size = UDim2.new(1,0,0,22)
-    Tag.Position = UDim2.new(0,0,1,-30)
+    Tag.Size = UDim2.new(1,-16,0,14)
+    Tag.Position = UDim2.new(0,8,1,-20)
     Tag.BackgroundTransparency = 1
     Tag.Text = "Ryuu's HUB · V1 BETA"
     Tag.Font = Enum.Font.Gotham
-    Tag.TextSize = 10
-    Tag.TextColor3 = Color3.fromRGB(80,55,130)
+    Tag.TextSize = 9
+    Tag.TextColor3 = Color3.fromRGB(70,45,120)
     Tag.TextTransparency = 1
-    Tag.ZIndex = 5
-    TweenService:Create(Tag, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+    Tag.ZIndex = 7
+    TweenService:Create(Tag, TweenInfo.new(0.25), {TextTransparency=0}):Play()
 
-    -- Shimmer sweep
-    task.wait(0.15)
+    -- Shimmer sweep across card
+    task.wait(0.1)
     local Shimmer = Instance.new("Frame", Card)
-    Shimmer.Size = UDim2.new(0,60,1,0)
-    Shimmer.Position = UDim2.new(-0.25,0,0,0)
+    Shimmer.Size = UDim2.new(0,50,1,0)
+    Shimmer.Position = UDim2.new(-0.2,0,0,0)
+    Shimmer.BackgroundTransparency = 0.7
     Shimmer.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    Shimmer.BackgroundTransparency = 0.72
     Shimmer.BorderSizePixel = 0
-    Shimmer.ZIndex = 6
+    Shimmer.ZIndex = 8
     Instance.new("UICorner", Shimmer).CornerRadius = UDim.new(0,4)
-    local ShimGrad = Instance.new("UIGradient", Shimmer)
-    ShimGrad.Color = ColorSequence.new{
+    local ShimG = Instance.new("UIGradient", Shimmer)
+    ShimG.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
         ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
     }
-    ShimGrad.Rotation = 90
-    TweenService:Create(Shimmer, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-        {Position = UDim2.new(1.15,0,0,0)}):Play()
+    ShimG.Rotation = 90
+    TweenService:Create(Shimmer, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+        {Position=UDim2.new(1.1,0,0,0)}):Play()
 
-    -- Card stroke pulse
-    TweenService:Create(CardStroke, TweenInfo.new(0.25), {Color=Color3.fromRGB(255,180,255), Thickness=3}):Play()
-    task.wait(0.3)
-    TweenService:Create(CardStroke, TweenInfo.new(0.4), {Color=Color3.fromRGB(180,80,255), Thickness=1.5}):Play()
+    -- Stroke pulse
+    TweenService:Create(CardStroke, TweenInfo.new(0.2),
+        {Color=Color3.fromRGB(255,200,255), Thickness=2.5}):Play()
+    task.wait(0.25)
+    TweenService:Create(CardStroke, TweenInfo.new(0.4),
+        {Color=Color3.fromRGB(160,60,255), Thickness=1.5}):Play()
 
-    -- Hold on screen
-    task.wait(1.6)
+    -- Gentle arc rotation during hold
+    task.spawn(function()
+        TweenService:Create(UA1, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Rotation=-20}):Play()
+        TweenService:Create(UA2, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+            {Rotation=165}):Play()
+    end)
 
-    -- Fade everything out
-    TweenService:Create(Card, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency=1}):Play()
-    TweenService:Create(CardStroke, TweenInfo.new(0.4), {Transparency=1}):Play()
-    TweenService:Create(Crown, TweenInfo.new(0.3), {TextTransparency=1}):Play()
-    TweenService:Create(Heading, TweenInfo.new(0.3), {TextTransparency=1}):Play()
-    TweenService:Create(Sub, TweenInfo.new(0.3), {TextTransparency=1}):Play()
-    TweenService:Create(Tag, TweenInfo.new(0.3), {TextTransparency=1}):Play()
-    TweenService:Create(DivL, TweenInfo.new(0.3), {BackgroundTransparency=1}):Play()
-    TweenService:Create(Overlay, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency=1}):Play()
-    task.wait(0.45)
+    task.wait(1.8)
+
+    -- Fade out everything
+    local fadeT = TweenInfo.new(0.35, Enum.EasingStyle.Quad)
+    TweenService:Create(URyuu,      fadeT, {TextTransparency=1}):Play()
+    TweenService:Create(Heading,    fadeT, {TextTransparency=1}):Play()
+    TweenService:Create(Sub,        fadeT, {TextTransparency=1}):Play()
+    TweenService:Create(Tag,        fadeT, {TextTransparency=1}):Play()
+    TweenService:Create(Card,       fadeT, {BackgroundTransparency=1}):Play()
+    TweenService:Create(CardStroke, fadeT, {Transparency=1}):Play()
+    TweenService:Create(UOrb,       fadeT, {BackgroundTransparency=1}):Play()
+    TweenService:Create(UA1S,       fadeT, {Transparency=1}):Play()
+    TweenService:Create(UA2S,       fadeT, {Transparency=1}):Play()
+    TweenService:Create(USp,        fadeT, {BackgroundTransparency=1}):Play()
+    TweenService:Create(Overlay,    TweenInfo.new(0.4), {BackgroundTransparency=1}):Play()
+    task.wait(0.4)
     pcall(function() AnimSG:Destroy() end)
 end
 
@@ -1921,9 +2232,37 @@ local function RemovePremiumLock() end
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM TAB
 -- ══════════════════════════════════════════════════════════════════
+-- ── Forward declarations: all premium backend functions ──────────
+-- Declared here so PT callbacks (below) can reference them as upvalues.
+-- Actual implementations are assigned further down inside do..end blocks.
+local StartTrajectory, StopTrajectory
+local StartDistESP, StopDistESP
+local StartBallSpeedMeter, StopBallSpeedMeter
+local ApplyChams, RemoveChams
+local StartSafeZone, StopSafeZone
+local ApplyPremFPS, RemovePremFPS
+local SetGhost
+local StartAutoDodge, StopAutoDodge
+local StartComboTracker, StopComboTracker
+local StartSilentBallHighlight, StopSilentBallHighlight
+local StartTargetAlert, StopTargetAlert
+local StartAntiBlock, StopAntiBlock
+local StartParrySound, StopParrySound
+local StartAbilDetect, StopAbilDetect
+local StartPremAbilDetect, StopPremAbilDetect
+local StartPremAbilityESP, StopPremAbilityESP
+
 local PT = W:CreateTab("✨ Premium", nil)
 local PremiumUnlocked = false
 local EnteredKey = ""
+
+local function PremGuard(v, name, cb)
+    if not PremiumUnlocked then
+        Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+        return
+    end
+    cb(v)
+end
 
 PT:CreateSection("✨ Ryuu's HUB Premium")
 PT:CreateLabel("Premium gives you the Aggressive Parry engine —")
@@ -2326,8 +2665,6 @@ PT:CreateSlider({Name="Detect Cooldown (per enemy)",Range={10,100},Increment=5,C
     end})
 
 
--- Forward declarations for ability detector
-local StartAbilDetect, StopAbilDetect, StartPremAbilDetect, StopPremAbilDetect
 do
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY DETECTOR ENGINE ◈ Free + Premium
@@ -2669,14 +3006,6 @@ end
 
 end -- ability detector do..end
 
--- Forward declarations for premium backend 1
-local StartTrajectory, StopTrajectory
-local StartDistESP, StopDistESP
-local StartBallSpeedMeter, StopBallSpeedMeter
-local ApplyChams, RemoveChams
-local StartSafeZone, StopSafeZone
-local ApplyPremFPS, RemovePremFPS
-local SetGhost
 do
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM EXCLUSIVE FEATURES ◈ Backend systems
@@ -3053,14 +3382,6 @@ end
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM TAB ◈ New features added
 -- ══════════════════════════════════════════════════════════════════
-local function PremGuard(v, name, cb)
-    if not PremiumUnlocked then
-        Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
-        return
-    end
-    cb(v)
-end
-
 PT:CreateDivider()
 PT:CreateSection("🎯 Ball Trajectory")
 PT:CreateLabel("Red beam from ball to YOU — see exactly where it's going.")
@@ -3179,13 +3500,6 @@ end})
 
 end -- premium backend 1 do..end
 
--- Forward declarations for premium backend 2
-local StartAutoDodge, StopAutoDodge
-local StartComboTracker, StopComboTracker
-local StartSilentBallHighlight, StopSilentBallHighlight
-local StartTargetAlert, StopTargetAlert
-local StartAntiBlock, StopAntiBlock
-local StartParrySound, StopParrySound
 do
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM FEATURES BATCH 2 ◈ More exclusives
