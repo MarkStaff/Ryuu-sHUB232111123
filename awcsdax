@@ -274,6 +274,7 @@ local VALID_KEYS = {
     "RYUU-KEY1a0da90sdacsdaasdx",
     "RYUU-KEY2o3i4j2o3232sxasdv",
     "09153552478",
+    "x31THEGOAT",
 }
 local IsWhitelisted = false
 local PremiumActive = false
@@ -558,7 +559,7 @@ local function StartEngine()
 
         -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 10.0 then FireParry() end
+            if Dist <= 13.0 then FireParry() end
             return
         end
 
@@ -576,11 +577,10 @@ local function StartEngine()
         end
 
         -- FIX 2+3: Full ping compensation, bigger hitbox
-        local hbox = 10.0
-        -- Adaptive ping multiplier: low ping (0-100ms) = 1x, high ping (100ms+) = scales up
-        -- so laggy players fire much earlier to compensate
-        local pingFactor = PingMs <= 100 and 1.0 or (1.0 + ((PingMs - 100) / 100) * 0.5)
-        pingFactor = math.min(pingFactor, 4.0) -- cap at 4x so it doesn't go insane
+        local hbox = 13.0
+        -- Adaptive ping multiplier: aggressive early fire
+        local pingFactor = PingMs <= 100 and 1.4 or (1.4 + ((PingMs - 100) / 100) * 0.7)
+        pingFactor = math.min(pingFactor, 5.0)
         local pingComp = (PingMs / 1000) * effectiveSpeed * pingFactor
         local fireAt = hbox + pingComp
 
@@ -593,7 +593,7 @@ local function StartEngine()
 
         -- Next-frame extrapolation (2 frames ahead)
         if Speed > 1 then
-            local nextPos = BPos + Vel * (2/60)
+            local nextPos = BPos + Vel * (4/60)
             local nextDist = (HPos - nextPos).Magnitude
             if nextDist <= fireAt then
                 FireParry()
@@ -790,7 +790,7 @@ local function StartPremiumEngine()
 
         -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 12.0 then PremiumFire() end
+            if Dist <= 15.0 then PremiumFire() end
             return
         end
 
@@ -809,10 +809,10 @@ local function StartPremiumEngine()
         end
 
         -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
-        local hbox = P.HitboxTarget or 12.0
-        -- Adaptive ping multiplier: low ping (0-100ms) = 1x, high ping scales aggressively
-        local pingFactor = PingMin <= 100 and 1.0 or (1.0 + ((PingMin - 100) / 100) * 0.6)
-        pingFactor = math.min(pingFactor, 5.0) -- cap at 5x for premium
+        local hbox = P.HitboxTarget or 15.0
+        -- Adaptive ping multiplier: very aggressive for premium
+        local pingFactor = PingMin <= 100 and 1.6 or (1.6 + ((PingMin - 100) / 100) * 0.8)
+        pingFactor = math.min(pingFactor, 6.0)
         local pingComp = (PingMin / 1000) * effectiveSpeed * pingFactor
         local fireAt = hbox + pingComp
 
@@ -822,7 +822,7 @@ local function StartPremiumEngine()
 
         -- 3-frame lookahead (free does 2)
         if Speed > 1 then
-            local nextPos = predictQuadPos(BPos, Vel, 3/60)
+            local nextPos = predictQuadPos(BPos, Vel, 5/60)
             local nextDist = (HPos - nextPos).Magnitude
             if nextDist <= fireAt then
                 PremiumFire(); return
@@ -842,7 +842,7 @@ local function StartPremiumEngine()
 
         -- Dual prediction: quadratic curve check at 1/20s ahead
         if P.QuadCurvePredict then
-            local predPos = predictQuadPos(BPos, Vel, 1/20)
+            local predPos = predictQuadPos(BPos, Vel, 1/12)
             local predDist = (HPos - predPos).Magnitude
             if predDist <= fireAt then
                 PremiumFire()
@@ -1298,6 +1298,7 @@ local function ScanAbility(plr)
     end
     return nil
 end
+local AbilityLastSeen = {}  -- dirty-flag cache: [plr] = last ability string
 local function BuildAbilityBB(plr)
     if not (plr and plr.Character) then return end
     local head = plr.Character:FindFirstChild("Head")
@@ -1305,6 +1306,7 @@ local function BuildAbilityBB(plr)
     if AbilityBBs[plr] and AbilityBBs[plr].Parent then
         pcall(function() AbilityBBs[plr]:Destroy() end)
     end
+    AbilityLastSeen[plr] = nil  -- reset cache on rebuild
     local bb = Instance.new("BillboardGui")
     bb.Name = "RyuuAbilESP"
     bb.AlwaysOnTop = true
@@ -1367,6 +1369,10 @@ local function RefreshBB(plr)
     local stk = bg:FindFirstChildOfClass("UIStroke")
     if not aLbl then return end
     local name = ScanAbility(plr)
+    -- DIRTY FLAG: skip redraw if ability hasn't changed (kills FPS drop)
+    local cacheKey = name or "__none__"
+    if AbilityLastSeen[plr] == cacheKey then return end
+    AbilityLastSeen[plr] = cacheKey
     if name then
         local data = BB_ABILITIES[name]
         if data then
@@ -1426,7 +1432,7 @@ local function StartAbilityESP()
                     AbilityBBs[p] = nil
                 end
             end
-            task.wait(0.4)
+            task.wait(0.8)  -- slowed from 0.4 -- dirty cache means no visual difference
         end
     end)
     Players.PlayerAdded:Connect(function(p)
@@ -1689,24 +1695,7 @@ T3:CreateToggle({Name="Ability ESP",CurrentValue=false,Flag="AESP",Callback=func
         Rayfield:Notify({Title="Ability ESP ◈ OFF",Content="Cards removed.",Duration=2,Image=4483362458})
     end
 end})
-T3:CreateDivider()
-T3:CreateSection("⚡ FPS Booster")
-FPS_Label_Ref = T3:CreateLabel("FPS: measuring...")
-T3:CreateLabel("Targets: lighting, shadows, render fidelity, post FX")
-local FPSLevel=2
-T3:CreateDropdown({Name="Boost Level",Options={"1 — Mild","2 — Medium","3 — Max"},
-    CurrentOption={"2 — Medium"},MultipleOptions=false,Flag="FPSLV",
-    Callback=function(v)
-        local s=type(v)=="table" and v[1] or tostring(v)
-        if s:find("1") then FPSLevel=1 elseif s:find("3") then FPSLevel=3 else FPSLevel=2 end
-    end})
-T3:CreateToggle({Name="FPS Booster",CurrentValue=false,Flag="FPSB",Callback=function(v)
-    if v then ApplyFPS(FPSLevel)
-        Rayfield:Notify({Title="FPS Booster ON",Content="Level "..FPSLevel,Duration=3,Image=4483362458})
-    else RemoveFPS()
-        Rayfield:Notify({Title="FPS Booster OFF",Content="Restored",Duration=2,Image=4483362458})
-    end
-end})
+
 -- ── TAB 4: PLAYER ────────────────────────────────────────────────
 local T4 = W:CreateTab("🧍 Player", nil)
 T4:CreateSection("Movement")
@@ -2414,4 +2403,828 @@ PT:CreateToggle({Name="Premium Ability ESP", CurrentValue=false, Flag="PAESP",
             StopPremAbilityESP()
             Rayfield:Notify({Title="👁 Ability ESP OFF",Content="Cards removed.",Duration=2,Image=4483362458})
         end
+    end})
+
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM EXCLUSIVE FEATURES ◈ Backend systems
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── 1. BALL TRAJECTORY LINE ──────────────────────────────────────
+-- Draws a neon line from the ball toward YOU showing exactly where
+-- it will land. Updates every frame. Premium only.
+local Traj = {conn=nil, beam=nil}
+local function StartTrajectory()
+    if Traj.conn then Traj.conn:Disconnect() end
+    Traj.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall(); if not ball then return end
+            local hrp = GetHRP(); if not hrp then return end
+            local isTgt = ball:GetAttribute("target") == Plr.Name
+            if not isTgt then
+                if Traj.beam then Traj.beam.Enabled = false end
+                return
+            end
+            -- Draw/update attachment beam
+            if not Traj.beam then
+                local a0 = Instance.new("Attachment", ball)
+                a0.Name = "RyuuTA0"
+                local a1 = Instance.new("Attachment", hrp)
+                a1.Name = "RyuuTA1"
+                local beam = Instance.new("Beam", workspace.Terrain)
+                beam.Name = "RyuuTraj.beam"
+                beam.Attachment0 = a0
+                beam.Attachment1 = a1
+                beam.Width0 = 0.08
+                beam.Width1 = 0.08
+                beam.FaceCamera = true
+                beam.Segments = 6
+                beam.Transparency = NumberSequence.new{
+                    NumberSequenceKeypoint.new(0, 0.2),
+                    NumberSequenceKeypoint.new(1, 0.7),
+                }
+                beam.Color = ColorSequence.new(Color3.fromRGB(255, 60, 60))
+                beam.LightEmission = 1
+                beam.LightInfluence = 0
+                beam.Enabled = true
+                Traj.beam = beam
+            else
+                Traj.beam.Enabled = true
+            end
+        end)
+    end)
+end
+local function StopTrajectory()
+    if Traj.conn then Traj.conn:Disconnect(); Traj.conn = nil end
+    pcall(function()
+        if Traj.beam then Traj.beam:Destroy(); Traj.beam = nil end
+        local hrp = GetHRP()
+        if hrp then
+            local a = hrp:FindFirstChild("RyuuTA1")
+            if a then a:Destroy() end
+        end
+        local ball = GetBall()
+        if ball then
+            local a = ball:FindFirstChild("RyuuTA0")
+            if a then a:Destroy() end
+        end
+        local b = workspace.Terrain:FindFirstChild("RyuuTraj.beam")
+        if b then b:Destroy() end
+    end)
+end
+
+-- ── 2. ENEMY DISTANCE ESP ────────────────────────────────────────
+-- Floating tag above each enemy showing their stud distance from you.
+-- Updates every 0.2s. Color: green=far, yellow=close, red=danger.
+local DistESP = {bbs={}, conn=nil}
+local function StartDistESP()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character then
+            local head = p.Character:FindFirstChild("Head")
+            if head then
+                local bb = Instance.new("BillboardGui", head)
+                bb.Name = "RyuuDistESP"
+                bb.AlwaysOnTop = true
+                bb.Size = UDim2.new(0, 60, 0, 18)
+                bb.StudsOffset = Vector3.new(0, 2.0, 0)
+                bb.MaxDistance = 120
+                local lbl = Instance.new("TextLabel", bb)
+                lbl.Size = UDim2.new(1,0,1,0)
+                lbl.BackgroundTransparency = 1
+                lbl.Font = Enum.Font.GothamBold
+                lbl.TextSize = 11
+                lbl.Text = "-- st"
+                lbl.TextColor3 = Color3.fromRGB(100,255,100)
+                DistESP.bbs[p] = bb
+            end
+        end
+    end
+    DistESP.conn = RunService.Heartbeat:Connect(function()
+        local hrp = GetHRP(); if not hrp then return end
+        for p, bb in pairs(DistESP.bbs) do
+            pcall(function()
+                if not p.Parent or not p.Character then return end
+                local ehr = p.Character:FindFirstChild("HumanoidRootPart")
+                if not ehr or not bb.Parent then return end
+                local d = math.floor((hrp.Position - ehr.Position).Magnitude)
+                local lbl = bb:FindFirstChildOfClass("TextLabel")
+                if lbl then
+                    lbl.Text = d.."st"
+                    lbl.TextColor3 = d <= 15 and Color3.fromRGB(255,60,60)
+                                  or d <= 35 and Color3.fromRGB(255,200,50)
+                                  or Color3.fromRGB(60,220,100)
+                end
+            end)
+        end
+    end)
+    Players.PlayerAdded:Connect(function(p)
+        p.CharacterAdded:Connect(function(char)
+            task.wait(0.5)
+            local head = char:FindFirstChild("Head"); if not head then return end
+            local bb = Instance.new("BillboardGui", head)
+            bb.Name = "RyuuDistESP"; bb.AlwaysOnTop = true
+            bb.Size = UDim2.new(0,60,0,18); bb.StudsOffset = Vector3.new(0,2.0,0)
+            bb.MaxDistance = 120
+            local lbl = Instance.new("TextLabel", bb)
+            lbl.Size = UDim2.new(1,0,1,0); lbl.BackgroundTransparency = 1
+            lbl.Font = Enum.Font.GothamBold; lbl.TextSize = 11
+            lbl.Text = "-- st"; lbl.TextColor3 = Color3.fromRGB(100,255,100)
+            DistESP.bbs[p] = bb
+        end)
+    end)
+end
+local function StopDistESP()
+    if DistESP.conn then DistESP.conn:Disconnect(); DistESP.conn = nil end
+    for _, bb in pairs(DistESP.bbs) do
+        pcall(function() if bb and bb.Parent then bb:Destroy() end end)
+    end
+    DistESP.bbs = {}
+end
+
+-- ── 3. BALL SPEED METER ──────────────────────────────────────────
+-- Floating HUD showing current ball speed in studs/s.
+-- Also shows if a speed boost is active.
+local BSM = {gui=nil, conn=nil}
+local function StartBallSpeedMeter()
+    if BSM.gui then pcall(function() BSM.gui:Destroy() end) end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "RyuuBSM"; sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true; sg.DisplayOrder = 9995
+    pcall(function() sg.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not sg.Parent then pcall(function() sg.Parent = Plr:WaitForChild("PlayerGui") end) end
+    BSM.gui = sg
+    local card = Instance.new("Frame", sg)
+    card.AnchorPoint = Vector2.new(1,1)
+    card.Position = UDim2.new(1,-12,1,-12)
+    card.Size = UDim2.new(0,160,0,46)
+    card.BackgroundColor3 = Color3.fromRGB(8,4,18)
+    card.BackgroundTransparency = 0.2
+    card.BorderSizePixel = 0
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0,8)
+    local stroke = Instance.new("UIStroke", card)
+    stroke.Thickness = 1; stroke.Color = Color3.fromRGB(90,40,180)
+    local titleLbl = Instance.new("TextLabel", card)
+    titleLbl.Size = UDim2.new(1,-8,0,16)
+    titleLbl.Position = UDim2.new(0,4,0,4)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = "⚽ BALL SPEED"
+    titleLbl.Font = Enum.Font.GothamBold; titleLbl.TextSize = 10
+    titleLbl.TextColor3 = Color3.fromRGB(120,80,200)
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local speedLbl = Instance.new("TextLabel", card)
+    speedLbl.Size = UDim2.new(1,-8,0,22)
+    speedLbl.Position = UDim2.new(0,4,0,20)
+    speedLbl.BackgroundTransparency = 1
+    speedLbl.Text = "-- st/s"
+    speedLbl.Font = Enum.Font.GothamBlack; speedLbl.TextSize = 16
+    speedLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    speedLbl.TextXAlignment = Enum.TextXAlignment.Left
+    BSM.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall()
+            if not ball then speedLbl.Text = "No Ball"; speedLbl.TextColor3 = Color3.fromRGB(80,75,100); return end
+            local spd = math.floor(GetVel(ball).Magnitude)
+            local col = spd >= 150 and Color3.fromRGB(255,60,60)
+                     or spd >= 80  and Color3.fromRGB(255,200,50)
+                     or Color3.fromRGB(60,220,100)
+            speedLbl.Text = spd.." st/s"
+            speedLbl.TextColor3 = col
+            stroke.Color = col
+        end)
+    end)
+end
+local function StopBallSpeedMeter()
+    if BSM.conn then BSM.conn:Disconnect(); BSM.conn = nil end
+    if BSM.gui then pcall(function() BSM.gui:Destroy() end); BSM.gui = nil end
+end
+
+-- ── 4. CHAMS (Enemy highlight through walls) ─────────────────────
+-- Makes all enemies glow a solid highlight color visible through walls.
+local ChamsActive = false
+local ChamsOriginals = {}
+local function ApplyChams(col)
+    ChamsOriginals = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character then
+            for _, part in ipairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    table.insert(ChamsOriginals, {
+                        part = part,
+                        color = part.Color,
+                        mat = part.Material,
+                        cast = part.CastShadow,
+                    })
+                    pcall(function()
+                        part.Color = col
+                        part.Material = Enum.Material.Neon
+                        part.CastShadow = false
+                    end)
+                end
+            end
+        end
+    end
+    ChamsActive = true
+end
+local function RemoveChams()
+    for _, v in ipairs(ChamsOriginals) do
+        pcall(function()
+            v.part.Color = v.color
+            v.part.Material = v.mat
+            v.part.CastShadow = v.cast
+        end)
+    end
+    ChamsOriginals = {}
+    ChamsActive = false
+end
+
+-- ── 5. SAFE ZONE INDICATOR ───────────────────────────────────────
+-- Pulses screen edge red when ball is targeting YOU and close.
+-- Warning kicks in when ball is within 25 studs.
+local SZ = {gui=nil, conn=nil}
+local function StartSafeZone()
+    if SZ.gui then pcall(function() SZ.gui:Destroy() end) end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "RyuuSZ"; sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true; sg.DisplayOrder = 9994
+    pcall(function() sg.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not sg.Parent then pcall(function() sg.Parent = Plr:WaitForChild("PlayerGui") end) end
+    SZ.gui = sg
+    local edge = Instance.new("Frame", sg)
+    edge.Size = UDim2.new(1,0,1,0)
+    edge.BackgroundTransparency = 1
+    edge.BorderSizePixel = 0
+    local stroke = Instance.new("UIStroke", edge)
+    stroke.Thickness = 14
+    stroke.Color = Color3.fromRGB(255,40,40)
+    stroke.Transparency = 1
+    SZ.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall(); if not ball then stroke.Transparency=1; return end
+            local hrp = GetHRP(); if not hrp then stroke.Transparency=1; return end
+            local isTgt = ball:GetAttribute("target") == Plr.Name
+            if not isTgt then stroke.Transparency=1; return end
+            local dist = (hrp.Position - ball.Position).Magnitude
+            if dist <= 25 then
+                local intensity = 1 - (dist / 25)
+                stroke.Transparency = 1 - (intensity * 0.85)
+                stroke.Color = dist <= 10
+                    and Color3.fromRGB(255,40,40)
+                    or  Color3.fromRGB(255,140,40)
+            else
+                stroke.Transparency = 1
+            end
+        end)
+    end)
+end
+local function StopSafeZone()
+    if SZ.conn then SZ.conn:Disconnect(); SZ.conn = nil end
+    if SZ.gui then pcall(function() SZ.gui:Destroy() end); SZ.gui = nil end
+end
+
+-- ── 6. PREMIUM FPS BOOSTER ───────────────────────────────────────
+-- More aggressive than the old free one. Removes ALL particles,
+-- disables ALL post effects, nukes shadows, lowers render distance.
+local PremFPS = {active=false, saved={effects={},casters={},fidelity={},parts={}}}
+local function ApplyPremFPS()
+    if PremFPS.active then return end; PremFPS.active = true
+    PremFPS.saved = {effects={},casters={},fidelity={},parts={}}
+    -- Nuke lighting
+    pcall(function()
+        PremFPS.saved.tech    = Lighting.Technology
+        PremFPS.saved.shadow  = Lighting.GlobalShadows
+        PremFPS.saved.envD    = Lighting.EnvironmentDiffuseScale
+        PremFPS.saved.envS    = Lighting.EnvironmentSpecularScale
+        PremFPS.saved.bright  = Lighting.Brightness
+        Lighting.Technology               = Enum.Technology.Compatibility
+        Lighting.GlobalShadows            = false
+        Lighting.EnvironmentDiffuseScale  = 0
+        Lighting.EnvironmentSpecularScale = 0
+        for _, e in ipairs(Lighting:GetChildren()) do
+            if e:IsA("PostEffect") or e:IsA("Sky") or e:IsA("Atmosphere") then
+                table.insert(PremFPS.saved.effects, {o=e, was=e.Enabled})
+                pcall(function() e.Enabled = false end)
+            end
+        end
+    end)
+    -- Nuke all workspace parts
+    pcall(function()
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                if v.CastShadow then
+                    table.insert(PremFPS.saved.casters, v); v.CastShadow = false
+                end
+                if v.RenderFidelity ~= Enum.RenderFidelity.Performance then
+                    table.insert(PremFPS.saved.fidelity, {o=v,was=v.RenderFidelity})
+                    pcall(function() v.RenderFidelity = Enum.RenderFidelity.Performance end)
+                end
+            end
+            -- Kill all particles
+            if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                table.insert(PremFPS.saved.parts, {o=v,was=v.Enabled})
+                pcall(function() v.Enabled = false end)
+            end
+        end
+    end)
+    -- Watch new parts
+    if Conn.PremFPSWatch then Conn.PremFPSWatch:Disconnect() end
+    Conn.PremFPSWatch = workspace.DescendantAdded:Connect(function(v)
+        if not PremFPS.active then return end
+        pcall(function()
+            if v:IsA("BasePart") then
+                v.CastShadow = false
+                v.RenderFidelity = Enum.RenderFidelity.Performance
+            end
+            if v:IsA("ParticleEmitter") or v:IsA("Fire") or v:IsA("Smoke") or v:IsA("Sparkles") then
+                v.Enabled = false
+            end
+        end)
+    end)
+end
+local function RemovePremFPS()
+    if not PremFPS.active then return end; PremFPS.active = false
+    if Conn.PremFPSWatch then Conn.PremFPSWatch:Disconnect(); Conn.PremFPSWatch=nil end
+    pcall(function()
+        Lighting.Technology               = PremFPS.saved.tech
+        Lighting.GlobalShadows            = PremFPS.saved.shadow
+        Lighting.EnvironmentDiffuseScale  = PremFPS.saved.envD
+        Lighting.EnvironmentSpecularScale = PremFPS.saved.envS
+        if PremFPS.saved.bright then Lighting.Brightness = PremFPS.saved.bright end
+    end)
+    for _, e in ipairs(PremFPS.saved.effects)   do pcall(function() e.o.Enabled = e.was end) end
+    for _, v in ipairs(PremFPS.saved.casters)   do pcall(function() v.CastShadow = true end) end
+    for _, e in ipairs(PremFPS.saved.fidelity)  do pcall(function() e.o.RenderFidelity = e.was end) end
+    for _, e in ipairs(PremFPS.saved.parts)     do pcall(function() e.o.Enabled = e.was end) end
+end
+
+-- ── 7. GHOST MODE (Server-side invisible) ────────────────────────
+-- Makes your character transparent locally. Very useful for
+-- dodging + confusing enemies visually.
+local Ghost = {active=false, orig={}}
+local function SetGhost(on)
+    Ghost.active = on
+    local char = Plr.Character; if not char then return end
+    if on then
+        Ghost.orig = {}
+        for _, v in ipairs(char:GetDescendants()) do
+            if v:IsA("BasePart") or v:IsA("Decal") then
+                table.insert(Ghost.orig, {o=v, t=v.Transparency})
+                pcall(function() v.Transparency = 0.75 end)
+            end
+        end
+    else
+        for _, v in ipairs(Ghost.orig) do
+            pcall(function() v.o.Transparency = v.t end)
+        end
+        Ghost.orig = {}
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM TAB ◈ New features added
+-- ══════════════════════════════════════════════════════════════════
+local function PremGuard(v, name, cb)
+    if not PremiumUnlocked then
+        Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+        return
+    end
+    cb(v)
+end
+
+PT:CreateDivider()
+PT:CreateSection("🎯 Ball Trajectory")
+PT:CreateLabel("Red beam from ball to YOU — see exactly where it's going.")
+PT:CreateToggle({Name="Ball Trajectory Line", CurrentValue=false, Flag="PTRAJ",
+    Callback=function(v) PremGuard(v,"Trajectory",function(val)
+        if val then StartTrajectory()
+            Rayfield:Notify({Title="🎯 Trajectory ON",Content="Red line shows ball path.",Duration=3,Image=4483362458})
+        else StopTrajectory() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("📏 Enemy Distance ESP")
+PT:CreateLabel("Shows stud distance above every enemy. Red = danger zone.")
+PT:CreateToggle({Name="Distance ESP", CurrentValue=false, Flag="PDESP",
+    Callback=function(v) PremGuard(v,"DistESP",function(val)
+        if val then StartDistESP()
+            Rayfield:Notify({Title="📏 Distance ESP ON",Content="Stud tags active.",Duration=3,Image=4483362458})
+        else StopDistESP() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("⚽ Ball Speed Meter")
+PT:CreateLabel("Live ball speed in studs/s. Red = dangerous speed.")
+PT:CreateToggle({Name="Ball Speed Meter", CurrentValue=false, Flag="PBSM",
+    Callback=function(v) PremGuard(v,"BSM",function(val)
+        if val then StartBallSpeedMeter()
+            Rayfield:Notify({Title="⚽ Speed Meter ON",Content="Bottom-right corner.",Duration=3,Image=4483362458})
+        else StopBallSpeedMeter() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🌟 Enemy Chams")
+PT:CreateLabel("Enemies glow through walls. Neon highlight color.")
+PT:CreateDropdown({Name="Chams Color",
+    Options={"Red","Purple","Cyan","Yellow","White","Orange"},
+    CurrentOption={"Red"}, MultipleOptions=false, Flag="PCHAMSCOL",
+    Callback=function(v)
+        if not PremiumUnlocked then return end
+        local s = type(v)=="table" and v[1] or tostring(v)
+        local cols = {
+            Red=Color3.fromRGB(255,60,60), Purple=Color3.fromRGB(180,40,255),
+            Cyan=Color3.fromRGB(0,220,220), Yellow=Color3.fromRGB(255,220,40),
+            White=Color3.fromRGB(240,240,255), Orange=Color3.fromRGB(255,120,20),
+        }
+        if ChamsActive then RemoveChams(); ApplyChams(cols[s] or cols.Red) end
+    end})
+PT:CreateToggle({Name="Enemy Chams", CurrentValue=false, Flag="PCHAMS",
+    Callback=function(v) PremGuard(v,"Chams",function(val)
+        if val then
+            local colMap = {Red=Color3.fromRGB(255,60,60),Purple=Color3.fromRGB(180,40,255),
+                Cyan=Color3.fromRGB(0,220,220),Yellow=Color3.fromRGB(255,220,40),
+                White=Color3.fromRGB(240,240,255),Orange=Color3.fromRGB(255,120,20)}
+            local ok,sel = pcall(function()
+                return Rayfield.Flags and Rayfield.Flags.PCHAMSCOL and Rayfield.Flags.PCHAMSCOL.Value or "Red"
+            end)
+            local selName = (ok and sel) or "Red"
+            ApplyChams(colMap[selName] or colMap.Red)
+            Rayfield:Notify({Title="🌟 Chams ON",Content="Enemies highlighted.",Duration=3,Image=4483362458})
+        else RemoveChams() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🔴 Danger Screen Pulse")
+PT:CreateLabel("Screen edge pulses RED when ball is flying at you.")
+PT:CreateLabel("Brighter = closer. Impossible to miss incoming ball.")
+PT:CreateToggle({Name="Danger Pulse", CurrentValue=false, Flag="PSZ",
+    Callback=function(v) PremGuard(v,"SafeZone",function(val)
+        if val then StartSafeZone()
+            Rayfield:Notify({Title="🔴 Danger Pulse ON",Content="Screen edge warns you.",Duration=3,Image=4483362458})
+        else StopSafeZone() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("⚡ Premium FPS Booster")
+PT:CreateLabel("Kills particles, shadows, atmosphere, post FX — everything.")
+PT:CreateLabel("Way more aggressive than the old free version.")
+PT:CreateToggle({Name="Premium FPS Boost", CurrentValue=false, Flag="PFPSB",
+    Callback=function(v) PremGuard(v,"PremFPS",function(val)
+        if val then ApplyPremFPS()
+            Rayfield:Notify({Title="⚡ Premium FPS ON",Content="Max performance mode.",Duration=3,Image=4483362458})
+        else RemovePremFPS()
+            Rayfield:Notify({Title="⚡ Premium FPS OFF",Content="Restored.",Duration=2,Image=4483362458})
+        end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("👻 Ghost Mode")
+PT:CreateLabel("Makes your character 75% transparent locally.")
+PT:CreateLabel("Confuses enemies — they can barely see you moving.")
+PT:CreateToggle({Name="Ghost Mode", CurrentValue=false, Flag="PGHOST",
+    Callback=function(v) PremGuard(v,"Ghost",function(val)
+        SetGhost(val)
+        Rayfield:Notify({
+            Title = val and "👻 Ghost Mode ON" or "👻 Ghost Mode OFF",
+            Content = val and "You are nearly invisible." or "Restored.",
+            Duration = 3, Image = 4483362458,
+        })
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("📊 Premium Status")
+PT:CreateButton({Name="Check Premium Status", Callback=function()
+    if PremiumUnlocked then
+        Rayfield:Notify({Title="✨ Premium ACTIVE",Content="All premium features unlocked.",Duration=4,Image=4483362458})
+    else
+        Rayfield:Notify({Title="🔒 Not Unlocked",Content="Enter your key above.",Duration=4,Image=4483362458})
+    end
+end})
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM FEATURES BATCH 2 ◈ More exclusives
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── 8. AUTO DODGE ────────────────────────────────────────────────
+-- When the ball is targeting YOU and within a threshold,
+-- fires a random strafe direction to break the ball's path.
+-- Uses BodyVelocity for a clean instant burst.
+local AutoDodge = {conn=nil, cd=0}
+local function StartAutoDodge()
+    if AutoDodge.conn then AutoDodge.conn:Disconnect() end
+    AutoDodge.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            if not PremiumUnlocked then return end
+            local ball = GetBall(); if not ball then return end
+            local hrp = GetHRP(); if not hrp then return end
+            if ball:GetAttribute("target") ~= Plr.Name then return end
+            local dist = (hrp.Position - ball.Position).Magnitude
+            local now = os.clock()
+            if dist <= 18 and now - AutoDodge.cd > 1.2 then
+                AutoDodge.cd = now
+                local dirs = {
+                    hrp.CFrame.RightVector,
+                    -hrp.CFrame.RightVector,
+                    hrp.CFrame.RightVector + hrp.CFrame.LookVector,
+                    -hrp.CFrame.RightVector - hrp.CFrame.LookVector,
+                }
+                local dir = dirs[math.random(1, #dirs)]
+                local bv = Instance.new("BodyVelocity", hrp)
+                bv.Velocity = dir * 55
+                bv.MaxForce = Vector3.new(1e5, 0, 1e5)
+                game:GetService("Debris"):AddItem(bv, 0.12)
+            end
+        end)
+    end)
+end
+local function StopAutoDodge()
+    if AutoDodge.conn then AutoDodge.conn:Disconnect(); AutoDodge.conn = nil end
+end
+
+-- ── 9. COMBO TRACKER ─────────────────────────────────────────────
+-- Counts consecutive successful parries this round.
+-- Shows on a floating HUD with streak record.
+local Combo = {gui=nil, count=0, record=0, conn=nil, lastPCount=0}
+local function StartComboTracker()
+    if Combo.gui then pcall(function() Combo.gui:Destroy() end) end
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "RyuuCombo"; sg.ResetOnSpawn = false
+    sg.IgnoreGuiInset = true; sg.DisplayOrder = 9993
+    pcall(function() sg.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not sg.Parent then pcall(function() sg.Parent = Plr:WaitForChild("PlayerGui") end) end
+    Combo.gui = sg
+    local card = Instance.new("Frame", sg)
+    card.AnchorPoint = Vector2.new(0, 0.5)
+    card.Position = UDim2.new(0, 14, 0.5, 0)
+    card.Size = UDim2.new(0, 120, 0, 60)
+    card.BackgroundColor3 = Color3.fromRGB(6, 4, 14)
+    card.BackgroundTransparency = 0.15
+    card.BorderSizePixel = 0
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10)
+    local stroke = Instance.new("UIStroke", card)
+    stroke.Thickness = 1.2; stroke.Color = Color3.fromRGB(90, 40, 180)
+    local titleL = Instance.new("TextLabel", card)
+    titleL.Size = UDim2.new(1,-8,0,16); titleL.Position = UDim2.new(0,4,0,4)
+    titleL.BackgroundTransparency = 1; titleL.Text = "⚔ COMBO"
+    titleL.Font = Enum.Font.GothamBold; titleL.TextSize = 10
+    titleL.TextColor3 = Color3.fromRGB(120,80,200); titleL.TextXAlignment = Enum.TextXAlignment.Left
+    local comboL = Instance.new("TextLabel", card)
+    comboL.Name = "CL"
+    comboL.Size = UDim2.new(1,-8,0,22); comboL.Position = UDim2.new(0,4,0,18)
+    comboL.BackgroundTransparency = 1; comboL.Text = "x0"
+    comboL.Font = Enum.Font.GothamBlack; comboL.TextSize = 20
+    comboL.TextColor3 = Color3.fromRGB(200,200,220); comboL.TextXAlignment = Enum.TextXAlignment.Left
+    local recL = Instance.new("TextLabel", card)
+    recL.Name = "RL"
+    recL.Size = UDim2.new(1,-8,0,14); recL.Position = UDim2.new(0,4,0,42)
+    recL.BackgroundTransparency = 1; recL.Text = "Best: 0"
+    recL.Font = Enum.Font.Gotham; recL.TextSize = 10
+    recL.TextColor3 = Color3.fromRGB(100,80,150); recL.TextXAlignment = Enum.TextXAlignment.Left
+    -- Watch parry counter
+    Combo.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local cl = card:FindFirstChild("CL"); if not cl then return end
+            local rl = card:FindFirstChild("RL"); if not rl then return end
+            if S.ParryCount ~= Combo.lastPCount then
+                Combo.count = Combo.count + (S.ParryCount - Combo.lastPCount)
+                if Combo.count > Combo.record then Combo.record = Combo.count end
+                Combo.lastPCount = S.ParryCount
+                cl.Text = "x"..Combo.count
+                rl.Text = "Best: "..Combo.record
+                -- Color tier
+                local col = Combo.count >= 20 and Color3.fromRGB(255,60,220)
+                         or Combo.count >= 10 and Color3.fromRGB(255,130,30)
+                         or Combo.count >=  5 and Color3.fromRGB(80,220,120)
+                         or Color3.fromRGB(200,200,220)
+                cl.TextColor3 = col
+                stroke.Color = col
+            end
+        end)
+    end)
+    -- Reset combo on death
+    Plr.CharacterAdded:Connect(function()
+        Combo.count = 0
+        pcall(function()
+            local cl = card:FindFirstChild("CL"); if cl then cl.Text="x0"; cl.TextColor3=Color3.fromRGB(200,200,220) end
+        end)
+    end)
+end
+local function StopComboTracker()
+    if Combo.conn then Combo.conn:Disconnect(); Combo.conn = nil end
+    if Combo.gui then pcall(function() Combo.gui:Destroy() end); Combo.gui = nil end
+end
+
+-- ── 10. SILENT BALL HIGHLIGHT ────────────────────────────────────
+-- Makes the ball glow bright neon when targeting YOU specifically.
+-- Normal color otherwise. Impossible to lose track of.
+local SBH = {conn=nil, color=nil, mat=nil}
+local function StartSilentBallHighlight()
+    if SBH.conn then SBH.conn:Disconnect() end
+    SBH.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall(); if not ball then return end
+            local bp = ball:FindFirstChildOfClass("BasePart") or ball
+            if not bp:IsA("BasePart") then return end
+            if ball:GetAttribute("target") == Plr.Name then
+                if SBH.color == nil then
+                    SBH.color = bp.Color
+                    SBH.mat   = bp.Material
+                end
+                bp.Color    = Color3.fromRGB(255, 50, 50)
+                bp.Material = Enum.Material.Neon
+            else
+                if SBH.color then
+                    bp.Color    = SBH.color
+                    bp.Material = SBH.mat
+                    SBH.color = nil; SBH.mat = nil
+                end
+            end
+        end)
+    end)
+end
+local function StopSilentBallHighlight()
+    if SBH.conn then SBH.conn:Disconnect(); SBH.conn = nil end
+    pcall(function()
+        local ball = GetBall(); if not ball then return end
+        local bp = ball:FindFirstChildOfClass("BasePart") or ball
+        if SBH.color and bp:IsA("BasePart") then
+            bp.Color = SBH.color; bp.Material = SBH.mat
+        end
+        SBH.color = nil; SBH.mat = nil
+    end)
+end
+
+-- ── 11. TARGET ALERT ─────────────────────────────────────────────
+-- Pops a screen notification the instant the ball switches to target YOU.
+-- Shows who passed it and the ball speed at time of targeting.
+local TA = {conn=nil, last=""}
+local function StartTargetAlert()
+    if TA.conn then TA.conn:Disconnect() end
+    TA.last = ""
+    TA.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall(); if not ball then TA.last=""; return end
+            local tgt = ball:GetAttribute("target") or ""
+            if tgt == Plr.Name and TA.last ~= Plr.Name then
+                -- Ball just switched to us
+                local spd = math.floor(GetVel(ball).Magnitude)
+                Rayfield:Notify({
+                    Title = "🎯 BALL INCOMING",
+                    Content = "Speed: "..spd.." st/s — GET READY",
+                    Duration = 1.5,
+                    Image = 4483362458,
+                })
+            end
+            TA.last = tgt
+        end)
+    end)
+end
+local function StopTargetAlert()
+    if TA.conn then TA.conn:Disconnect(); TA.conn = nil end
+    TA.last = ""
+end
+
+-- ── 12. ANTI-BLOCK (spam prevention bypass) ──────────────────────
+-- Auto-detects when your parry key is eaten (e.g. clicked too fast)
+-- and re-fires once with a 0.05s delay to push it through.
+local AB = {conn=nil, last=0}
+local function StartAntiBlock()
+    if AB.conn then AB.conn:Disconnect() end
+    local prevCount = S.ParryCount
+    AB.conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local now = os.clock()
+            -- If we fired but parry count didn't go up in 0.15s, re-fire
+            if S.DidParry and now - S.LastParry > 0.1 and now - AB.last > 0.3 then
+                if S.ParryCount == prevCount then
+                    task.delay(0.05, function()
+                        if not S.DidParry then return end
+                        VIM:SendMouseButtonEvent(0,0,0,true,game,0)
+                        task.wait(0.02)
+                        VIM:SendMouseButtonEvent(0,0,0,false,game,0)
+                        AB.last = os.clock()
+                    end)
+                end
+            end
+            prevCount = S.ParryCount
+        end)
+    end)
+end
+local function StopAntiBlock()
+    if AB.conn then AB.conn:Disconnect(); AB.conn = nil end
+end
+
+-- ── 13. PARRY SOUND ALERT ────────────────────────────────────────
+-- Plays a local beep sound on successful parry so you can hear
+-- your own parry rate without watching the counter.
+local PS = {sound=nil, conn=nil, last=0}
+local function SetupParrySound()
+    PS.sound = Instance.new("Sound")
+    PS.sound.SoundId = "rbxassetid://6042053626"
+    PS.sound.Volume = 0.4
+    PS.sound.RollOffMaxDistance = 0
+    PS.sound.Parent = workspace
+end
+local function StartParrySound()
+    SetupParrySound()
+    local lastCount = S.ParryCount
+    PS.soundConn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            if S.ParryCount ~= lastCount then
+                lastCount = S.ParryCount
+                local now = os.clock()
+                if now - PS.soundLast > 0.1 then
+                    PS.soundLast = now
+                    PS.sound:Play()
+                end
+            end
+        end)
+    end)
+end
+local function StopParrySound()
+    if PS.soundConn then PS.soundConn:Disconnect(); PS.soundConn = nil end
+    if PS.sound then pcall(function() PS.sound:Destroy() end); PS.sound = nil end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM TAB ◈ Batch 2 UI additions
+-- ══════════════════════════════════════════════════════════════════
+PT:CreateDivider()
+PT:CreateSection("💨 Auto Dodge")
+PT:CreateLabel("Strafes randomly when ball is ~18 studs away targeting you.")
+PT:CreateLabel("1.2s cooldown so it doesn't spam. Works with any parry engine.")
+PT:CreateToggle({Name="Auto Dodge", CurrentValue=false, Flag="PADODGE",
+    Callback=function(v) PremGuard(v,"AutoDodge",function(val)
+        if val then StartAutoDodge()
+            Rayfield:Notify({Title="💨 Auto Dodge ON",Content="Will strafe when ball closes in.",Duration=3,Image=4483362458})
+        else StopAutoDodge() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("⚔ Combo Tracker")
+PT:CreateLabel("Counts consecutive parries. Left side of screen. Tracks your best.")
+PT:CreateToggle({Name="Combo Tracker", CurrentValue=false, Flag="PCOMBO",
+    Callback=function(v) PremGuard(v,"Combo",function(val)
+        if val then StartComboTracker()
+            Rayfield:Notify({Title="⚔ Combo ON",Content="Left side of screen.",Duration=3,Image=4483362458})
+        else StopComboTracker() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🔴 Ball Highlight")
+PT:CreateLabel("Ball turns RED neon when it's targeting you. Never lose it.")
+PT:CreateToggle({Name="Ball Highlight (Targeting You)", CurrentValue=false, Flag="PSBH",
+    Callback=function(v) PremGuard(v,"BallHL",function(val)
+        if val then StartSilentBallHighlight()
+            Rayfield:Notify({Title="🔴 Ball Highlight ON",Content="Ball glows red when on you.",Duration=3,Image=4483362458})
+        else StopSilentBallHighlight() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🎯 Target Alert")
+PT:CreateLabel("Instant notification the moment the ball switches to target YOU.")
+PT:CreateLabel("Shows ball speed so you know how fast to react.")
+PT:CreateToggle({Name="Target Alert", CurrentValue=false, Flag="PTGTALERT",
+    Callback=function(v) PremGuard(v,"TargetAlert",function(val)
+        if val then StartTargetAlert()
+            Rayfield:Notify({Title="🎯 Target Alert ON",Content="You'll be notified instantly.",Duration=3,Image=4483362458})
+        else StopTargetAlert() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🛡 Anti-Block")
+PT:CreateLabel("Re-fires parry if it gets eaten by the game's click filter.")
+PT:CreateLabel("Fixes missed parries caused by rapid clicking.")
+PT:CreateToggle({Name="Anti-Block", CurrentValue=false, Flag="PANTIBLOCK",
+    Callback=function(v) PremGuard(v,"AntiBlock",function(val)
+        if val then StartAntiBlock()
+            Rayfield:Notify({Title="🛡 Anti-Block ON",Content="Missed parries auto-retry.",Duration=3,Image=4483362458})
+        else StopAntiBlock() end
+    end)
+end})
+
+PT:CreateDivider()
+PT:CreateSection("🔊 Parry Sound")
+PT:CreateLabel("Plays a click sound on every successful parry.")
+PT:CreateLabel("Lets you hear your own parry rate without watching the HUD.")
+PT:CreateToggle({Name="Parry Sound", CurrentValue=false, Flag="PPSOUND",
+    Callback=function(v) PremGuard(v,"ParrySound",function(val)
+        if val then StartParrySound()
+            Rayfield:Notify({Title="🔊 Parry Sound ON",Content="Click = confirmed parry.",Duration=3,Image=4483362458})
+        else StopParrySound() end
+    end)
+end})
+PT:CreateSlider({Name="Sound Volume", Range={0,100}, Increment=5, CurrentValue=40, Suffix="%", Flag="PVOL",
+    Callback=function(v)
+        if not PremiumUnlocked then return end
+        if PS.sound then pcall(function() PS.sound.Volume = v/100 end) end
     end})
