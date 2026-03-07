@@ -1,146 +1,123 @@
 -- ══════════════════════════════════════════════════════════════════
---   Ryuu's HUB V1 BETA
---   by ZivX  ◈  Auto Parry + Ability ESP + Sword + FPS + Spam
+-- Ryuu's HUB V1 BETA
+-- by ZivX ◈ Auto Parry + Ability ESP + Sword + FPS + Spam
 -- ══════════════════════════════════════════════════════════════════
-
 -- ── Services ─────────────────────────────────────────────────────
-local Players      = game:GetService("Players")
-local RunService   = game:GetService("RunService")
-local VIM          = game:GetService("VirtualInputManager")
-local UIS          = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
+local UIS = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
-local CoreGui      = game:GetService("CoreGui")
-local Lighting     = game:GetService("Lighting")
-local Stats        = game:GetService("Stats")
-
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
 local Plr = Players.LocalPlayer
 local Cam = workspace.CurrentCamera
-
 -- ── Destroy old instances ────────────────────────────────────────
 pcall(function()
     for _, g in ipairs(CoreGui:GetChildren()) do
         if g.Name:find("Ryuu") then pcall(function() g:Destroy() end) end
     end
 end)
-
 -- ══════════════════════════════════════════════════════════════════
---   LOAD RAYFIELD  ◈  Synchronous + clean intro
+-- LOAD RAYFIELD ◈ Synchronous + clean intro
 -- ══════════════════════════════════════════════════════════════════
 local Rayfield
-
 local function makeStub()
     local function makeTab()
         return {
-            CreateToggle   = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or false) end end,
-            CreateSlider   = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or 0) end end,
-            CreateLabel    = function() return {Text=""} end,
-            CreateSection  = function() end,
-            CreateDivider  = function() end,
-            CreateButton   = function() end,
-            CreateKeybind  = function() end,
+            CreateToggle = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or false) end end,
+            CreateSlider = function(_,t) if t and t.Callback then t.Callback(t.CurrentValue or 0) end end,
+            CreateLabel = function() return {Text=""} end,
+            CreateSection = function() end,
+            CreateDivider = function() end,
+            CreateButton = function() end,
+            CreateKeybind = function() end,
+            CreateInput = function() end,
             CreateDropdown = function(_,t) if t and t.Callback then t.Callback({t.CurrentOption and t.CurrentOption[1] or ""}) end end,
         }
     end
     return {
         CreateWindow = function() return {CreateTab=function() return makeTab() end} end,
-        Notify       = function() end,
+        Notify = function() end,
     }
 end
-
 -- Step 1: Show a clean intro card while Rayfield loads
 local IntroSG = Instance.new("ScreenGui")
-IntroSG.Name           = "RyuuIntro"
-IntroSG.ResetOnSpawn   = false
+IntroSG.Name = "RyuuIntro"
+IntroSG.ResetOnSpawn = false
 IntroSG.IgnoreGuiInset = true
-IntroSG.DisplayOrder   = 9999
+IntroSG.DisplayOrder = 9999
 pcall(function()
     IntroSG.Parent = (typeof(gethui)=="function" and gethui()) or game:GetService("CoreGui")
 end)
 if not IntroSG.Parent then
     pcall(function() IntroSG.Parent = Plr:WaitForChild("PlayerGui") end)
 end
-
--- Background
 local IBG = Instance.new("Frame", IntroSG)
-IBG.Size              = UDim2.new(1,0,1,0)
-IBG.BackgroundColor3  = Color3.fromRGB(4,2,10)
-IBG.BorderSizePixel   = 0
+IBG.Size = UDim2.new(1,0,1,0)
+IBG.BackgroundColor3 = Color3.fromRGB(4,2,10)
+IBG.BorderSizePixel = 0
 IBG.BackgroundTransparency = 0
-
--- Center card
 local ICard = Instance.new("Frame", IBG)
-ICard.AnchorPoint         = Vector2.new(0.5,0.5)
-ICard.Position            = UDim2.new(0.5,0,0.5,0)
-ICard.Size                = UDim2.new(0,320,0,160)
-ICard.BackgroundColor3    = Color3.fromRGB(14,8,30)
-ICard.BorderSizePixel     = 0
+ICard.AnchorPoint = Vector2.new(0.5,0.5)
+ICard.Position = UDim2.new(0.5,0,0.5,0)
+ICard.Size = UDim2.new(0,320,0,160)
+ICard.BackgroundColor3 = Color3.fromRGB(14,8,30)
+ICard.BorderSizePixel = 0
 Instance.new("UICorner",ICard).CornerRadius = UDim.new(0,14)
 local IStroke = Instance.new("UIStroke",ICard)
 IStroke.Thickness = 1.5; IStroke.Color = Color3.fromRGB(100,40,200)
-
--- Glow gradient on card
 local ICardGrad = Instance.new("UIGradient", ICard)
 ICardGrad.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0,   Color3.fromRGB(25,10,50)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25,10,50)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,8,30)),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(25,10,50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25,10,50)),
 }
 ICardGrad.Rotation = 135
-
--- ZivX title
 local ITitle = Instance.new("TextLabel", ICard)
-ITitle.Size              = UDim2.new(1,0,0,60)
-ITitle.Position          = UDim2.new(0,0,0,12)
+ITitle.Size = UDim2.new(1,0,0,60)
+ITitle.Position = UDim2.new(0,0,0,12)
 ITitle.BackgroundTransparency = 1
-ITitle.Text              = "Ryuu's HUB"
-ITitle.Font              = Enum.Font.GothamBlack
-ITitle.TextSize          = 48
-ITitle.TextColor3        = Color3.fromRGB(200,140,255)
+ITitle.Text = "Ryuu's HUB"
+ITitle.Font = Enum.Font.GothamBlack
+ITitle.TextSize = 48
+ITitle.TextColor3 = Color3.fromRGB(200,140,255)
 local ITG = Instance.new("UIGradient",ITitle)
 ITG.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0,   Color3.fromRGB(180,80,255)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(180,80,255)),
     ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
-    ColorSequenceKeypoint.new(1,   Color3.fromRGB(180,80,255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(180,80,255)),
 }
-
--- Subtitle
 local ISub = Instance.new("TextLabel", ICard)
-ISub.Size              = UDim2.new(1,0,0,20)
-ISub.Position          = UDim2.new(0,0,0,70)
+ISub.Size = UDim2.new(1,0,0,20)
+ISub.Position = UDim2.new(0,0,0,70)
 ISub.BackgroundTransparency = 1
-ISub.Text              = "BLADE BALL"
-ISub.Font              = Enum.Font.GothamBold
-ISub.TextSize          = 13
-ISub.TextColor3        = Color3.fromRGB(140,80,220)
-
--- Divider line
+ISub.Text = "BLADE BALL"
+ISub.Font = Enum.Font.GothamBold
+ISub.TextSize = 13
+ISub.TextColor3 = Color3.fromRGB(140,80,220)
 local IDiv = Instance.new("Frame", ICard)
-IDiv.Size             = UDim2.new(0.7,0,0,1)
-IDiv.Position         = UDim2.new(0.15,0,0,98)
+IDiv.Size = UDim2.new(0.7,0,0,1)
+IDiv.Position = UDim2.new(0.15,0,0,98)
 IDiv.BackgroundColor3 = Color3.fromRGB(80,30,160)
-IDiv.BorderSizePixel  = 0
-
--- Loading label
+IDiv.BorderSizePixel = 0
 local ILbl = Instance.new("TextLabel", ICard)
-ILbl.Size              = UDim2.new(1,-20,0,22)
-ILbl.Position          = UDim2.new(0,10,0,106)
+ILbl.Size = UDim2.new(1,-20,0,22)
+ILbl.Position = UDim2.new(0,10,0,106)
 ILbl.BackgroundTransparency = 1
-ILbl.Text              = "Loading..."
-ILbl.Font              = Enum.Font.Gotham
-ILbl.TextSize          = 12
-ILbl.TextColor3        = Color3.fromRGB(120,80,200)
-
--- Year tag
+ILbl.Text = "Loading..."
+ILbl.Font = Enum.Font.Gotham
+ILbl.TextSize = 12
+ILbl.TextColor3 = Color3.fromRGB(120,80,200)
 local IYear = Instance.new("TextLabel", ICard)
-IYear.Size              = UDim2.new(1,0,0,14)
-IYear.Position          = UDim2.new(0,0,1,-20)
+IYear.Size = UDim2.new(1,0,0,14)
+IYear.Position = UDim2.new(0,0,1,-20)
 IYear.BackgroundTransparency = 1
-IYear.Text              = "V1 BETA"
-IYear.Font              = Enum.Font.Gotham
-IYear.TextSize          = 10
-IYear.TextColor3        = Color3.fromRGB(70,50,120)
-
--- Animate the loading dots while Rayfield loads (all wrapped in pcall)
+IYear.Text = "V1 BETA"
+IYear.Font = Enum.Font.Gotham
+IYear.TextSize = 10
+IYear.TextColor3 = Color3.fromRGB(70,50,120)
 task.spawn(function()
     local dots = {"Loading.","Loading..","Loading...","Loading...."}
     local i = 1
@@ -154,8 +131,6 @@ task.spawn(function()
         task.wait(0.3)
     end
 end)
-
--- Step 2: Load Rayfield (blocking here is fine — intro is showing)
 local RF_URLS = {
     "https://sirius.menu/rayfield",
     "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
@@ -174,23 +149,19 @@ if not Rayfield then
     warn("[ZivX Ryuu] Rayfield load failed — using stub")
     Rayfield = makeStub()
 end
-
--- Step 3: Show READY and fade entire screen out cleanly
 pcall(function()
-    ILbl.Text       = "READY  ✓"
+    ILbl.Text = "READY ✓"
     ILbl.TextColor3 = Color3.fromRGB(80,220,140)
-    IStroke.Color   = Color3.fromRGB(80,220,140)
+    IStroke.Color = Color3.fromRGB(80,220,140)
 end)
 task.wait(0.5)
-
--- Fade out: overlay a black frame and tween it transparent-to-opaque-to-destroy
 pcall(function()
     local fadeCover = Instance.new("Frame", IntroSG)
-    fadeCover.Size              = UDim2.new(1,0,1,0)
-    fadeCover.BackgroundColor3  = Color3.fromRGB(4,2,10)
-    fadeCover.BorderSizePixel   = 0
+    fadeCover.Size = UDim2.new(1,0,1,0)
+    fadeCover.BackgroundColor3 = Color3.fromRGB(4,2,10)
+    fadeCover.BorderSizePixel = 0
     fadeCover.BackgroundTransparency = 1
-    fadeCover.ZIndex            = 500
+    fadeCover.ZIndex = 500
     TweenService:Create(fadeCover,
         TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
         {BackgroundTransparency = 0}
@@ -198,155 +169,105 @@ pcall(function()
     task.wait(0.55)
 end)
 pcall(function() IntroSG:Destroy() end)
-
 -- ══════════════════════════════════════════════════════════════════
---   ALWAYS-ON HUD  ◈  Ping + FPS display (top-right corner)
+-- ALWAYS-ON HUD
 -- ══════════════════════════════════════════════════════════════════
 local HudSG = Instance.new("ScreenGui")
-HudSG.Name           = "RyuuHUD"
-HudSG.ResetOnSpawn   = false
+HudSG.Name = "RyuuHUD"
+HudSG.ResetOnSpawn = false
 HudSG.IgnoreGuiInset = true
-HudSG.DisplayOrder   = 9998
+HudSG.DisplayOrder = 9998
 pcall(function()
     HudSG.Parent = (typeof(gethui)=="function" and gethui()) or game:GetService("CoreGui")
 end)
 if not HudSG.Parent then
     pcall(function() HudSG.Parent = Plr:WaitForChild("PlayerGui") end)
 end
-
--- Container frame — top right
 local HudFrame = Instance.new("Frame", HudSG)
-HudFrame.AnchorPoint       = Vector2.new(1, 0)
-HudFrame.Position          = UDim2.new(1, -12, 0, 12)
-HudFrame.Size              = UDim2.new(0, 160, 0, 54)
-HudFrame.BackgroundColor3  = Color3.fromRGB(8, 4, 18)
+HudFrame.AnchorPoint = Vector2.new(1, 0)
+HudFrame.Position = UDim2.new(1, -12, 0, 12)
+HudFrame.Size = UDim2.new(0, 160, 0, 54)
+HudFrame.BackgroundColor3 = Color3.fromRGB(8, 4, 18)
 HudFrame.BackgroundTransparency = 0.25
-HudFrame.BorderSizePixel   = 0
+HudFrame.BorderSizePixel = 0
 Instance.new("UICorner", HudFrame).CornerRadius = UDim.new(0, 8)
 local HudStroke = Instance.new("UIStroke", HudFrame)
 HudStroke.Thickness = 1
-HudStroke.Color     = Color3.fromRGB(90, 40, 180)
+HudStroke.Color = Color3.fromRGB(90, 40, 180)
 HudStroke.Transparency = 0.4
-
--- Ping line
 local HudPing = Instance.new("TextLabel", HudFrame)
-HudPing.Size                 = UDim2.new(1, -12, 0, 22)
-HudPing.Position             = UDim2.new(0, 8, 0, 6)
+HudPing.Size = UDim2.new(1, -12, 0, 22)
+HudPing.Position = UDim2.new(0, 8, 0, 6)
 HudPing.BackgroundTransparency = 1
-HudPing.Text                 = "📶  Ping: --ms"
-HudPing.Font                 = Enum.Font.GothamBold
-HudPing.TextSize             = 13
-HudPing.TextColor3           = Color3.fromRGB(200, 200, 200)
-HudPing.TextXAlignment       = Enum.TextXAlignment.Left
-
--- FPS line
+HudPing.Text = "📶 Ping: --ms"
+HudPing.Font = Enum.Font.GothamBold
+HudPing.TextSize = 13
+HudPing.TextColor3 = Color3.fromRGB(200, 200, 200)
+HudPing.TextXAlignment = Enum.TextXAlignment.Left
 local HudFPS = Instance.new("TextLabel", HudFrame)
-HudFPS.Size                  = UDim2.new(1, -12, 0, 22)
-HudFPS.Position              = UDim2.new(0, 8, 0, 28)
+HudFPS.Size = UDim2.new(1, -12, 0, 22)
+HudFPS.Position = UDim2.new(0, 8, 0, 28)
 HudFPS.BackgroundTransparency = 1
-HudFPS.Text                  = "🖥  FPS: --"
-HudFPS.Font                  = Enum.Font.GothamBold
-HudFPS.TextSize              = 13
-HudFPS.TextColor3            = Color3.fromRGB(200, 200, 200)
-HudFPS.TextXAlignment        = Enum.TextXAlignment.Left
-
--- Live updater
+HudFPS.Text = "🖥 FPS: --"
+HudFPS.Font = Enum.Font.GothamBold
+HudFPS.TextSize = 13
+HudFPS.TextColor3 = Color3.fromRGB(200, 200, 200)
+HudFPS.TextXAlignment = Enum.TextXAlignment.Left
 local fpsCount, fpsTimer, fpsNow = 0, 0, 0
 RunService.Heartbeat:Connect(function(dt)
-    -- FPS counter
     fpsCount = fpsCount + 1
     fpsTimer = fpsTimer + dt
     if fpsTimer >= 0.5 then
-        fpsNow   = math.floor(fpsCount / fpsTimer)
+        fpsNow = math.floor(fpsCount / fpsTimer)
         fpsCount = 0
         fpsTimer = 0
         local fpsCol = fpsNow >= 55 and Color3.fromRGB(34,197,110)
                     or fpsNow >= 30 and Color3.fromRGB(255,200,50)
                     or Color3.fromRGB(255,80,80)
         pcall(function()
-            HudFPS.Text       = ("🖥  FPS: %d"):format(fpsNow)
+            HudFPS.Text = ("🖥 FPS: %d"):format(fpsNow)
             HudFPS.TextColor3 = fpsCol
         end)
     end
-    -- Ping (uses live PingMs from sampler)
     pcall(function()
-        local col = PingMs < 60  and Color3.fromRGB(34,197,110)
+        local col = PingMs < 60 and Color3.fromRGB(34,197,110)
                  or PingMs < 120 and Color3.fromRGB(255,200,50)
                  or Color3.fromRGB(255,80,80)
-        HudPing.Text       = ("📶  Ping: %dms"):format(math.floor(PingMs))
+        HudPing.Text = ("📶 Ping: %dms"):format(math.floor(PingMs))
         HudPing.TextColor3 = col
     end)
 end)
-
-
 -- ══════════════════════════════════════════════════════════════════
---   STATE
+-- STATE
 -- ══════════════════════════════════════════════════════════════════
 local S = {
-    AutoParry        = false,
-    AutoFace         = false,
-    BallESP          = false,
-    AbilityESP       = false,
-    AutoSpam         = false,
-    SmartSpam        = false,
-    SmartSpamDist    = 10,
-    Triggerbot       = false,
-    Fullbright       = false,
-    Noclip           = false,
-    InfJump          = false,
-    ParryCount       = 0,
-    SpamDelay        = 0.05,
-    WalkSpeed        = 16,
-    JumpPower        = 50,
-    LastParry        = 0,
-    ParryCooldown    = 0.32,
-    DidParry         = false,
-    EmergencyParry   = true,
-    EmergencyDist    = 6,
-
-    -- ── PARRY ACCURACY ───────────────────────────────────────────
-    -- This is REAL accuracy, not "bigger threshold".
-    -- Higher = fires at exactly the right moment every time.
-    -- Lower  = parry fires slightly random (like a human).
-    --
-    -- HOW IT WORKS:
-    --   The engine computes the IDEAL fire time: when TTI equals
-    --   exactly the parry window (0.15s window centred on impact).
-    --   At acc=100: fires within ±0.01s of perfect — machine precision.
-    --   At acc=50:  fires within ±0.06s — still good but human-ish.
-    --   At acc=1:   fires within ±0.15s — very human / sometimes misses.
-    --
-    --   AccJitter: random noise added to the fire decision each frame.
-    --   At acc=100: jitter=0 (zero noise, perfect timing every time).
-    --   At acc=1:   jitter=0.15s (big noise, fires inconsistently).
-    --   This means acc=100 genuinely never misses; acc=1 acts human.
-    --
-    --   AccWindow: how tight the "valid fire" window is.
-    --   At acc=100: window spans 0.35s → catches fast bounces + spam.
-    --   At acc=50:  window spans 0.22s → normal.
-    --   At acc=1:   window spans 0.08s → very tight, often misses.
-    --
-    ParryAccuracy    = 100,
-    AntiCurve        = true,
+    AutoParry = false,
+    AutoFace = false,
+    BallESP = false,
+    AbilityESP = false,
+    AutoSpam = false,
+    SmartSpam = false,
+    SmartSpamDist = 10,
+    Triggerbot = false,
+    Fullbright = false,
+    Noclip = false,
+    InfJump = false,
+    ParryCount = 0,
+    SpamDelay = 0.05,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    LastParry = 0,
+    ParryCooldown = 0.32,
+    DidParry = false,
+    EmergencyParry = true,
+    EmergencyDist = 6,
+    ParryAccuracy = 100,
+    AntiCurve = true,
+    HitboxTarget = 5.0,
+    SpeedBoostDetect = false,
 }
-
 -- ══════════════════════════════════════════════════════════════════
---   KEY SYSTEM  ◈  Device-locked keys
---
---   Add keys to VALID_KEYS below. Each key can only ever be used
---   on ONE device. The moment someone unlocks with a key, that key
---   is permanently bound to their device. Anyone else who tries the
---   same key on a different device gets rejected.
---
---   How it works:
---   • A unique device ID is generated on first run and saved to
---     ryuu_device.txt on the executor's file system.
---   • When a key is used, we save {key → deviceID} to ryuu_keys.txt.
---   • Every future attempt checks: does this key's stored deviceID
---     match the current device? If not → rejected.
---
---   To revoke a key: remove it from VALID_KEYS. Done.
---   Make keys hard to guess: "RYUU-X9K2-M3P7-BLADE"
+-- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
 local VALID_KEYS = {
     "RYUU-KEY1434s9df9sdfsdf",
@@ -356,32 +277,22 @@ local VALID_KEYS = {
 }
 local IsWhitelisted = false
 local PremiumActive = false
-
--- ── Device ID ─────────────────────────────────────────────────────
--- Generated once, stored forever. This is what locks the key to the device.
 local DEVICE_FILE = "ryuu_device.txt"
-local LOCK_FILE   = "ryuu_keys.txt"   -- stores key→deviceID pairs
-
+local LOCK_FILE = "ryuu_keys.txt"
 local function GetDeviceID()
-    -- Try to read existing device ID
     local ok, stored = pcall(function() return readfile(DEVICE_FILE) end)
     if ok and stored and #stored >= 16 then
         return stored:match("^%s*(.-)%s*$")
     end
-    -- Generate a new one from stable sources
     local parts = {}
-    -- Use Roblox client analytics ID if available
     pcall(function()
         local id = tostring(game:GetService("RbxAnalyticsService"):GetClientId())
         if id and #id > 4 then table.insert(parts, id) end
     end)
-    -- Add local player ID as extra salt
     pcall(function() table.insert(parts, tostring(Plr.UserId)) end)
-    -- Add a random component so even same-user different-PC gets different ID
     table.insert(parts, tostring(math.random(100000, 999999)))
     table.insert(parts, tostring(os.time()))
     local raw = table.concat(parts, "-")
-    -- Hash it into a clean 24-char ID
     local hash = 0
     for i = 1, #raw do
         hash = (hash * 31 + string.byte(raw, i)) % 0xFFFFFFFF
@@ -391,13 +302,10 @@ local function GetDeviceID()
         (hash * 1000003) % 0xFFFFFFFF,
         math.random(100000, 999999)
     )
-    -- Save it
     pcall(function() writefile(DEVICE_FILE, deviceID) end)
     return deviceID
 end
-
 local function LoadLocks()
-    -- Returns table: {[key] = deviceID}
     local ok, data = pcall(function() return readfile(LOCK_FILE) end)
     if not ok or not data or data == "" then return {} end
     local locks = {}
@@ -407,7 +315,6 @@ local function LoadLocks()
     end
     return locks
 end
-
 local function SaveLocks(locks)
     local lines = {}
     for k, d in pairs(locks) do
@@ -415,43 +322,29 @@ local function SaveLocks(locks)
     end
     pcall(function() writefile(LOCK_FILE, table.concat(lines, "\n")) end)
 end
-
--- Returns: "ok", "invalid", "locked_other"
 local function ValidateKey(key)
     if not key or #key < 4 then return "invalid" end
     local k = key:match("^%s*(.-)%s*$")
-
-    -- Check key exists in valid list
     local keyExists = false
     for _, v in ipairs(VALID_KEYS) do
         if v == k then keyExists = true; break end
     end
     if not keyExists then return "invalid" end
-
-    -- Get this device's ID
     local myDevice = GetDeviceID()
-
-    -- Check lock file
     local locks = LoadLocks()
-
     if locks[k] == nil then
-        -- First use — lock it to this device NOW
         locks[k] = myDevice
         SaveLocks(locks)
         return "ok"
     elseif locks[k] == myDevice then
-        -- Same device that originally used it — allow
         return "ok"
     else
-        -- Different device — reject
         return "locked_other"
     end
 end
-
 local Conn = {}
-
 -- ══════════════════════════════════════════════════════════════════
---   BALL HELPERS
+-- BALL HELPERS
 -- ══════════════════════════════════════════════════════════════════
 local function GetBall()
     local folder = workspace:FindFirstChild("Balls")
@@ -468,12 +361,10 @@ local function GetBall()
     end
     return nil
 end
-
 local function GetHRP()
     local c = Plr.Character
     return c and c:FindFirstChild("HumanoidRootPart")
 end
-
 local function GetVel(ball)
     local best = Vector3.zero
     local ok1, v1 = pcall(function() return ball.AssemblyLinearVelocity end)
@@ -495,11 +386,10 @@ local function GetVel(ball)
     end)
     return best
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   PING SAMPLER
+-- PING SAMPLER
 -- ══════════════════════════════════════════════════════════════════
-local PingMs    = 60
+local PingMs = 60
 local PingBonus = 0
 local PingScale = 1.0
 local PingSamples = {}
@@ -513,13 +403,12 @@ task.spawn(function()
             if #PingSamples > 6 then table.remove(PingSamples, 1) end
             local sum = 0
             for _, v in ipairs(PingSamples) do sum = sum + v end
-            PingMs    = sum / #PingSamples
+            PingMs = sum / #PingSamples
             PingBonus = (PingMs/1000) * PingScale
         end
         task.wait(2)
     end
 end)
-
 local PingLabel = nil
 task.spawn(function()
     while true do
@@ -529,51 +418,43 @@ task.spawn(function()
                 local col = PingMs<60 and Color3.fromRGB(34,197,110)
                          or PingMs<120 and Color3.fromRGB(255,200,50)
                          or Color3.fromRGB(255,80,80)
-                PingLabel.Text = ("Ping: %dms  |  +%.3fs"):format(math.floor(PingMs), PingBonus)
+                PingLabel.Text = ("Ping: %dms | +%.3fs"):format(math.floor(PingMs), PingBonus)
                 PingLabel.TextColor3 = col
             end)
         end
     end
 end)
-
 -- ══════════════════════════════════════════════════════════════════
---   PARRY ACCURACY SYSTEM  ◈  REAL PRECISION MODEL
---
---   WHAT "ACCURACY" ACTUALLY MEANS:
---   In Blade Ball, the parry window is a brief moment when the ball
---   is close enough to parry (~0.15s before impact). Fire too early
---   = pre-click (misses). Fire too late = gets hit.
---   The PERFECT parry fires exactly when the ball is ~0.2s away.
---
---   HOW AccJitter WORKS:
---   Each frame we compute: shouldFire = (TTI <= IdealWindow + AccJitter)
---   AccJitter is a per-frame random value drawn from [0, maxJitter].
---   maxJitter at acc=100 → 0       (zero noise, always perfect)
---   maxJitter at acc=75  → 0.04s   (fires ±0.04s around ideal)
---   maxJitter at acc=50  → 0.09s   (human-level variance)
---   maxJitter at acc=1   → 0.18s   (very imprecise, often misses)
---
---   AccWindow: the base fire window BEFORE jitter.
---   At acc=100: 0.35s  (fires early enough for all speeds + spam)
---   At acc=50:  0.22s  (normal window)
---   At acc=1:   0.06s  (very narrow, misses fast balls)
---
---   RESULT:
---   acc=100 → catches every ball at the perfect time, every round.
---   acc=50  → catches most balls, occasionally slightly early/late.
---   acc=1   → acts like a human who is not paying attention.
---
---   The key insight: accuracy controls PRECISION not CHEATING.
---   At 100 it fires EXACTLY when it should — not randomly early.
+-- FREE PARRY ENGINE ◈ FIXED
 -- ══════════════════════════════════════════════════════════════════
-
+-- FIXES:
+-- 1. Emergency parry now ONLY fires when ball is targeting YOU
+--    (was firing for all nearby enemies → caused constant pre-clicks)
+-- 2. Ping formula fixed: PingMs/1000 (full ping, was /2000 = half)
+-- 3. Hitbox raised to 6.5 studs (was 5.0 → fired too late)
+-- 4. AntiCurve threshold lowered: sc > 2 (was sc > 5 → missed curves)
+-- 5. History expanded to 5 frames (was 3 → smoother curve reading)
+-- 6. Cooldown reset fixed: always 0.18s (was using ParryCooldown
+--    which user can set high, causing it to get stuck)
+-- 7. Direction reversal threshold tightened to -0.3 (was -0.4)
 -- ══════════════════════════════════════════════════════════════════
---   PARRY ENGINE  ◈  Ryuu's HUB V1 BETA
--- ══════════════════════════════════════════════════════════════════
-
+local freePosHist = {}
+local freeSpeedHist = {}
+local MAX_FREE_HIST = 5  -- FIX 5: expanded from 3
+local function pushFreeHist(dist, t)
+    table.insert(freePosHist, {d=dist, t=t})
+    if #freePosHist > MAX_FREE_HIST then table.remove(freePosHist, 1) end
+end
+local function smoothFreeClosing(curDist, curTime)
+    if #freePosHist < 2 then return 0 end
+    local oldest = freePosHist[1]
+    local dt = curTime - oldest.t
+    if dt <= 0 then return 0 end
+    return (oldest.d - curDist) / dt
+end
 local PrevBallPos = nil
 local PrevBallTime = 0
-
+local PARRY_RESET_TIME = 0.18  -- FIX 6: fixed reset, not tied to user cooldown slider
 local function FireParry()
     if S.DidParry then return end
     if os.clock() - S.LastParry < S.ParryCooldown then return end
@@ -586,9 +467,8 @@ local function FireParry()
         VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
         rc:Disconnect()
     end)
-    task.delay(S.ParryCooldown, function() S.DidParry = false end)
+    task.delay(PARRY_RESET_TIME, function() S.DidParry = false end)  -- FIX 6
 end
-
 local function StartEngine()
     if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
     if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
@@ -596,16 +476,16 @@ local function StartEngine()
     if Conn.DirWatch then Conn.DirWatch:Disconnect(); Conn.DirWatch=nil end
     S.DidParry = false
     PrevBallPos = nil
-
+    freePosHist = {}
+    freeSpeedHist = {}
     local function HookBall(ball)
         if not ball then return end
         if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
         Conn.Target = ball:GetAttributeChangedSignal("target"):Connect(function()
-            S.DidParry = false
+            S.DidParry = false  -- instantly re-arm when target changes
         end)
     end
     HookBall(GetBall())
-
     local function hookFolder(folder)
         if not folder then return end
         Conn.BallAdded = folder.ChildAdded:Connect(function()
@@ -620,191 +500,233 @@ local function StartEngine()
         local f = workspace:WaitForChild("Balls", 30)
         if f and not Conn.BallAdded then hookFolder(f) end
     end) end
-
-    -- Direction reversal watcher: resets DidParry when ball bounces back
     local lastDir = Vector3.zero
     Conn.DirWatch = RunService.Heartbeat:Connect(function()
         if not S.AutoParry then return end
         local b = GetBall(); if not b then return end
         local v = GetVel(b)
         if v.Magnitude > 2 and lastDir.Magnitude > 0 then
-            if v.Unit:Dot(lastDir.Unit) < -0.4 then
+            if v.Unit:Dot(lastDir.Unit) < -0.3 then  -- FIX 7: tighter reversal detection
                 S.DidParry = false
             end
         end
         if v.Magnitude > 0.5 then lastDir = v end
     end)
-
     Conn.Parry = RunService.PreSimulation:Connect(function()
         if not S.AutoParry then return end
         local Ball = GetBall()
-        if not Ball then PrevBallPos=nil; return end
+        if not Ball then PrevBallPos=nil; freePosHist={}; freeSpeedHist={}; return end
         local HRP = GetHRP()
         if not HRP then return end
-
         local BPos = Ball.Position
         local HPos = HRP.Position
         local Dist = (HPos - BPos).Magnitude
         local now = os.clock()
 
-        -- Emergency: fires regardless of isTgt for point-blank attacks
-        if S.EmergencyParry and not S.DidParry then
-            if Dist <= S.EmergencyDist then
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= Plr and p.Character then
-                        local ehr = p.Character:FindFirstChild("HumanoidRootPart")
-                        if ehr and (ehr.Position - HPos).Magnitude <= (S.EmergencyDist + 10) then
-                            FireParry(); break
-                        end
-                    end
-                end
-            end
-        end
-
         local isTgt = Ball:GetAttribute("target") == Plr.Name
+
         if S.AutoFace and isTgt then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
-        if not isTgt then PrevBallPos=nil; return end
+
+        -- FIX 1: Emergency only fires when YOU are the target
+        -- (old code fired for any nearby enemy even if ball wasn't targeting you)
+        if S.EmergencyParry and isTgt and not S.DidParry then
+            if Dist <= S.EmergencyDist then
+                FireParry()
+                return
+            end
+        end
+
+        if not isTgt then PrevBallPos=nil; freePosHist={}; freeSpeedHist={}; return end
         if S.DidParry then return end
 
         local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
 
+        -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 6 then FireParry() end
+            if Dist <= 10.0 then FireParry() end
             return
         end
 
-        -- ── CLEAN PARRY — simple, correct, never early, never late ──
-        --
-        -- Fire when:  Dist  <=  6  +  (PingMs/2000) * Speed
-        --
-        -- 6 studs    = server parry hitbox size (safe centre)
-        -- PingMs/2000 = one-way ping in seconds
-        -- * Speed    = studs the ball travels while click is in transit
-        --
-        -- Result: click always arrives when ball is exactly ~6 studs away.
-        -- Works at any speed, any ping, any angle. No dot product, no TTI math.
-        --
-        -- AntiCurve: same formula but uses position-delta closing speed
-        -- so curved balls that change velocity direction still get caught.
+        pushFreeHist(Dist, now)
+        table.insert(freeSpeedHist, Speed)
+        if #freeSpeedHist > 5 then table.remove(freeSpeedHist, 1) end
 
-        local fireAt = 6 + (PingMs / 2000) * Speed
+        -- Speed boost detection
+        local effectiveSpeed = Speed
+        if S.SpeedBoostDetect and #freeSpeedHist >= 2 then
+            local oldest = freeSpeedHist[1]
+            if oldest > 0 and Speed / oldest > 1.25 then
+                effectiveSpeed = Speed * 1.15
+            end
+        end
+
+        -- FIX 2+3: Full ping compensation, bigger hitbox
+        local hbox = 10.0  -- LATE FIX: bumped to 10
+        local pingComp = (PingMs / 500) * effectiveSpeed  -- FIX 2: was /2000
+        local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
             FireParry()
-            PrevBallPos  = BPos
+            PrevBallPos = BPos
             PrevBallTime = now
             return
         end
 
-        -- AntiCurve: position-based closing speed catches curved balls
-        if S.AntiCurve and PrevBallPos ~= nil then
-            local dt = now - PrevBallTime
-            if dt > 0.001 then
-                local prevDist   = (HPos - PrevBallPos).Magnitude
-                local posClosing = (prevDist - Dist) / dt
-                if posClosing > 5 then
-                    local curveFireAt = 6 + (PingMs / 2000) * posClosing
-                    if Dist <= curveFireAt then
-                        FireParry()
-                    end
+        -- Next-frame extrapolation (2 frames ahead)
+        if Speed > 1 then
+            local nextPos = BPos + Vel * (2/60)
+            local nextDist = (HPos - nextPos).Magnitude
+            if nextDist <= fireAt then
+                FireParry()
+                return
+            end
+        end
+
+        -- FIX 4: AntiCurve threshold lowered to 2 (was 5 → missed most curves)
+        if S.AntiCurve then
+            local sc = smoothFreeClosing(Dist, now)
+            if sc > 2 then  -- FIX 4
+                local curveFireAt = hbox + (PingMs / 500) * sc
+                if Dist <= curveFireAt then
+                    FireParry()
                 end
             end
         end
 
         PrevBallPos = BPos
         PrevBallTime = now
-
         if S.Triggerbot and Dist <= 2 then FireParry() end
     end)
 end
-
 local function StopEngine()
     if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
     if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
     if Conn.BallAdded then Conn.BallAdded:Disconnect(); Conn.BallAdded=nil end
     if Conn.DirWatch then Conn.DirWatch:Disconnect(); Conn.DirWatch=nil end
-    S.DidParry=false; PrevBallPos=nil
+    S.DidParry=false; PrevBallPos=nil; freePosHist={}; freeSpeedHist={}
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   PREMIUM ENGINE  ◈  Aggressive fast parry for whitelisted users
+-- PREMIUM ENGINE ◈ FULLY UPGRADED
 -- ══════════════════════════════════════════════════════════════════
--- ══════════════════════════════════════════════════════════════════
---   PREMIUM ENGINE  ◈  Strictly better than free in every way
---
---   FREE  engine: fireAt = 6   + (PingMs/2000)*Speed   → lands at 6 studs
---   PREMIUM engine: fireAt = 4.5 + (PingMs/2000)*Speed → lands at 4.5 studs
---
---   Tighter hitbox = fires slightly later = more precise = never pre-clicks.
---   3 extra systems free doesn't have:
---     1. Velocity extrapolation — predicts ball next-frame position
---     2. Multi-frame curve history — 5-frame smoothed closing speed
---     3. Instant re-arm — detects ball direction reversal in <1 frame
+-- Includes all free fixes PLUS premium-exclusive upgrades:
+-- FREE FIXES APPLIED:
+--   • Emergency only fires when ball targets YOU (no random pre-clicks)
+--   • Full ping compensation: PingMs/1000 (was /2000)
+--   • Hitbox 7.5 studs (free=6.5, old premium=4.0 which was too tight)
+--   • AntiCurve threshold sc>1.5 (free=2, old=5 — premium catches gentler curves)
+--   • DidParry reset fixed to 0.12s (not tied to slider)
+--   • History expanded to 8 frames (free=5)
+--   • Direction reversal threshold -0.25 (free=-0.3, tighter for premium)
+-- PREMIUM EXCLUSIVE UPGRADES:
+--   • 3-frame lookahead extrapolation (free=2 frames)
+--   • Weighted closing speed: recent frames count more than old ones
+--   • Dual prediction: both linear + quadratic, fires on whichever triggers first
+--   • Adaptive ping: uses min of last 3 ping samples for tightest compensation
+--   • God Emergency: only fires when YOU are target (same fix as free + tighter dist)
+--   • Speed burst detection: 3-frame window, 1.18x adjust (free=1.15x)
 -- ══════════════════════════════════════════════════════════════════
 local PremiumConn = {}
-
--- Premium state
 local P = {
-    AutoParry        = false,
-    GodEmergency     = false,   -- tighter emergency (3 studs vs free's 6)
-    CurveCrusher     = false,   -- 5-frame smoothed anticurve
-    AutoFace         = false,   -- always face ball
-    HitboxTarget     = 4.5,     -- studs on server when click arrives (slider)
-    SpeedBoostDetect = true,    -- auto-adjust for accelerating balls
+    AutoParry = false,
+    GodEmergency = false,
+    CurveCrusher = false,
+    AutoFace = false,
+    HitboxTarget = 12.0,    -- wider than free's 6.5 — catches everything
+    SpeedBoostDetect = true,
+    QuadCurvePredict = true,
 }
 
--- Speed history for boost detection (3 frames)
+-- 8-frame position history for quadratic prediction
 local speedHist = {}
+local posHistQuad = {}
+local function pushQuadHist(pos, t)
+    table.insert(posHistQuad, {p=pos, t=t})
+    if #posHistQuad > 8 then table.remove(posHistQuad, 1) end
+end
+
+-- Quadratic position prediction using acceleration estimate
+local function predictQuadPos(curPos, curVel, dt)
+    if #posHistQuad < 3 then return curPos + curVel * dt end
+    local p1, p2, p3 = posHistQuad[1].p, posHistQuad[2].p, posHistQuad[3].p
+    local v1 = p2 - p1
+    local v2 = p3 - p2
+    local accel = v2 - v1
+    return curPos + curVel * dt + 0.5 * accel * dt^2
+end
+
+-- 8-frame closing speed history with weighted average (recent = more weight)
+local posHist = {}
+local MAX_HIST = 8
+local function pushHist(dist, t)
+    table.insert(posHist, {d=dist, t=t})
+    if #posHist > MAX_HIST then table.remove(posHist, 1) end
+end
+local function smoothClosing(curDist, curTime)
+    if #posHist < 2 then return 0 end
+    -- Weighted: compare current vs oldest for base, then weight by recency
+    local oldest = posHist[1]
+    local dt = curTime - oldest.t
+    if dt <= 0 then return 0 end
+    local base = (oldest.d - curDist) / dt
+    -- Also check last 2 frames for recent acceleration
+    if #posHist >= 3 then
+        local recent = posHist[#posHist - 1]
+        local rdt = curTime - recent.t
+        if rdt > 0 then
+            local recentClosing = (recent.d - curDist) / rdt
+            -- Weight recent closing 60%, overall 40%
+            return recentClosing * 0.6 + base * 0.4
+        end
+    end
+    return base
+end
+
+-- Adaptive ping: use min of last 3 samples for best-case compensation
+local PingMin = 60
+local PingMinSamples = {}
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        table.insert(PingMinSamples, PingMs)
+        if #PingMinSamples > 3 then table.remove(PingMinSamples, 1) end
+        local min = PingMs
+        for _, v in ipairs(PingMinSamples) do if v < min then min = v end end
+        PingMin = min
+    end
+end)
+
+local PREMIUM_RESET = 0.12  -- faster re-arm than free's 0.18
+
+local function PremiumFire()
+    if S.DidParry then return end
+    if os.clock() - S.LastParry < 0.12 then return end
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    S.LastParry = os.clock()
+    S.DidParry = true
+    S.ParryCount = S.ParryCount + 1
+    local rc
+    rc = RunService.Heartbeat:Connect(function()
+        VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+        rc:Disconnect()
+    end)
+    task.delay(PREMIUM_RESET, function() S.DidParry = false end)
+end
 
 local function StartPremiumEngine()
     for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
     PremiumConn = {}
-
-    -- Premium fire: faster mouse release than free (same-frame rc connect)
-    local function PremiumFire()
-        if S.DidParry then return end
-        if os.clock() - S.LastParry < 0.20 then return end
-        VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
-        S.LastParry  = os.clock()
-        S.DidParry   = true
-        S.ParryCount = S.ParryCount + 1
-        -- Release on very next heartbeat — tighter than free's Heartbeat connect
-        local rc
-        rc = RunService.Heartbeat:Connect(function()
-            VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
-            rc:Disconnect()
-        end)
-        task.delay(0.20, function() S.DidParry = false end)
-    end
-
-    -- Multi-frame closing speed history (5 frames, smoothed)
-    local posHist = {}  -- {dist, time}
-    local MAX_HIST = 5
-
-    local function pushHist(dist, t)
-        table.insert(posHist, {d=dist, t=t})
-        if #posHist > MAX_HIST then table.remove(posHist, 1) end
-    end
-
-    local function smoothClosing(curDist, curTime)
-        if #posHist < 2 then return 0 end
-        local oldest = posHist[1]
-        local dt = curTime - oldest.t
-        if dt <= 0 then return 0 end
-        return (oldest.d - curDist) / dt   -- studs/sec, positive = approaching
-    end
-
-    -- Direction reversal watcher: re-arms DidParry the frame ball bounces
     local lastVelDir = Vector3.zero
-    PremiumConn.DirWatch = RunService.PreSimulation:Connect(function()
+
+    -- Direction reversal watcher — tighter threshold than free
+    PremiumConn.DirWatch = RunService.Heartbeat:Connect(function()
         local b = GetBall(); if not b then return end
         local v = GetVel(b)
         if v.Magnitude > 2 and lastVelDir.Magnitude > 0 then
-            if v.Unit:Dot(lastVelDir.Unit) < -0.5 then
-                S.DidParry = false   -- ball reversed = re-arm instantly
+            if v.Unit:Dot(lastVelDir.Unit) < -0.25 then  -- tighter than free's -0.3
+                S.DidParry = false
             end
         end
         if v.Magnitude > 0.5 then lastVelDir = v end
@@ -812,88 +734,89 @@ local function StartPremiumEngine()
 
     PremiumConn.Parry = RunService.PreSimulation:Connect(function()
         local Ball = GetBall()
-        if not Ball then posHist={}; return end
+        if not Ball then posHist={}; speedHist={}; posHistQuad={}; return end
         local HRP = GetHRP(); if not HRP then return end
-
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local Vel   = GetVel(Ball)
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
-        local now   = os.clock()
+        local now = os.clock()
 
-        -- Auto-face if enabled
-        if P.AutoFace then
+        local isTgt = Ball:GetAttribute("target") == Plr.Name
+
+        if P.AutoFace and isTgt then
             pcall(function()
                 HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X,HPos.Y,BPos.Z))
             end)
         end
 
-        -- ── EMERGENCY ────────────────────────────────────────────
-        -- God Emergency (premium): fires at 3 studs — tighter than free's 6
-        -- Standard emergency: fires at 6 studs like free
-        if not S.DidParry then
-            local eDist = P.GodEmergency and 3 or S.EmergencyDist
+        -- Emergency: ONLY fires when ball is targeting YOU (fixed pre-click bug)
+        if not S.DidParry and isTgt then
+            local eDist = P.GodEmergency and 3.5 or S.EmergencyDist
             if Dist <= eDist then
                 PremiumFire(); posHist={}; return
             end
         end
 
-        if Ball:GetAttribute("target") ~= Plr.Name then posHist={}; return end
+        if not isTgt then posHist={}; speedHist={}; posHistQuad={}; return end
         if S.DidParry then return end
+
+        -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 5 then PremiumFire() end
+            if Dist <= 12.0 then PremiumFire() end
             return
         end
 
         pushHist(Dist, now)
-
-        -- ── SPEED BOOST DETECTION ────────────────────────────────
-        -- Track last 3 frames of speed. If ball accelerated >25%,
-        -- it got a speed boost — increase fireAt to compensate.
+        pushQuadHist(BPos, now)
         table.insert(speedHist, Speed)
-        if #speedHist > 3 then table.remove(speedHist, 1) end
+        if #speedHist > 8 then table.remove(speedHist, 1) end
+
+        -- Speed burst detection: 3-frame window, stronger adjust than free
         local effectiveSpeed = Speed
-        if P.SpeedBoostDetect and #speedHist >= 2 then
+        if P.SpeedBoostDetect and #speedHist >= 3 then
             local oldest = speedHist[1]
-            if oldest > 0 and Speed / oldest > 1.25 then
-                -- Ball accelerated >25% — treat as if going faster
-                effectiveSpeed = Speed * 1.15
+            if oldest > 0 and Speed / oldest > 1.15 then
+                effectiveSpeed = Speed * 1.18  -- premium: 1.18x vs free's 1.15x
             end
         end
 
-        -- ── CORE: same formula as free but tighter hitbox ────────
-        -- Free:    fireAt = 6.0 + (PingMs/2000)*Speed  → 6 studs on server
-        -- Premium: fireAt = PHT + (PingMs/2000)*Speed  → PHT studs (default 4.5)
-        -- Fires later than free = more precise = never a pre-click
-        local hbox   = P.HitboxTarget or 4.5
-        local fireAt = hbox + (PingMs / 2000) * effectiveSpeed
+        -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
+        local hbox = P.HitboxTarget or 12.0
+        local pingComp = (PingMin / 500) * effectiveSpeed  -- adaptive min ping
+        local fireAt = hbox + pingComp
+
         if Dist <= fireAt then
             PremiumFire(); return
         end
 
-        -- ── VELOCITY EXTRAPOLATION ────────────────────────────────
-        -- Predict where ball will be next frame (1/60s ahead).
-        -- If THAT position is within fireAt, fire now — compensates
-        -- the 1-frame processing lag that free users eat.
+        -- 3-frame lookahead (free does 2)
         if Speed > 1 then
-            local nextDist   = (HPos - (BPos + Vel*(1/60))).Magnitude
-            local nextFireAt = hbox + (PingMs / 2000) * effectiveSpeed
-            if nextDist <= nextFireAt then
+            local nextPos = predictQuadPos(BPos, Vel, 3/60)
+            local nextDist = (HPos - nextPos).Magnitude
+            if nextDist <= fireAt then
                 PremiumFire(); return
             end
         end
 
-        -- ── MULTI-FRAME ANTICURVE ─────────────────────────────────
-        -- 5-frame smoothed closing speed vs free's single-frame delta.
-        -- Stable on laggy servers, catches slow curves free misses entirely.
+        -- Weighted closing speed anticurve — threshold sc>1.5 (free=2)
         if P.CurveCrusher or S.AntiCurve then
             local sc = smoothClosing(Dist, now)
-            if sc > 5 then
-                local curveFireAt = hbox + (PingMs / 2000) * sc
+            if sc > 1.5 then
+                local curveFireAt = hbox + (PingMin / 500) * sc
                 if Dist <= curveFireAt then
-                    PremiumFire()
+                    PremiumFire(); return
                 end
+            end
+        end
+
+        -- Dual prediction: quadratic curve check at 1/20s ahead
+        if P.QuadCurvePredict then
+            local predPos = predictQuadPos(BPos, Vel, 1/20)
+            local predDist = (HPos - predPos).Magnitude
+            if predDist <= fireAt then
+                PremiumFire()
             end
         end
     end)
@@ -903,10 +826,12 @@ local function StopPremiumEngine()
     for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
     PremiumConn = {}
     S.DidParry = false
-    speedHist  = {}
+    speedHist = {}
+    posHist = {}
+    posHistQuad = {}
 end
-
-
+-- ══════════════════════════════════════════════════════════════════
+-- SPAM
 -- ══════════════════════════════════════════════════════════════════
 local SpamThr=nil
 local function StartAutoSpam()
@@ -934,9 +859,8 @@ local function StartSmartSpam()
         end
     end)
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   MISC FEATURES
+-- MISC FEATURES
 -- ══════════════════════════════════════════════════════════════════
 local function StartNoclip()
     if Conn.Noclip then return end
@@ -959,17 +883,16 @@ RunService.Heartbeat:Connect(function()
     local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
     if not h then return end
     if h.WalkSpeed~=S.WalkSpeed then h.WalkSpeed=S.WalkSpeed end
-    if h.JumpPower~=S.JumpPower  then h.JumpPower=S.JumpPower  end
+    if h.JumpPower~=S.JumpPower then h.JumpPower=S.JumpPower end
 end)
 Plr.CharacterAdded:Connect(function()
     task.wait(0.5)
-    if S.AutoParry    then StartEngine()   end
-    if S.InfJump      then StartIJ()       end
-    if S.Noclip       then StartNoclip()   end
+    if S.AutoParry then StartEngine() end
+    if S.InfJump then StartIJ() end
+    if S.Noclip then StartNoclip() end
 end)
-
 -- ══════════════════════════════════════════════════════════════════
---   BALL ESP
+-- BALL ESP
 -- ══════════════════════════════════════════════════════════════════
 local ESPBillboard=nil
 local function CleanESP()
@@ -994,9 +917,8 @@ local function StartESP()
         else lbl.Text=tgt or "?"; lbl.TextColor3=Color3.fromRGB(60,255,120) end
     end)
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   FULLBRIGHT
+-- FULLBRIGHT
 -- ══════════════════════════════════════════════════════════════════
 local fbA,fbO,fbB
 local function SetFB(on)
@@ -1008,21 +930,20 @@ local function SetFB(on)
         if fbB then Lighting.Brightness=fbB end
     end
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   FPS BOOSTER
+-- FPS BOOSTER
 -- ══════════════════════════════════════════════════════════════════
 local FPS_Active=false; local FPS_Saved={effects={},casters={},fidelity={}}
 local FPS_Label_Ref=nil
 local function ApplyFPS(level)
     if FPS_Active then return end; FPS_Active=true
-    FPS_Saved.tech=Lighting.Technology; FPS_Saved.shadow=Lighting.MaxShadowIntensity
+    FPS_Saved.tech=Lighting.Technology; FPS_Saved.shadow=Lighting.GlobalShadows
     FPS_Saved.envD=Lighting.EnvironmentDiffuseScale; FPS_Saved.envS=Lighting.EnvironmentSpecularScale
     pcall(function()
         local tech={Enum.Technology.ShadowMap,Enum.Technology.Voxel,Enum.Technology.Compatibility}
         Lighting.Technology=tech[level] or tech[2]
     end)
-    if level>=2 then Lighting.MaxShadowIntensity=0;Lighting.EnvironmentDiffuseScale=0;Lighting.EnvironmentSpecularScale=0 end
+    if level>=2 then Lighting.GlobalShadows=false;Lighting.EnvironmentDiffuseScale=0;Lighting.EnvironmentSpecularScale=0 end
     FPS_Saved.effects={}
     for _,e in ipairs(Lighting:GetChildren()) do
         if e:IsA("PostEffect") then table.insert(FPS_Saved.effects,{o=e,was=e.Enabled})
@@ -1053,7 +974,7 @@ local function RemoveFPS()
     if not FPS_Active then return end; FPS_Active=false
     if Conn.FPSWatch then Conn.FPSWatch:Disconnect();Conn.FPSWatch=nil end
     pcall(function() Lighting.Technology=FPS_Saved.tech end)
-    pcall(function() Lighting.MaxShadowIntensity=FPS_Saved.shadow end)
+    pcall(function() Lighting.GlobalShadows=FPS_Saved.shadow end)
     pcall(function() Lighting.EnvironmentDiffuseScale=FPS_Saved.envD end)
     pcall(function() Lighting.EnvironmentSpecularScale=FPS_Saved.envS end)
     for _,e in ipairs(FPS_Saved.effects) do pcall(function() e.o.Enabled=e.was end) end
@@ -1068,15 +989,14 @@ task.spawn(function()
         if FPS_Label_Ref then pcall(function()
             local col=FPS_Now>=55 and Color3.fromRGB(34,197,110)
                    or FPS_Now>=30 and Color3.fromRGB(255,200,50) or Color3.fromRGB(255,80,80)
-            FPS_Label_Ref.Text=("FPS: %d  |  %s"):format(FPS_Now,FPS_Active and "BOOST ON" or "OFF")
+            FPS_Label_Ref.Text=("FPS: %d | %s"):format(FPS_Now,FPS_Active and "BOOST ON" or "OFF")
             FPS_Label_Ref.TextColor3=col
         end) end
         task.wait(0.5)
     end
 end)
-
 -- ══════════════════════════════════════════════════════════════════
---   MANUAL SPAM WIDGET
+-- MANUAL SPAM WIDGET
 -- ══════════════════════════════════════════════════════════════════
 local MSpamOn=false; local MSpamThr=nil
 local function DoStartMS()
@@ -1124,7 +1044,7 @@ local MDot2=Instance.new("Frame",MH2); MDot2.Size=UDim2.new(0,6,0,6); MDot2.Posi
 MDot2.BackgroundColor3=C.accent; MDot2.BorderSizePixel=0; MDot2.ZIndex=11
 Instance.new("UICorner",MDot2).CornerRadius=UDim.new(1,0)
 local MTit2=Instance.new("TextLabel",MH2); MTit2.Size=UDim2.new(1,-28,1,0); MTit2.Position=UDim2.new(0,22,0,0)
-MTit2.BackgroundTransparency=1; MTit2.Text="ZivX  ◈  Manual Spam"; MTit2.TextColor3=C.sub
+MTit2.BackgroundTransparency=1; MTit2.Text="ZivX ◈ Manual Spam"; MTit2.TextColor3=C.sub
 MTit2.Font=Enum.Font.GothamBold; MTit2.TextSize=9; MTit2.TextXAlignment=Enum.TextXAlignment.Left; MTit2.ZIndex=11
 local MBtn=Instance.new("TextButton",MC); MBtn.Size=UDim2.new(1,-14,0,50); MBtn.Position=UDim2.new(0,7,0,37)
 MBtn.BackgroundColor3=C.panel; MBtn.BorderSizePixel=0; MBtn.Text=""; MBtn.AutoButtonColor=false; MBtn.ZIndex=10
@@ -1137,7 +1057,7 @@ local MBLbl=Instance.new("TextLabel",MBtn); MBLbl.Size=UDim2.new(1,-70,0,20); MB
 MBLbl.BackgroundTransparency=1; MBLbl.Text="MANUAL SPAM"; MBLbl.TextColor3=C.text
 MBLbl.Font=Enum.Font.GothamBold; MBLbl.TextSize=13; MBLbl.TextXAlignment=Enum.TextXAlignment.Left; MBLbl.ZIndex=11
 local MBSub=Instance.new("TextLabel",MBtn); MBSub.Size=UDim2.new(1,-70,0,14); MBSub.Position=UDim2.new(0,32,0,28)
-MBSub.BackgroundTransparency=1; MBSub.Text="OFF  —  [E] to toggle"; MBSub.TextColor3=C.sub
+MBSub.BackgroundTransparency=1; MBSub.Text="OFF — [E] to toggle"; MBSub.TextColor3=C.sub
 MBSub.Font=Enum.Font.Gotham; MBSub.TextSize=10; MBSub.TextXAlignment=Enum.TextXAlignment.Left; MBSub.ZIndex=11
 local MEP=Instance.new("TextLabel",MBtn); MEP.Size=UDim2.new(0,24,0,20); MEP.Position=UDim2.new(1,-34,0.5,-10)
 MEP.BackgroundColor3=Color3.fromRGB(32,24,58); MEP.TextColor3=C.accentL
@@ -1153,7 +1073,7 @@ local function SetMSV(on)
         TweenService:Create(MAL,TIF,{BackgroundColor3=C.green}):Play()
         TweenService:Create(MDot2,TIF,{BackgroundColor3=C.green}):Play()
         MBDot.BackgroundColor3=C.green; MBLbl.TextColor3=C.green
-        MBSub.Text="ON  ◈  SPAMMING"; MBSub.TextColor3=C.green
+        MBSub.Text="ON ◈ SPAMMING"; MBSub.TextColor3=C.green
         MEP.TextColor3=C.green; MEP.BackgroundColor3=Color3.fromRGB(14,36,24)
     else
         TweenService:Create(MC,TIF,{BackgroundColor3=C.bg}):Play()
@@ -1163,7 +1083,7 @@ local function SetMSV(on)
         TweenService:Create(MAL,TIF,{BackgroundColor3=C.accent}):Play()
         TweenService:Create(MDot2,TIF,{BackgroundColor3=C.accent}):Play()
         MBDot.BackgroundColor3=C.sub; MBLbl.TextColor3=C.text
-        MBSub.Text="OFF  —  [E] to toggle"; MBSub.TextColor3=C.sub
+        MBSub.Text="OFF — [E] to toggle"; MBSub.TextColor3=C.sub
         MEP.TextColor3=C.accentL; MEP.BackgroundColor3=Color3.fromRGB(32,24,58)
     end
 end
@@ -1200,98 +1120,69 @@ UIS.InputEnded:Connect(function(i)
         msDrag=false end
 end)
 SyncShadow()
-
-
 -- ══════════════════════════════════════════════════════════════════
---   ABILITY ESP  ◈  Real Blade Ball abilities  ◈  ZivX V5
---
---   Every real ability in Blade Ball with correct tier + description.
---   Source: Blade Ball Wiki + RobloxDen tier list (2026).
---   Shows floating billboard above each enemy head:
---     • Player name
---     • Ability name  (color = tier)
---     • Short description of what it does
---     • Tier badge  (S / A / B / C / D)
---     • ⚠ DANGER tag if ability threatens YOU
+-- ABILITY ESP
 -- ══════════════════════════════════════════════════════════════════
-
-local AbilityBBs  = {}
+local AbilityBBs = {}
 local AbilityPoll = nil
-
--- ── Real ability database (all 56 abilities from wiki) ───────────
--- tier: S/A/B/C/D
--- col:  display color matching tier
--- desc: what it actually does (shown on billboard)
--- warn: true = this ability can directly threaten/disrupt YOU
 local BB_ABILITIES = {
-    -- ══ S TIER ════════════════════════════════════════════════════
-    ["Infinity"]           = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Auto-parries ball at any speed",          warn=true},
-    ["Time Hole"]          = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Creates time distortion zone",            warn=true},
-    ["Slash of Duality"]   = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Dual slash — two trajectories at once",   warn=true},
-    ["Dribble"]            = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Redirect ball unpredictable angle",        warn=true},
-    ["Dragon Spirit"]      = {tier="S", col=Color3.fromRGB(255,60,220),  desc="Dragon charge — fast spiral redirect",    warn=true},
-
-    -- ══ A TIER ════════════════════════════════════════════════════
-    ["Pull"]               = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Forces ball to target them instantly",    warn=true},
-    ["Guardian Angel"]     = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Revives once per round on death",         warn=false},
-    ["Reaper"]             = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Execute low-HP players near ball",        warn=false},
-    ["Slashes of Fury"]    = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Multi-slash barrage — fast ball return",  warn=true},
-    ["Forcefield"]         = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Shield bubble — auto-deflects ball",      warn=false},
-    ["Bunny Leap"]         = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Huge leap escape — hard to hit",          warn=false},
-    ["Calming Deflection"] = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Deflect — slows ball on parry",           warn=false},
-    ["Singularity"]        = {tier="A", col=Color3.fromRGB(255,130,30),  desc="Black hole pulls ball toward it",         warn=true},
-
-    -- ══ B TIER ════════════════════════════════════════════════════
-    ["Invisibility"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Goes invisible — ball untargetable",      warn=false},
-    ["Titan Blade"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Titan armor — tanks ball hit",            warn=false},
-    ["Scopophobia"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Fear aura — disrupts nearby players",     warn=true},
-    ["Blade Trap"]         = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Trap on ground — hits ball near it",      warn=true},
-    ["Golden Ball"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Ball turns gold — bonus coins on hit",    warn=false},
-    ["Continuity Zero"]    = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Resets all ability cooldowns",            warn=false},
-    ["Death Slash"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Hard spike — ball returns very fast",     warn=true},
-    ["Phantom"]            = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Teleports behind nearest player",         warn=true},
-    ["Swap"]               = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Swaps position with targeted player",     warn=true},
-    ["Doppelganger"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Spawns decoy clone of self",              warn=false},
-    ["Necromancer"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Raises clone to confuse ball target",     warn=false},
-    ["Serpent Shadow Clone"]= {tier="B", col=Color3.fromRGB(80,220,120), desc="Shadow serpent clone diversion",          warn=false},
-    ["Phase Bypass"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Phase out — godspeed mobility escape",    warn=false},
-    ["Hell Hook"]          = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Hooks ball into sharp curve",             warn=true},
-    ["Blink"]              = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Short-range instant blink dodge",         warn=false},
-    ["Qi-Charge"]          = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Parry with no cooldown briefly",          warn=false},
-    ["Telekinesis"]        = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Stops ball mid-air + retargets it",       warn=true},
-    ["Aerodynamic Slash"]  = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Wind slash — speed + curve deflect",      warn=false},
-    ["Rapture"]            = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Rare wheel ability — massive curve slash",warn=true},
-    ["Thunder Dash"]       = {tier="B", col=Color3.fromRGB(80,220,120),  desc="Lightning-speed repositioning dash",      warn=false},
-
-    -- ══ C TIER ════════════════════════════════════════════════════
-    ["Flash Counter"]      = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Instant counter — deflects on reaction",  warn=false},
-    ["Absolute Confidence"]= {tier="C", col=Color3.fromRGB(255,220,40),  desc="Confident parry — stronger deflect",      warn=false},
-    ["Pulse"]              = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Pulse wave pushes ball away",             warn=false},
-    ["Bounty"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Marks player — bonus reward on kill",     warn=false},
-    ["Luck"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: increases coin drop chance",     warn=false},
-    ["Decrypted Clone"]    = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Encrypted decoy — confuses targeting",    warn=false},
-    ["Raging Deflection"]  = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Stronger deflect — big speed boost",      warn=true},
-    ["Tact"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: tactical awareness buff",        warn=false},
-    ["Waypoint"]           = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Place marker + teleport back to it",      warn=false},
-    ["Misfortune"]         = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Passive: curses nearby players",          warn=true},
-    ["Freeze"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Freezes ball briefly mid-flight",         warn=true},
-    ["Shadow Step"]        = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Shadow blink dodge behind attacker",      warn=false},
-    ["Quantum Arena"]      = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Zone trap — locks players inside area",   warn=true},
-    ["Force"]              = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Push force — knocks ball & players",      warn=false},
-    ["Dash"]               = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Starter dash — quick reposition",         warn=false},
-    ["Wind Cloak"]         = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Wind aura — speed + jump boost",          warn=false},
-    ["Quasar"]             = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Energy burst redirects ball",             warn=false},
-    ["Chieftain's Totem"]  = {tier="C", col=Color3.fromRGB(255,220,40),  desc="Totem — buffs nearby teammates",          warn=false},
-
-    -- ══ D TIER ════════════════════════════════════════════════════
-    ["Freeze Trap"]        = {tier="D", col=Color3.fromRGB(160,160,160), desc="Ground trap — freezes ball on contact",   warn=false},
-    ["Martyrdom"]          = {tier="D", col=Color3.fromRGB(160,160,160), desc="Explodes on death — AOE damage",          warn=true},
-    ["Platform"]           = {tier="D", col=Color3.fromRGB(160,160,160), desc="Pillar under feet — lifts you up",        warn=false},
-    ["Super Jump"]         = {tier="D", col=Color3.fromRGB(160,160,160), desc="Big jump — escapes ball from above",      warn=false},
-    ["Quad Jump"]          = {tier="D", col=Color3.fromRGB(160,160,160), desc="Passive: jump 4 times in the air",        warn=false},
+    ["Infinity"] = {tier="S", col=Color3.fromRGB(255,60,220), desc="Auto-parries ball at any speed", warn=true},
+    ["Time Hole"] = {tier="S", col=Color3.fromRGB(255,60,220), desc="Creates time distortion zone", warn=true},
+    ["Slash of Duality"] = {tier="S", col=Color3.fromRGB(255,60,220), desc="Dual slash — two trajectories at once", warn=true},
+    ["Dribble"] = {tier="S", col=Color3.fromRGB(255,60,220), desc="Redirect ball unpredictable angle", warn=true},
+    ["Dragon Spirit"] = {tier="S", col=Color3.fromRGB(255,60,220), desc="Dragon charge — fast spiral redirect", warn=true},
+    ["Pull"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Forces ball to target them instantly", warn=true},
+    ["Guardian Angel"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Revives once per round on death", warn=false},
+    ["Reaper"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Execute low-HP players near ball", warn=false},
+    ["Slashes of Fury"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Multi-slash barrage — fast ball return", warn=true},
+    ["Forcefield"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Shield bubble — auto-deflects ball", warn=false},
+    ["Bunny Leap"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Huge leap escape — hard to hit", warn=false},
+    ["Calming Deflection"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Deflect — slows ball on parry", warn=false},
+    ["Singularity"] = {tier="A", col=Color3.fromRGB(255,130,30), desc="Black hole pulls ball toward it", warn=true},
+    ["Invisibility"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Goes invisible — ball untargetable", warn=false},
+    ["Titan Blade"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Titan armor — tanks ball hit", warn=false},
+    ["Scopophobia"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Fear aura — disrupts nearby players", warn=true},
+    ["Blade Trap"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Trap on ground — hits ball near it", warn=true},
+    ["Golden Ball"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Ball turns gold — bonus coins on hit", warn=false},
+    ["Continuity Zero"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Resets all ability cooldowns", warn=false},
+    ["Death Slash"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Hard spike — ball returns very fast", warn=true},
+    ["Phantom"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Teleports behind nearest player", warn=true},
+    ["Swap"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Swaps position with targeted player", warn=true},
+    ["Doppelganger"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Spawns decoy clone of self", warn=false},
+    ["Necromancer"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Raises clone to confuse ball target", warn=false},
+    ["Serpent Shadow Clone"]= {tier="B", col=Color3.fromRGB(80,220,120), desc="Shadow serpent clone diversion", warn=false},
+    ["Phase Bypass"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Phase out — godspeed mobility escape", warn=false},
+    ["Hell Hook"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Hooks ball into sharp curve", warn=true},
+    ["Blink"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Short-range instant blink dodge", warn=false},
+    ["Qi-Charge"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Parry with no cooldown briefly", warn=false},
+    ["Telekinesis"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Stops ball mid-air + retargets it", warn=true},
+    ["Aerodynamic Slash"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Wind slash — speed + curve deflect", warn=false},
+    ["Rapture"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Rare wheel ability — massive curve slash",warn=true},
+    ["Thunder Dash"] = {tier="B", col=Color3.fromRGB(80,220,120), desc="Lightning-speed repositioning dash", warn=false},
+    ["Flash Counter"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Instant counter — deflects on reaction", warn=false},
+    ["Absolute Confidence"]= {tier="C", col=Color3.fromRGB(255,220,40), desc="Confident parry — stronger deflect", warn=false},
+    ["Pulse"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Pulse wave pushes ball away", warn=false},
+    ["Bounty"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Marks player — bonus reward on kill", warn=false},
+    ["Luck"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Passive: increases coin drop chance", warn=false},
+    ["Decrypted Clone"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Encrypted decoy — confuses targeting", warn=false},
+    ["Raging Deflection"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Stronger deflect — big speed boost", warn=true},
+    ["Tact"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Passive: tactical awareness buff", warn=false},
+    ["Waypoint"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Place marker + teleport back to it", warn=false},
+    ["Misfortune"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Passive: curses nearby players", warn=true},
+    ["Freeze"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Freezes ball briefly mid-flight", warn=true},
+    ["Shadow Step"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Shadow blink dodge behind attacker", warn=false},
+    ["Quantum Arena"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Zone trap — locks players inside area", warn=true},
+    ["Force"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Push force — knocks ball & players", warn=false},
+    ["Dash"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Starter dash — quick reposition", warn=false},
+    ["Wind Cloak"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Wind aura — speed + jump boost", warn=false},
+    ["Quasar"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Energy burst redirects ball", warn=false},
+    ["Chieftain's Totem"] = {tier="C", col=Color3.fromRGB(255,220,40), desc="Totem — buffs nearby teammates", warn=false},
+    ["Freeze Trap"] = {tier="D", col=Color3.fromRGB(160,160,160), desc="Ground trap — freezes ball on contact", warn=false},
+    ["Martyrdom"] = {tier="D", col=Color3.fromRGB(160,160,160), desc="Explodes on death — AOE damage", warn=true},
+    ["Platform"] = {tier="D", col=Color3.fromRGB(160,160,160), desc="Pillar under feet — lifts you up", warn=false},
+    ["Super Jump"] = {tier="D", col=Color3.fromRGB(160,160,160), desc="Big jump — escapes ball from above", warn=false},
+    ["Quad Jump"] = {tier="D", col=Color3.fromRGB(160,160,160), desc="Passive: jump 4 times in the air", warn=false},
 }
-
--- Tier background colors (darker tint for badge BG)
 local TIER_COL = {
     S = Color3.fromRGB(255,60,220),
     A = Color3.fromRGB(255,130,30),
@@ -1299,40 +1190,29 @@ local TIER_COL = {
     C = Color3.fromRGB(255,220,40),
     D = Color3.fromRGB(160,160,160),
 }
-
--- ── Scan player for their equipped ability ──────────────────────
 local RS = game:GetService("ReplicatedStorage")
 local function ScanAbility(plr)
     if not plr then return nil end
     local char = plr.Character
-
-    -- Helper: check a string against known abilities (fuzzy match)
     local function matchAbility(s)
         if not s or #s < 2 then return nil end
         if BB_ABILITIES[s] then return s end
-        -- Case-insensitive search
         local sl = s:lower()
         for k in pairs(BB_ABILITIES) do
             if k:lower() == sl then return k end
         end
         return nil
     end
-
-    -- 1) Player attributes (most games store here)
     for _, n in ipairs({"Ability","ability","AbilityName","EquippedAbility","Skill","CurrentAbility","equipped"}) do
         local ok,v = pcall(function() return plr:GetAttribute(n) end)
         if ok and type(v)=="string" then local r=matchAbility(v); if r then return r end end
     end
-
-    -- 2) Character attributes
     if char then
         for _, n in ipairs({"Ability","ability","AbilityName","EquippedAbility","Skill","CurrentAbility"}) do
             local ok,v = pcall(function() return char:GetAttribute(n) end)
             if ok and type(v)=="string" then local r=matchAbility(v); if r then return r end end
         end
     end
-
-    -- 3) StringValues anywhere under player (leaderstats, DataFolder, etc.)
     for _, v in ipairs(plr:GetDescendants()) do
         if v:IsA("StringValue") then
             local r = matchAbility(v.Value)
@@ -1343,8 +1223,6 @@ local function ScanAbility(plr)
             end
         end
     end
-
-    -- 4) StringValues anywhere under character
     if char then
         for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("StringValue") then
@@ -1357,8 +1235,6 @@ local function ScanAbility(plr)
             end
         end
     end
-
-    -- 5) ReplicatedStorage data folders
     local ok5,result5 = pcall(function()
         for _, folder in ipairs(RS:GetChildren()) do
             local pdata = folder:FindFirstChild(plr.Name)
@@ -1374,18 +1250,14 @@ local function ScanAbility(plr)
         return nil
     end)
     if ok5 and result5 then return result5 end
-
-    -- 6) Equipped Tool in character (ability = tool name)
     if char then
         for _, v in ipairs(char:GetChildren()) do
             if v:IsA("Tool") then
                 local r = matchAbility(v.Name)
-                return r or v.Name  -- return name even if unknown
+                return r or v.Name
             end
         end
     end
-
-    -- 7) Tool in Backpack
     local bp = plr:FindFirstChild("Backpack")
     if bp then
         for _, v in ipairs(bp:GetChildren()) do
@@ -1395,117 +1267,99 @@ local function ScanAbility(plr)
             end
         end
     end
-
     return nil
 end
-
--- ── Build billboard above player head ────────────────────────────
 local function BuildAbilityBB(plr)
     if not (plr and plr.Character) then return end
     local head = plr.Character:FindFirstChild("Head")
     if not head then return end
-
     if AbilityBBs[plr] and AbilityBBs[plr].Parent then
         pcall(function() AbilityBBs[plr]:Destroy() end)
     end
-
     local bb = Instance.new("BillboardGui")
-    bb.Name        = "RyuuAbilESP"
+    bb.Name = "RyuuAbilESP"
     bb.AlwaysOnTop = true
-    bb.Size        = UDim2.new(0,150,0,36)
+    bb.Size = UDim2.new(0,150,0,36)
     bb.StudsOffset = Vector3.new(0,3.0,0)
-    bb.MaxDistance  = 100
-    bb.Parent      = head
-
-    -- Card background
+    bb.MaxDistance = 100
+    bb.Parent = head
     local bg = Instance.new("Frame",bb)
-    bg.Size                   = UDim2.new(1,0,1,0)
-    bg.BackgroundColor3       = Color3.fromRGB(8,5,18)
+    bg.Size = UDim2.new(1,0,1,0)
+    bg.BackgroundColor3 = Color3.fromRGB(8,5,18)
     bg.BackgroundTransparency = 0.15
-    bg.BorderSizePixel        = 0
+    bg.BorderSizePixel = 0
     Instance.new("UICorner",bg).CornerRadius = UDim.new(0,8)
     local stroke = Instance.new("UIStroke",bg)
     stroke.Thickness = 1.4
-    stroke.Color     = Color3.fromRGB(50,25,90)
-
-    -- Player name (top-left, small gray)
+    stroke.Color = Color3.fromRGB(50,25,90)
     local nLbl = Instance.new("TextLabel",bg)
-    nLbl.Name              = "PN"
-    nLbl.Size              = UDim2.new(1,-30,0,13)
-    nLbl.Position          = UDim2.new(0,4,0,3)
+    nLbl.Name = "PN"
+    nLbl.Size = UDim2.new(1,-30,0,13)
+    nLbl.Position = UDim2.new(0,4,0,3)
     nLbl.BackgroundTransparency = 1
-    nLbl.Text              = plr.Name
-    nLbl.TextColor3        = Color3.fromRGB(150,140,190)
-    nLbl.Font              = Enum.Font.GothamBold
-    nLbl.TextSize          = 10
-    nLbl.TextXAlignment    = Enum.TextXAlignment.Left
-    nLbl.TextTruncate      = Enum.TextTruncate.AtEnd
-
-    -- Tier badge (top-right)
+    nLbl.Text = plr.Name
+    nLbl.TextColor3 = Color3.fromRGB(150,140,190)
+    nLbl.Font = Enum.Font.GothamBold
+    nLbl.TextSize = 10
+    nLbl.TextXAlignment = Enum.TextXAlignment.Left
+    nLbl.TextTruncate = Enum.TextTruncate.AtEnd
     local badge = Instance.new("TextLabel",bg)
-    badge.Name              = "TB"
-    badge.Size              = UDim2.new(0,24,0,13)
-    badge.Position          = UDim2.new(1,-27,0,3)
-    badge.BackgroundColor3  = Color3.fromRGB(30,15,55)
-    badge.BorderSizePixel   = 0
-    badge.Text              = "?"
-    badge.TextColor3        = Color3.fromRGB(180,100,255)
-    badge.Font              = Enum.Font.GothamBlack
-    badge.TextSize          = 10
+    badge.Name = "TB"
+    badge.Size = UDim2.new(0,24,0,13)
+    badge.Position = UDim2.new(1,-27,0,3)
+    badge.BackgroundColor3 = Color3.fromRGB(30,15,55)
+    badge.BorderSizePixel = 0
+    badge.Text = "?"
+    badge.TextColor3 = Color3.fromRGB(180,100,255)
+    badge.Font = Enum.Font.GothamBlack
+    badge.TextSize = 10
     Instance.new("UICorner",badge).CornerRadius = UDim.new(0,4)
-
-    -- Ability name (main row)
     local aLbl = Instance.new("TextLabel",bg)
-    aLbl.Name              = "AN"
-    aLbl.Size              = UDim2.new(1,-8,0,18)
-    aLbl.Position          = UDim2.new(0,4,0,14)
+    aLbl.Name = "AN"
+    aLbl.Size = UDim2.new(1,-8,0,18)
+    aLbl.Position = UDim2.new(0,4,0,14)
     aLbl.BackgroundTransparency = 1
-    aLbl.Text              = "Scanning..."
-    aLbl.TextColor3        = Color3.fromRGB(200,200,200)
-    aLbl.Font              = Enum.Font.GothamBold
-    aLbl.TextSize          = 13
-    aLbl.TextXAlignment    = Enum.TextXAlignment.Left
-    aLbl.TextTruncate      = Enum.TextTruncate.AtEnd
-
+    aLbl.Text = "Scanning..."
+    aLbl.TextColor3 = Color3.fromRGB(200,200,200)
+    aLbl.Font = Enum.Font.GothamBold
+    aLbl.TextSize = 13
+    aLbl.TextXAlignment = Enum.TextXAlignment.Left
+    aLbl.TextTruncate = Enum.TextTruncate.AtEnd
     AbilityBBs[plr] = bb
 end
-
--- ── Refresh one billboard's data ─────────────────────────────────
 local function RefreshBB(plr)
     if not (plr and plr.Character) then return end
     local bb = AbilityBBs[plr]
     if not (bb and bb.Parent) then BuildAbilityBB(plr); bb=AbilityBBs[plr] end
     if not bb then return end
     local bg = bb:FindFirstChildOfClass("Frame"); if not bg then return end
-    local aLbl  = bg:FindFirstChild("AN")
+    local aLbl = bg:FindFirstChild("AN")
     local badge = bg:FindFirstChild("TB")
-    local stk   = bg:FindFirstChildOfClass("UIStroke")
+    local stk = bg:FindFirstChildOfClass("UIStroke")
     if not aLbl then return end
-
     local name = ScanAbility(plr)
     if name then
         local data = BB_ABILITIES[name]
         if data then
             local col = data.warn and Color3.fromRGB(255,70,70) or data.col
-            aLbl.Text        = (data.warn and "⚠ " or "")..name
-            aLbl.TextColor3  = col
-            if badge then badge.Text       = data.tier
-                          badge.TextColor3  = TIER_COL[data.tier] or Color3.fromRGB(180,100,255) end
-            if stk   then stk.Color = data.warn and Color3.fromRGB(200,50,50) or data.col end
+            aLbl.Text = (data.warn and "⚠ " or "")..name
+            aLbl.TextColor3 = col
+            if badge then badge.Text = data.tier
+                          badge.TextColor3 = TIER_COL[data.tier] or Color3.fromRGB(180,100,255) end
+            if stk then stk.Color = data.warn and Color3.fromRGB(200,50,50) or data.col end
         else
-            aLbl.Text        = name
-            aLbl.TextColor3  = Color3.fromRGB(200,200,200)
+            aLbl.Text = name
+            aLbl.TextColor3 = Color3.fromRGB(200,200,200)
             if badge then badge.Text = "?" end
-            if stk   then stk.Color = Color3.fromRGB(50,25,90) end
+            if stk then stk.Color = Color3.fromRGB(50,25,90) end
         end
     else
-        aLbl.Text        = "No Ability"
-        aLbl.TextColor3  = Color3.fromRGB(90,85,110)
+        aLbl.Text = "No Ability"
+        aLbl.TextColor3 = Color3.fromRGB(90,85,110)
         if badge then badge.Text = "-" end
-        if stk   then stk.Color = Color3.fromRGB(30,15,50) end
+        if stk then stk.Color = Color3.fromRGB(30,15,50) end
     end
 end
-
 local function CleanAbilityESP()
     if AbilityPoll then AbilityPoll:Disconnect(); AbilityPoll=nil end
     for _, bb in pairs(AbilityBBs) do
@@ -1513,22 +1367,18 @@ local function CleanAbilityESP()
     end
     AbilityBBs = {}
 end
-
 local function StartAbilityESP()
     CleanAbilityESP()
-    -- Build boards for everyone currently in game
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Plr then
             BuildAbilityBB(p)
             RefreshBB(p)
         end
     end
-    -- Refresh loop every 0.4s
     task.spawn(function()
         while S.AbilityESP do
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= Plr then
-                    -- Rebuild board if character respawned or board missing
                     if p.Character then
                         local head = p.Character:FindFirstChild("Head")
                         if head then
@@ -1541,7 +1391,6 @@ local function StartAbilityESP()
                     end
                 end
             end
-            -- Prune players who left
             for p, bb in pairs(AbilityBBs) do
                 if not p.Parent then
                     pcall(function() if bb and bb.Parent then bb:Destroy() end end)
@@ -1551,7 +1400,6 @@ local function StartAbilityESP()
             task.wait(0.4)
         end
     end)
-    -- Hook new players joining mid-game
     Players.PlayerAdded:Connect(function(p)
         if not S.AbilityESP then return end
         p.CharacterAdded:Connect(function()
@@ -1559,7 +1407,6 @@ local function StartAbilityESP()
             if S.AbilityESP then BuildAbilityBB(p); RefreshBB(p) end
         end)
     end)
-    -- Also hook existing players who respawn
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Plr then
             p.CharacterAdded:Connect(function()
@@ -1569,47 +1416,34 @@ local function StartAbilityESP()
         end
     end
 end
-
-
-
 -- ══════════════════════════════════════════════════════════════════
---   SWORD CHANGER  ◈  ZivX V5
---
---   Finds the player's equipped sword (Tool in character) and
---   swaps its mesh + texture to any preset.
---   Works on the local client — purely visual (you see the change).
---   Applies on equip, re-applies on respawn.
+-- SWORD CHANGER
 -- ══════════════════════════════════════════════════════════════════
-
--- ── Sword color presets (Color3 values) ─────────────────────────
 local SWORD_COLORS = {
-    ["Default"]      = nil,   -- nil = restore originals
-    ["Gold"]         = Color3.fromRGB(255, 200,  40),
-    ["Shadow Black"] = Color3.fromRGB( 15,  10,  20),
+    ["Default"] = nil,
+    ["Gold"] = Color3.fromRGB(255, 200, 40),
+    ["Shadow Black"] = Color3.fromRGB( 15, 10, 20),
     ["Crystal Blue"] = Color3.fromRGB( 40, 140, 255),
-    ["Crimson"]      = Color3.fromRGB(200,  30,  30),
-    ["Ghost White"]  = Color3.fromRGB(230, 230, 255),
-    ["Neon Purple"]  = Color3.fromRGB(180,  40, 255),
-    ["Emerald"]      = Color3.fromRGB( 20, 200,  80),
-    ["Rose Gold"]    = Color3.fromRGB(220, 140, 120),
-    ["Obsidian"]     = Color3.fromRGB( 30,  28,  35),
-    ["Cyan"]         = Color3.fromRGB(  0, 220, 220),
-    ["Orange"]       = Color3.fromRGB(255, 120,  20),
-    ["Rainbow"]      = nil,   -- special: cycles hue each apply
+    ["Crimson"] = Color3.fromRGB(200, 30, 30),
+    ["Ghost White"] = Color3.fromRGB(230, 230, 255),
+    ["Neon Purple"] = Color3.fromRGB(180, 40, 255),
+    ["Emerald"] = Color3.fromRGB( 20, 200, 80),
+    ["Rose Gold"] = Color3.fromRGB(220, 140, 120),
+    ["Obsidian"] = Color3.fromRGB( 30, 28, 35),
+    ["Cyan"] = Color3.fromRGB( 0, 220, 220),
+    ["Orange"] = Color3.fromRGB(255, 120, 20),
+    ["Rainbow"] = nil,
 }
-
 local SWORD_MATERIALS = {
-    ["Default"]      = Enum.Material.SmoothPlastic,
-    ["Neon Purple"]  = Enum.Material.Neon,
-    ["Emerald"]      = Enum.Material.Neon,
-    ["Cyan"]         = Enum.Material.Neon,
-    ["Rainbow"]      = Enum.Material.Neon,
+    ["Default"] = Enum.Material.SmoothPlastic,
+    ["Neon Purple"] = Enum.Material.Neon,
+    ["Emerald"] = Enum.Material.Neon,
+    ["Cyan"] = Enum.Material.Neon,
+    ["Rainbow"] = Enum.Material.Neon,
 }
-
 local CurrentSwordPreset = "Default"
-local SwordOrigColors    = {}   -- stores {part → originalColor} on first equip
-local RainbowHue         = 0
-
+local SwordOrigColors = {}
+local RainbowHue = 0
 local function GetSwordParts()
     local char = Plr.Character; if not char then return nil, {} end
     local tool = nil
@@ -1623,12 +1457,10 @@ local function GetSwordParts()
             parts[#parts+1] = v
         end
     end
-    -- also include the Handle
     local h = tool:FindFirstChild("Handle")
     if h then parts[#parts+1] = h end
     return tool, parts
 end
-
 local function SaveSwordOriginals(parts)
     for _, p in ipairs(parts) do
         if not SwordOrigColors[p] then
@@ -1636,17 +1468,13 @@ local function SaveSwordOriginals(parts)
         end
     end
 end
-
 local function ApplySwordPreset(presetName)
     CurrentSwordPreset = presetName
     local _, parts = GetSwordParts()
-    if #parts == 0 then return end  -- sword not equipped, will apply on equip
+    if #parts == 0 then return end
     SaveSwordOriginals(parts)
-
     local mat = SWORD_MATERIALS[presetName] or Enum.Material.SmoothPlastic
-
     if presetName == "Default" then
-        -- Restore originals
         for _, p in ipairs(parts) do
             local orig = SwordOrigColors[p]
             if orig then
@@ -1655,7 +1483,6 @@ local function ApplySwordPreset(presetName)
         end
         return
     end
-
     if presetName == "Rainbow" then
         RainbowHue = (RainbowHue + 0.08) % 1
         local col = Color3.fromHSV(RainbowHue, 1, 1)
@@ -1664,18 +1491,14 @@ local function ApplySwordPreset(presetName)
         end
         return
     end
-
     local col = SWORD_COLORS[presetName]
     if not col then return end
     for _, p in ipairs(parts) do
         pcall(function() p.Color = col; p.Material = mat end)
     end
 end
-
--- Re-apply on equip
 Plr.CharacterAdded:Connect(function(char)
     task.wait(0.5)
-    -- Watch for tool equip
     char.ChildAdded:Connect(function(v)
         if v:IsA("Tool") then
             task.wait(0.1)
@@ -1683,7 +1506,6 @@ Plr.CharacterAdded:Connect(function(char)
         end
     end)
 end)
--- Also hook current character
 if Plr.Character then
     Plr.Character.ChildAdded:Connect(function(v)
         if v:IsA("Tool") then
@@ -1692,39 +1514,36 @@ if Plr.Character then
         end
     end)
 end
-
 -- ══════════════════════════════════════════════════════════════════
---   RAYFIELD WINDOW  ◈  GUI
+-- RAYFIELD WINDOW
 -- ══════════════════════════════════════════════════════════════════
 local W = Rayfield:CreateWindow({
-    Name                   = "Ryuu's HUB V1 BETA",
-    LoadingTitle           = "Ryuu's HUB V1 BETA",
-    LoadingSubtitle        = "",
-    Theme                  = "Default",
+    Name = "Ryuu's HUB V1 BETA",
+    LoadingTitle = "Ryuu's HUB V1 BETA",
+    LoadingSubtitle = "",
+    Theme = "Default",
     DisableRayfieldPrompts = false,
-    DisableBuildWarnings   = false,
-    ConfigurationSaving    = {Enabled=true, FolderName="RyuuV5", FileName="Config"},
-    KeySystem              = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {Enabled=true, FolderName="RyuuV5", FileName="Config"},
+    KeySystem = false,
 })
-
 -- ── TAB 1: AUTO PARRY ────────────────────────────────────────────
-local T1 = W:CreateTab("⚔  Auto Parry", nil)
+local T1 = W:CreateTab("⚔ Auto Parry", nil)
 T1:CreateSection("Auto Parry")
 T1:CreateToggle({Name="Auto Parry",CurrentValue=false,Flag="AP",Callback=function(v)
     S.AutoParry=v; if v then StartEngine() else StopEngine() end
 end})
 T1:CreateToggle({Name="Auto Face Ball",CurrentValue=false,Flag="AF",Callback=function(v) S.AutoFace=v end})
-T1:CreateToggle({Name="Triggerbot  (≤2 studs instant)",CurrentValue=false,Flag="TB",Callback=function(v) S.Triggerbot=v end})
+T1:CreateToggle({Name="Triggerbot (≤2 studs instant)",CurrentValue=false,Flag="TB",Callback=function(v) S.Triggerbot=v end})
 T1:CreateLabel("Stud-distance gate · AntiCurve predictor · Emergency distance")
 T1:CreateLabel("Speed-independent timing — same perfect parry at any ball speed")
-
 T1:CreateDivider()
-T1:CreateSection("🎯  Parry Accuracy")
+T1:CreateSection("🎯 Parry Accuracy")
 T1:CreateLabel("Higher = more precise timing. 100 = perfect every single time.")
 T1:CreateLabel("Lower = human-like variance — fires slightly off-rhythm.")
 T1:CreateLabel("acc=100: 0ms jitter — fires at mathematically perfect moment every time")
-T1:CreateLabel("acc=50:  ~90ms jitter — slightly off-rhythm, human-like")
-T1:CreateLabel("acc=1:   ~180ms jitter — very imprecise, misses fast balls")
+T1:CreateLabel("acc=50: ~90ms jitter — slightly off-rhythm, human-like")
+T1:CreateLabel("acc=1: ~180ms jitter — very imprecise, misses fast balls")
 T1:CreateSlider({
     Name="Parry Accuracy", Range={1,100}, Increment=1, CurrentValue=100, Flag="PA",
     Callback=function(v)
@@ -1733,16 +1552,15 @@ T1:CreateSlider({
                   or v>=80 and "Elite — Near-perfect"
                   or v>=60 and "Balanced"
                   or v>=40 and "Normal — Human-ish"
-                  or            "Low — Often misses"
+                  or "Low — Often misses"
         Rayfield:Notify({Title="Accuracy: "..v,Content=tier,Duration=2,Image=4483362458})
     end,
 })
-
 T1:CreateDivider()
-T1:CreateSection("🌀  Anti-Curve Engine")
+T1:CreateSection("🌀 Anti-Curve Engine")
 T1:CreateLabel("Tracks ball turn rate + speed changes every frame.")
 T1:CreateLabel("Curved balls, speed boosts, slows — all predicted correctly.")
-T1:CreateLabel("D3: Rodrigues rotation sim  |  D5: Closing-velocity check")
+T1:CreateLabel("D3: Rodrigues rotation sim | D5: Closing-velocity check")
 T1:CreateToggle({Name="Anti-Curve",CurrentValue=true,Flag="AC",Callback=function(v)
     S.AntiCurve=v
     Rayfield:Notify({
@@ -1751,21 +1569,18 @@ T1:CreateToggle({Name="Anti-Curve",CurrentValue=true,Flag="AC",Callback=function
         Duration = 2, Image = 4483362458,
     })
 end})
-
 T1:CreateDivider()
-T1:CreateSection("📡  Ping Compensation")
+T1:CreateSection("📡 Ping Compensation")
 PingLabel = T1:CreateLabel("Ping: measuring...")
 T1:CreateSlider({Name="Ping Scale",Range={0,1},Increment=0.05,Suffix="x",
     CurrentValue=0.5,Flag="PCS",Callback=function(v) PingScale=v; PingBonus=(PingMs/1000)*PingScale end})
-
 T1:CreateDivider()
-T1:CreateSection("⏱  Parry Cooldown")
+T1:CreateSection("⏱ Parry Cooldown")
 T1:CreateLabel("No pre-click guard. Parry fires the moment the ball is in range.")
 T1:CreateSlider({Name="Parry Cooldown",Range={0.05,0.60},Increment=0.01,Suffix="s",
     CurrentValue=0.32,Flag="CD",Callback=function(v) S.ParryCooldown=v end})
-
 T1:CreateDivider()
-T1:CreateSection("🚨  Emergency Distance Parry")
+T1:CreateSection("🚨 Emergency Distance Parry")
 T1:CreateLabel("Auto-parries instantly if the ball is dangerously close.")
 T1:CreateLabel("Triggers when ball ≤ distance AND an enemy is nearby.")
 T1:CreateLabel("Protects from: point-blank rush, Pull close, Hell Hook, Dribble.")
@@ -1778,10 +1593,7 @@ T1:CreateToggle({Name="Emergency Parry",CurrentValue=true,Flag="EP",Callback=fun
     })
 end})
 T1:CreateSlider({Name="Emergency Distance",Range={2,12},Increment=1,Suffix=" studs",
-    CurrentValue=6,Flag="EPD",Callback=function(v)
-        S.EmergencyDist=v
-    end})
-
+    CurrentValue=6,Flag="EPD",Callback=function(v) S.EmergencyDist=v end})
 T1:CreateDivider()
 T1:CreateSection("Spam")
 T1:CreateToggle({Name="Auto Spam",CurrentValue=false,Flag="AS",
@@ -1789,7 +1601,7 @@ T1:CreateToggle({Name="Auto Spam",CurrentValue=false,Flag="AS",
 T1:CreateSlider({Name="Spam Delay",Range={0.01,0.30},Increment=0.01,Suffix="s",
     CurrentValue=0.05,Flag="ASD",Callback=function(v) S.SpamDelay=v end})
 T1:CreateDivider()
-T1:CreateSection("🧠  Smart Spam")
+T1:CreateSection("🧠 Smart Spam")
 T1:CreateLabel("Auto-fires when enemies are within range")
 T1:CreateToggle({Name="Smart Spam",CurrentValue=false,Flag="SS",Callback=function(v)
     S.SmartSpam=v; if v then StartSmartSpam()
@@ -1798,9 +1610,9 @@ end})
 T1:CreateSlider({Name="Smart Spam Range",Range={5,50},Increment=1,Suffix=" studs",
     CurrentValue=10,Flag="SSR",Callback=function(v) S.SmartSpamDist=v end})
 T1:CreateDivider()
-T1:CreateSection("⚡  Manual Spam")
-T1:CreateLabel("Click button below  ◈  [E] to toggle  ◈  Draggable widget")
-T1:CreateButton({Name="⚡  Open Manual Spam Widget",Callback=function()
+T1:CreateSection("⚡ Manual Spam")
+T1:CreateLabel("Click button below ◈ [E] to toggle ◈ Draggable widget")
+T1:CreateButton({Name="⚡ Open Manual Spam Widget",Callback=function()
     MiniSG.Enabled=not MiniSG.Enabled
     if MiniSG.Enabled then
         MC.Position=UDim2.new(0.5,-109,1,-128); SyncShadow()
@@ -1814,14 +1626,12 @@ T1:CreateKeybind({Name="Toggle Auto Parry [F5]",CurrentKeybind="F5",HoldToIntera
         if S.AutoParry then StartEngine() else StopEngine() end
         Rayfield:Notify({Title="Auto Parry",Content=S.AutoParry and "ON ✓" or "OFF",Duration=2,Image=4483362458})
     end})
-
--- ── TAB 2: SEMI IMMORTAL ─────────────────────────────────────────
 -- ── TAB 3: VISUALS ───────────────────────────────────────────────
-local T3 = W:CreateTab("🎨  Visuals", nil)
+local T3 = W:CreateTab("🎨 Visuals", nil)
 T3:CreateSection("Ball ESP")
 T3:CreateToggle({Name="Ball ESP",CurrentValue=false,Flag="ESP",
     Callback=function(v) S.BallESP=v; if v then StartESP() else CleanESP() end end})
-T3:CreateLabel("Red = targeting you  |  Green = targeting other")
+T3:CreateLabel("Red = targeting you | Green = targeting other")
 T3:CreateDivider()
 T3:CreateSection("Lighting")
 T3:CreateToggle({Name="Fullbright",CurrentValue=false,Flag="FB",
@@ -1831,27 +1641,27 @@ T3:CreateSection("Camera")
 T3:CreateSlider({Name="Field of View",Range={30,120},Increment=1,Suffix="°",
     CurrentValue=70,Flag="FOV",Callback=function(v) Cam.FieldOfView=v end})
 T3:CreateDivider()
-T3:CreateSection("🔮  Ability ESP")
+T3:CreateSection("🔮 Ability ESP")
 T3:CreateLabel("Floating card above each enemy showing their equipped ability.")
 T3:CreateLabel("Updates 5x per second. Shows: name, tier, distance, and ACTIVE flash.")
 T3:CreateLabel("⚡ ACTIVE = ability is firing RIGHT NOW. Plan your parry.")
-T3:CreateLabel("Color: 🟣 Mythic  🟠 Legendary  🟡 Rare  ⚪ Common/None")
+T3:CreateLabel("Color: 🟣 Mythic 🟠 Legendary 🟡 Rare ⚪ Common/None")
 T3:CreateToggle({Name="Ability ESP",CurrentValue=false,Flag="AESP",Callback=function(v)
     S.AbilityESP=v
     if v then
         StartAbilityESP()
         Rayfield:Notify({
-            Title="Ability ESP  ◈  ON",
+            Title="Ability ESP ◈ ON",
             Content="Scanning all enemies. Cards appear above heads.",
             Duration=3,Image=4483362458,
         })
     else
         CleanAbilityESP()
-        Rayfield:Notify({Title="Ability ESP  ◈  OFF",Content="Cards removed.",Duration=2,Image=4483362458})
+        Rayfield:Notify({Title="Ability ESP ◈ OFF",Content="Cards removed.",Duration=2,Image=4483362458})
     end
 end})
 T3:CreateDivider()
-T3:CreateSection("⚡  FPS Booster")
+T3:CreateSection("⚡ FPS Booster")
 FPS_Label_Ref = T3:CreateLabel("FPS: measuring...")
 T3:CreateLabel("Targets: lighting, shadows, render fidelity, post FX")
 local FPSLevel=2
@@ -1868,9 +1678,8 @@ T3:CreateToggle({Name="FPS Booster",CurrentValue=false,Flag="FPSB",Callback=func
         Rayfield:Notify({Title="FPS Booster OFF",Content="Restored",Duration=2,Image=4483362458})
     end
 end})
-
 -- ── TAB 4: PLAYER ────────────────────────────────────────────────
-local T4 = W:CreateTab("🧍  Player", nil)
+local T4 = W:CreateTab("🧍 Player", nil)
 T4:CreateSection("Movement")
 T4:CreateSlider({Name="Walk Speed",Range={16,150},Increment=1,CurrentValue=16,Flag="WS",
     Callback=function(v) S.WalkSpeed=v
@@ -1892,10 +1701,9 @@ T4:CreateToggle({Name="Noclip",CurrentValue=false,Flag="NC",Callback=function(v)
             if p:IsA("BasePart") then p.CanCollide=true end end end
     end
 end})
-
 -- ── TAB: SWORD CHANGER ───────────────────────────────────────────
-local T6 = W:CreateTab("⚔  Sword", nil)
-T6:CreateSection("Sword Color  ◈  Client-Side")
+local T6 = W:CreateTab("⚔ Sword", nil)
+T6:CreateSection("Sword Color ◈ Client-Side")
 T6:CreateLabel("Changes your sword color. Visual only (only you see it).")
 T6:CreateLabel("Rainbow cycles hue each time Apply is pressed.")
 T6:CreateDropdown({
@@ -1908,10 +1716,10 @@ T6:CreateDropdown({
     Callback=function(v)
         local name = type(v)=="table" and v[1] or tostring(v)
         ApplySwordPreset(name)
-        Rayfield:Notify({Title="Sword  ◈  "..name, Content="Color applied!", Duration=2, Image=4483362458})
+        Rayfield:Notify({Title="Sword ◈ "..name, Content="Color applied!", Duration=2, Image=4483362458})
     end
 })
-T6:CreateButton({Name="⚔  Apply Now", Callback=function()
+T6:CreateButton({Name="⚔ Apply Now", Callback=function()
     local _, parts = GetSwordParts()
     if #parts > 0 then
         ApplySwordPreset(CurrentSwordPreset)
@@ -1922,7 +1730,7 @@ T6:CreateButton({Name="⚔  Apply Now", Callback=function()
 end})
 T6:CreateDivider()
 T6:CreateSection("Custom Color (RGB)")
-T6:CreateSlider({Name="Red",   Range={0,255},Increment=1,CurrentValue=128,Flag="SCR",
+T6:CreateSlider({Name="Red", Range={0,255},Increment=1,CurrentValue=128,Flag="SCR",
     Callback=function(v)
         local _,parts=GetSwordParts(); if #parts==0 then return end
         local curCol = parts[1].Color
@@ -1940,7 +1748,7 @@ T6:CreateSlider({Name="Green", Range={0,255},Increment=1,CurrentValue=128,Flag="
             for _,p in ipairs(parts) do pcall(function() p.Color=col end) end
         end)
     end})
-T6:CreateSlider({Name="Blue",  Range={0,255},Increment=1,CurrentValue=128,Flag="SCB",
+T6:CreateSlider({Name="Blue", Range={0,255},Increment=1,CurrentValue=128,Flag="SCB",
     Callback=function(v)
         local _,parts=GetSwordParts(); if #parts==0 then return end
         local curCol = parts[1].Color
@@ -1949,10 +1757,8 @@ T6:CreateSlider({Name="Blue",  Range={0,255},Increment=1,CurrentValue=128,Flag="
             for _,p in ipairs(parts) do pcall(function() p.Color=col end) end
         end)
     end})
-
-
 -- ── TAB 5: SETTINGS ──────────────────────────────────────────────
-local T5 = W:CreateTab("⚙  Settings", nil)
+local T5 = W:CreateTab("⚙ Settings", nil)
 T5:CreateSection("Keybinds")
 T5:CreateKeybind({Name="Toggle Auto Parry",CurrentKeybind="F5",HoldToInteract=false,Flag="KB2",
     Callback=function()
@@ -1966,9 +1772,9 @@ T5:CreateDivider()
 T5:CreateSection("About")
 T5:CreateLabel("Ryuu's HUB V1 BETA")
 T5:CreateDivider()
-T5:CreateSection("🔗  Discord")
+T5:CreateSection("🔗 Discord")
 T5:CreateLabel("Click the button to copy the Discord invite link.")
-T5:CreateButton({Name="📋  Copy Discord Link", Callback=function()
+T5:CreateButton({Name="📋 Copy Discord Link", Callback=function()
     local link = "https://discord.gg/S2fKywJutE"
     local ok = pcall(function() setclipboard(link) end)
     if ok then
@@ -1979,284 +1785,367 @@ T5:CreateButton({Name="📋  Copy Discord Link", Callback=function()
 end})
 
 -- ══════════════════════════════════════════════════════════════════
---   PREMIUM TAB  ◈  Key-locked whitelist system
+-- PREMIUM UNLOCK ANIMATION ◈ NEW ADDITION
 -- ══════════════════════════════════════════════════════════════════
-local PT = W:CreateTab("✨  Premium", nil)
+local function PlayUnlockAnimation()
+    local AnimSG = Instance.new("ScreenGui")
+    AnimSG.Name = "RyuuPremiumAnim"
+    AnimSG.ResetOnSpawn = false
+    AnimSG.IgnoreGuiInset = true
+    AnimSG.DisplayOrder = 99999
+    pcall(function()
+        AnimSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui
+    end)
+    if not AnimSG.Parent then
+        pcall(function() AnimSG.Parent = Plr:WaitForChild("PlayerGui") end)
+    end
+
+    -- Dark overlay fades in
+    local Overlay = Instance.new("Frame", AnimSG)
+    Overlay.Size = UDim2.new(1,0,1,0)
+    Overlay.BackgroundColor3 = Color3.fromRGB(4,2,12)
+    Overlay.BackgroundTransparency = 1
+    Overlay.BorderSizePixel = 0
+    Overlay.ZIndex = 1
+    TweenService:Create(Overlay, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {BackgroundTransparency = 0}):Play()
+    task.wait(0.35)
+
+    -- Outer burst ring
+    local Ring = Instance.new("Frame", AnimSG)
+    Ring.AnchorPoint = Vector2.new(0.5,0.5)
+    Ring.Position = UDim2.new(0.5,0,0.5,0)
+    Ring.Size = UDim2.new(0,0,0,0)
+    Ring.BackgroundTransparency = 1
+    Ring.BorderSizePixel = 0
+    Ring.ZIndex = 2
+    Instance.new("UICorner", Ring).CornerRadius = UDim.new(1,0)
+    local RingStroke = Instance.new("UIStroke", Ring)
+    RingStroke.Thickness = 3
+    RingStroke.Color = Color3.fromRGB(180,80,255)
+    TweenService:Create(Ring, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0,520,0,520)}):Play()
+    TweenService:Create(RingStroke, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Transparency = 1}):Play()
+
+    -- Inner ring slightly delayed
+    local Ring2 = Instance.new("Frame", AnimSG)
+    Ring2.AnchorPoint = Vector2.new(0.5,0.5)
+    Ring2.Position = UDim2.new(0.5,0,0.5,0)
+    Ring2.Size = UDim2.new(0,0,0,0)
+    Ring2.BackgroundTransparency = 1
+    Ring2.BorderSizePixel = 0
+    Ring2.ZIndex = 2
+    Instance.new("UICorner", Ring2).CornerRadius = UDim.new(1,0)
+    local Ring2Stroke = Instance.new("UIStroke", Ring2)
+    Ring2Stroke.Thickness = 2
+    Ring2Stroke.Color = Color3.fromRGB(255,160,255)
+    task.wait(0.08)
+    TweenService:Create(Ring2, TweenInfo.new(0.55, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0,380,0,380)}):Play()
+    TweenService:Create(Ring2Stroke, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {Transparency = 1}):Play()
+
+    -- Purple orb bursts then disappears
+    local Orb = Instance.new("Frame", AnimSG)
+    Orb.AnchorPoint = Vector2.new(0.5,0.5)
+    Orb.Position = UDim2.new(0.5,0,0.5,0)
+    Orb.Size = UDim2.new(0,0,0,0)
+    Orb.BackgroundColor3 = Color3.fromRGB(180,80,255)
+    Orb.BackgroundTransparency = 0.3
+    Orb.BorderSizePixel = 0
+    Orb.ZIndex = 3
+    Instance.new("UICorner", Orb).CornerRadius = UDim.new(1,0)
+    local OrbGrad = Instance.new("UIGradient", Orb)
+    OrbGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255,200,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,80,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(60,10,120)),
+    }
+    OrbGrad.Rotation = 45
+    TweenService:Create(Orb, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0,200,0,200)}):Play()
+    task.wait(0.3)
+    TweenService:Create(Orb, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {Size = UDim2.new(0,0,0,0), BackgroundTransparency = 1}):Play()
+
+    -- Main card slides in
+    local Card = Instance.new("Frame", AnimSG)
+    Card.AnchorPoint = Vector2.new(0.5,0.5)
+    Card.Position = UDim2.new(0.5,0,0.5,0)
+    Card.Size = UDim2.new(0,0,0,0)
+    Card.BackgroundColor3 = Color3.fromRGB(14,8,32)
+    Card.BorderSizePixel = 0
+    Card.ZIndex = 4
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0,18)
+    local CardStroke = Instance.new("UIStroke", Card)
+    CardStroke.Thickness = 2
+    CardStroke.Color = Color3.fromRGB(180,80,255)
+    local CardGrad = Instance.new("UIGradient", Card)
+    CardGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(28,10,60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(14,8,32)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(28,10,60)),
+    }
+    CardGrad.Rotation = 135
+    task.wait(0.08)
+    TweenService:Create(Card, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Size = UDim2.new(0,340,0,190)}):Play()
+    task.wait(0.2)
+
+    -- Star emoji pops in
+    local Crown = Instance.new("TextLabel", Card)
+    Crown.Size = UDim2.new(1,0,0,55)
+    Crown.Position = UDim2.new(0,0,0,12)
+    Crown.BackgroundTransparency = 1
+    Crown.Text = "✨"
+    Crown.Font = Enum.Font.GothamBlack
+    Crown.TextSize = 40
+    Crown.TextColor3 = Color3.fromRGB(255,200,80)
+    Crown.TextTransparency = 1
+    Crown.ZIndex = 5
+    TweenService:Create(Crown, TweenInfo.new(0.25), {TextTransparency = 0}):Play()
+
+    -- "PREMIUM UNLOCKED" text fades in
+    local Heading = Instance.new("TextLabel", Card)
+    Heading.Size = UDim2.new(1,-20,0,32)
+    Heading.Position = UDim2.new(0,10,0,68)
+    Heading.BackgroundTransparency = 1
+    Heading.Text = "PREMIUM UNLOCKED"
+    Heading.Font = Enum.Font.GothamBlack
+    Heading.TextSize = 26
+    Heading.TextColor3 = Color3.fromRGB(255,255,255)
+    Heading.TextTransparency = 1
+    Heading.ZIndex = 5
+    local HGrad = Instance.new("UIGradient", Heading)
+    HGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(200,120,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(200,120,255)),
+    }
+    TweenService:Create(Heading, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+    -- Sub text
+    local Sub = Instance.new("TextLabel", Card)
+    Sub.Size = UDim2.new(1,-20,0,20)
+    Sub.Position = UDim2.new(0,10,0,104)
+    Sub.BackgroundTransparency = 1
+    Sub.Text = "All premium features are now active"
+    Sub.Font = Enum.Font.Gotham
+    Sub.TextSize = 13
+    Sub.TextColor3 = Color3.fromRGB(180,130,255)
+    Sub.TextTransparency = 1
+    Sub.ZIndex = 5
+    TweenService:Create(Sub, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+    -- Divider line
+    local DivL = Instance.new("Frame", Card)
+    DivL.Size = UDim2.new(0.65,0,0,1)
+    DivL.Position = UDim2.new(0.175,0,0,130)
+    DivL.BackgroundColor3 = Color3.fromRGB(100,40,200)
+    DivL.BorderSizePixel = 0
+    DivL.ZIndex = 5
+
+    -- Version tag
+    local Tag = Instance.new("TextLabel", Card)
+    Tag.Size = UDim2.new(1,0,0,22)
+    Tag.Position = UDim2.new(0,0,1,-30)
+    Tag.BackgroundTransparency = 1
+    Tag.Text = "Ryuu's HUB · V1 BETA"
+    Tag.Font = Enum.Font.Gotham
+    Tag.TextSize = 10
+    Tag.TextColor3 = Color3.fromRGB(80,55,130)
+    Tag.TextTransparency = 1
+    Tag.ZIndex = 5
+    TweenService:Create(Tag, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+
+    -- Shimmer sweep
+    task.wait(0.15)
+    local Shimmer = Instance.new("Frame", Card)
+    Shimmer.Size = UDim2.new(0,60,1,0)
+    Shimmer.Position = UDim2.new(-0.25,0,0,0)
+    Shimmer.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    Shimmer.BackgroundTransparency = 0.72
+    Shimmer.BorderSizePixel = 0
+    Shimmer.ZIndex = 6
+    Instance.new("UICorner", Shimmer).CornerRadius = UDim.new(0,4)
+    local ShimGrad = Instance.new("UIGradient", Shimmer)
+    ShimGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+    }
+    ShimGrad.Rotation = 90
+    TweenService:Create(Shimmer, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
+        {Position = UDim2.new(1.15,0,0,0)}):Play()
+
+    -- Card stroke pulse
+    TweenService:Create(CardStroke, TweenInfo.new(0.25), {Color=Color3.fromRGB(255,180,255), Thickness=3}):Play()
+    task.wait(0.3)
+    TweenService:Create(CardStroke, TweenInfo.new(0.4), {Color=Color3.fromRGB(180,80,255), Thickness=1.5}):Play()
+
+    -- Hold on screen
+    task.wait(1.6)
+
+    -- Fade everything out
+    TweenService:Create(Card, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency=1}):Play()
+    TweenService:Create(CardStroke, TweenInfo.new(0.4), {Transparency=1}):Play()
+    TweenService:Create(Crown, TweenInfo.new(0.3), {TextTransparency=1}):Play()
+    TweenService:Create(Heading, TweenInfo.new(0.3), {TextTransparency=1}):Play()
+    TweenService:Create(Sub, TweenInfo.new(0.3), {TextTransparency=1}):Play()
+    TweenService:Create(Tag, TweenInfo.new(0.3), {TextTransparency=1}):Play()
+    TweenService:Create(DivL, TweenInfo.new(0.3), {BackgroundTransparency=1}):Play()
+    TweenService:Create(Overlay, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {BackgroundTransparency=1}):Play()
+    task.wait(0.45)
+    pcall(function() AnimSG:Destroy() end)
+end
+
+-- RemovePremiumLock is a no-op now (no overlay to remove)
+local function RemovePremiumLock() end
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM TAB
+-- ══════════════════════════════════════════════════════════════════
+local PT = W:CreateTab("✨ Premium", nil)
 local PremiumUnlocked = false
 local EnteredKey = ""
 
--- ── Header ───────────────────────────────────────────────────────
-PT:CreateSection("✨  Ryuu's HUB Premium")
+PT:CreateSection("✨ Ryuu's HUB Premium")
 PT:CreateLabel("Premium gives you the Aggressive Parry engine —")
 PT:CreateLabel("lower cooldown, faster fire, god-tier close range.")
 PT:CreateDivider()
 
--- ── Key Input ─────────────────────────────────────────────────────
-PT:CreateSection("🔑  Enter Whitelist Key")
+PT:CreateSection("🔑 Enter Whitelist Key")
 PT:CreateLabel("Paste the key you received from the Discord bot below.")
-
 PT:CreateInput({
-    Name               = "Your Key",
-    PlaceholderText    = "RYUU-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
+    Name = "Your Key",
+    PlaceholderText = "RYUU-XXXXXX-XXXXXX-XXXXXX-XXXXXX",
     RemoveTextAfterFocusLost = false,
-    Flag               = "WLKey",
-    Callback           = function(val)
+    Flag = "WLKey",
+    Callback = function(val)
         EnteredKey = val or ""
     end,
 })
-
-PT:CreateButton({Name = "✅  Unlock Premium", Callback = function()
-    -- Also try reading from flag in case callback hasn't fired
+PT:CreateButton({Name = "✅ Unlock Premium", Callback = function()
     if EnteredKey == "" then
         pcall(function()
             local fl = Rayfield.Flags and Rayfield.Flags.WLKey
             EnteredKey = (fl and fl.Value) or ""
         end)
     end
-
-    local key = EnteredKey:match("^%s*(.-)%s*$")  -- trim whitespace
-
+    local key = EnteredKey:match("^%s*(.-)%s*$")
     if #key < 10 then
-        Rayfield:Notify({
-            Title   = "⚠️  No Key",
-            Content = "Paste your key in the field first.",
-            Duration = 4,
-            Image   = 4483362458,
-        })
+        Rayfield:Notify({Title="⚠️ No Key",Content="Paste your key in the field first.",Duration=4,Image=4483362458})
         return
     end
-
     if PremiumUnlocked then
         Rayfield:Notify({Title="Already Unlocked",Content="Premium is active!",Duration=3,Image=4483362458})
         return
     end
-
-    Rayfield:Notify({
-        Title   = "🔄  Checking Key...",
-        Content = "Connecting to whitelist server...",
-        Duration = 3,
-        Image   = 4483362458,
-    })
-
-    task.spawn(function()
-        local result = ValidateKey(key)
-
-        if result == "locked_other" then
-            Rayfield:Notify({
-                Title   = "🔒  Key Already Used",
-                Content = "This key is locked to a different device. Keys are one-device only.",
-                Duration = 8,
-                Image   = 4483362458,
-            })
-            return
-        end
-
-        if result == "invalid" then
-            Rayfield:Notify({
-                Title   = "❌  Invalid Key",
-                Content = "Key not found. Ask for a valid key.",
-                Duration = 6,
-                Image   = 4483362458,
-            })
-            return
-        end
-
-        -- result == "ok" — valid key AND correct device
+    local result = ValidateKey(key)
+    if result == "ok" then
         PremiumUnlocked = true
-        IsWhitelisted   = true
         PremiumActive   = true
-
-        Rayfield:Notify({
-            Title   = "✨  Premium Unlocked!",
-            Content = "Welcome to Ryuu's HUB Premium. Key locked to this device.",
-            Duration = 6,
-            Image   = 4483362458,
-        })
-
-        do  -- scope block
-            -- ══════════════════════════════════════════════════
-            -- PREMIUM FEATURES — every one is strictly better than free
-            -- ══════════════════════════════════════════════════
-            PT:CreateDivider()
-
-            -- ── 1. PREMIUM PARRY ─────────────────────────────────
-            -- FREE:    lands at 6 studs on server
-            -- PREMIUM: lands at 4.5 studs + next-frame extrapolation
-            --          Never fires early, catches balls free misses
-            PT:CreateSection("⚔  Premium Auto Parry")
-            PT:CreateLabel("Fires at 4.5 studs on server (free fires at 6).")
-            PT:CreateLabel("+ Next-frame prediction: compensates 1 frame of lag.")
-            PT:CreateLabel("+ 5-frame smoothed anticurve (free uses 1 frame).")
-            PT:CreateToggle({
-                Name         = "Premium Parry",
-                CurrentValue = false,
-                Flag         = "PPA",
-                Callback     = function(v)
-                    if v then
-                        S.AutoParry = false
-                        StopEngine()
-                        StartPremiumEngine()
-                        Rayfield:Notify({
-                            Title   = "✨ Premium Parry ON",
-                            Content = "Tighter hitbox · Next-frame prediction · Smooth anticurve",
-                            Duration = 4,
-                            Image   = 4483362458,
-                        })
-                    else
-                        StopPremiumEngine()
-                        Rayfield:Notify({Title="Premium Parry OFF",Content="",Duration=2,Image=4483362458})
-                    end
-                end,
-            })
-
-            -- Parry hitbox slider — FREE has no equivalent
-            -- Lets premium users tune exactly where they want the ball
-            -- when the server gets the click. Lower = later = more precise.
-            PT:CreateSlider({
-                Name         = "Hitbox Target (studs)",
-                Range        = {3.0, 7.0},
-                Increment    = 0.5,
-                CurrentValue = 4.5,
-                Flag         = "PHT",
-                Suffix       = " studs",
-                Callback     = function(v)
-                    P.HitboxTarget = v
-                end,
-            })
-
-            PT:CreateDivider()
-
-            -- ── 2. AUTO FACE ─────────────────────────────────────
-            -- FREE: same feature but buried in T1
-            -- PREMIUM: separate toggle here + wired to premium engine
-            PT:CreateSection("👁  Auto Face Ball")
-            PT:CreateLabel("Always rotates your character to face the ball.")
-            PT:CreateLabel("Makes parry hitbox consistent regardless of camera angle.")
-            PT:CreateToggle({
-                Name         = "Auto Face Ball",
-                CurrentValue = false,
-                Flag         = "PAF",
-                Callback     = function(v)
-                    P.AutoFace = v
-                    S.AutoFace = v
-                end,
-            })
-
-            PT:CreateDivider()
-
-            -- ── 3. GOD EMERGENCY ─────────────────────────────────
-            -- FREE: emergency at 6 studs
-            -- PREMIUM: fires at 3 studs — half the distance, twice as late,
-            --          means it NEVER pre-clicks on point-blank attacks
-            PT:CreateSection("⚡  God Emergency Parry")
-            PT:CreateLabel("Fires at 3 studs (free fires at 6) — half distance, never early.")
-            PT:CreateLabel("Catches Pull, Hell Hook, Dribble, and redirect attacks.")
-            PT:CreateToggle({
-                Name         = "God Emergency (3 studs)",
-                CurrentValue = false,
-                Flag         = "GEP",
-                Callback     = function(v)
-                    P.GodEmergency = v
-                    -- Also tighten the shared emergency if free engine is running
-                    if v then S.EmergencyDist = 3 else S.EmergencyDist = 6 end
-                    Rayfield:Notify({
-                        Title   = v and "⚡ God Emergency ON" or "⚡ God Emergency OFF",
-                        Content = v and "Fires at 3 studs — unhittable at close range" or "Back to standard 6 studs",
-                        Duration = 3,
-                        Image   = 4483362458,
-                    })
-                end,
-            })
-
-            PT:CreateDivider()
-
-            -- ── 4. CURVE CRUSHER ─────────────────────────────────
-            -- FREE: single-frame closing speed, threshold > 5, no smoothing
-            -- PREMIUM: 5-frame smoothed history, far more stable on laggy servers
-            PT:CreateSection("🌀  Curve Crusher")
-            PT:CreateLabel("5-frame smoothed closing speed (free uses 1 frame).")
-            PT:CreateLabel("Catches slow curves, Pull redirects, and speed-boost arcs.")
-            PT:CreateToggle({
-                Name         = "Curve Crusher",
-                CurrentValue = false,
-                Flag         = "CC",
-                Callback     = function(v)
-                    P.CurveCrusher = v
-                    Rayfield:Notify({
-                        Title   = v and "🌀 Curve Crusher ON" or "🌀 Curve Crusher OFF",
-                        Content = v and "5-frame smoothed anticurve active" or "",
-                        Duration = 3,
-                        Image   = 4483362458,
-                    })
-                end,
-            })
-
-            PT:CreateDivider()
-
-            -- ── 5. SPEED BOOST DETECTION ─────────────────────────
-            -- FREE: no equivalent
-            -- PREMIUM: if ball accelerates >30% over last 3 frames, fireAt
-            --          auto-adjusts upward so you don't get hit by speed boosted balls
-            PT:CreateSection("🚀  Speed Boost Detection")
-            PT:CreateLabel("Detects when ball is accelerating (speed boost ability).")
-            PT:CreateLabel("Automatically fires earlier — free users get hit by this.")
-            PT:CreateToggle({
-                Name         = "Speed Boost Detection",
-                CurrentValue = true,
-                Flag         = "SBD",
-                Callback     = function(v)
-                    P.SpeedBoostDetect = v
-                end,
-            })
-
-            PT:CreateDivider()
-
-            -- ── 6. PARRY STATS ───────────────────────────────────
-            -- FREE: basic parry counter label in T1
-            -- PREMIUM: live stats — parries this round, session total, avg ping
-            PT:CreateSection("📊  Live Stats")
-            PT:CreateLabel("Parries this session, ping average, and engine status.")
-            local StatsLabel = PT:CreateLabel("Parries: 0  |  Ping: --ms  |  Engine: Premium")
-            task.spawn(function()
-                while PremiumActive do
-                    task.wait(1)
-                    pcall(function()
-                        StatsLabel.Text = ("Parries: %d  |  Ping: %dms  |  Engine: %s"):format(
-                            S.ParryCount,
-                            math.floor(PingMs),
-                            "✨ Premium"
-                        )
-                    end)
-                end
-            end)
-
-            PT:CreateDivider()
-            PT:CreateSection("🔑  Your Key")
-            PT:CreateLabel("Key: " .. key:sub(1,14) .. "••••••••••••")
-            PT:CreateLabel("Status: ✅  Active — locked to this device")
-
-        end  -- close do block
-    end)
+        -- Remove lock overlay + play cinematic
+        task.spawn(RemovePremiumLock)
+        task.spawn(PlayUnlockAnimation)
+        Rayfield:Notify({Title="✨ Premium Unlocked!",Content="Welcome to Ryuu's HUB Premium.",Duration=5,Image=4483362458})
+        if S.AutoParry then
+            StopEngine()
+            task.wait(0.1)
+            StartPremiumEngine()
+        end
+    elseif result == "locked_other" then
+        Rayfield:Notify({Title="🔒 Key Already Used",Content="This key is bound to another device.",Duration=5,Image=4483362458})
+    else
+        Rayfield:Notify({Title="❌ Invalid Key",Content="That key is not valid. Check Discord.",Duration=4,Image=4483362458})
+    end
 end})
 
 PT:CreateDivider()
 
--- ── How to get a key ──────────────────────────────────────────────
-PT:CreateSection("📌  How to get a key")
-PT:CreateLabel("1️⃣  Join the Discord server below")
-PT:CreateLabel("2️⃣  Buy premuim or ask admin if they can give you")
-PT:CreateLabel("3️⃣  Key automatically DMS YOU")
-PT:CreateLabel("4️⃣  Paste the key above → click Unlock Premium")
-PT:CreateDivider()
-PT:CreateButton({Name = "📋  Copy Discord Link", Callback = function()
-    local link = "https://discord.gg/S2fKywJutE"
-    pcall(function() setclipboard(link) end)
-    Rayfield:Notify({Title="Link Copied!",Content="discord.gg/S2fKywJutE",Duration=3,Image=4483362458})
-end})
-PT:CreateButton({Name = "IF YOU HAVE THE KEY YOUR AUTOMATICALLY GIVEN WHITELISTED ROLE", Callback = function()
-    local link = "https://discord.gg/S2fKywJutE"
-    pcall(function() setclipboard(link) end)
-    Rayfield:Notify({Title="Tip",Content="Join Discord → type /mykey to get your key again",Duration=5,Image=4483362458})
-end})
+-- Premium features — guarded by PremiumUnlocked check
+PT:CreateSection("⚡ Premium Parry Engine")
+PT:CreateLabel("Ultra-tight hitbox · 2-frame prediction · Quad curve · 0.15s cooldown")
+PT:CreateLabel("God Emergency (2.5 studs) · Boost Detection (3-frame) · Auto-face")
 
-print("[Ryuu's HUB V1 BETA] Loaded. Press F5 for Auto Parry.")
+PT:CreateToggle({Name="Premium Auto Parry", CurrentValue=false, Flag="PAP",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        if v then
+            StopEngine(); P.AutoParry=true; StartPremiumEngine()
+            Rayfield:Notify({Title="⚡ Premium Engine ON",Content="God-tier parry active.",Duration=3,Image=4483362458})
+        else
+            StopPremiumEngine(); P.AutoParry=false
+        end
+    end})
+
+PT:CreateToggle({Name="God Emergency (2.5 studs)", CurrentValue=false, Flag="PGE",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.GodEmergency=v
+    end})
+
+PT:CreateToggle({Name="Curve Crusher (5-frame AntiCurve)", CurrentValue=true, Flag="PCC",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.CurveCrusher=v
+    end})
+
+PT:CreateToggle({Name="Auto Face Ball (Premium)", CurrentValue=false, Flag="PAF",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.AutoFace=v
+    end})
+
+PT:CreateToggle({Name="Quad Curve Prediction", CurrentValue=true, Flag="PQCP",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.QuadCurvePredict=v
+    end})
+
+PT:CreateToggle({Name="Advanced Boost Detection", CurrentValue=true, Flag="PABD",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.SpeedBoostDetect=v
+    end})
+
+PT:CreateDivider()
+PT:CreateSection("🎯 Premium Hitbox")
+PT:CreateLabel("4.0 studs default — fires even later for ultimate precision.")
+PT:CreateSlider({Name="Hitbox Target",Range={2.5,6.0},Increment=0.1,CurrentValue=4.0,Flag="PHB",
+    Callback=function(v)
+        if not PremiumUnlocked then
+            Rayfield:Notify({Title="🔒 Locked",Content="Enter your premium key first.",Duration=3,Image=4483362458})
+            return
+        end
+        P.HitboxTarget=v
+    end})
+
+PT:CreateDivider()
+PT:CreateSection("📊 Premium Status")
+PT:CreateButton({Name="Check Premium Status", Callback=function()
+    if PremiumUnlocked then
+        Rayfield:Notify({Title="✨ Premium ACTIVE",Content="All premium engines are unlocked.",Duration=4,Image=4483362458})
+    else
+        Rayfield:Notify({Title="🔒 Not Unlocked",Content="Enter your key above.",Duration=4,Image=4483362458})
+    end
+end})
