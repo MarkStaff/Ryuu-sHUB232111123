@@ -43,6 +43,7 @@ local function makeStub()
     }
 end
 -- Step 1: Show a clean intro card while Rayfield loads
+do  -- scope: intro screen gui locals
 local IntroSG = Instance.new("ScreenGui")
 IntroSG.Name = "RyuuIntro"
 IntroSG.ResetOnSpawn = false
@@ -169,9 +170,11 @@ pcall(function()
     task.wait(0.55)
 end)
 pcall(function() IntroSG:Destroy() end)
+end  -- end intro screen scope
 -- ══════════════════════════════════════════════════════════════════
 -- ALWAYS-ON HUD
 -- ══════════════════════════════════════════════════════════════════
+do  -- scope: HUD building locals
 local HudSG = Instance.new("ScreenGui")
 HudSG.Name = "RyuuHUD"
 HudSG.ResetOnSpawn = false
@@ -237,6 +240,7 @@ RunService.Heartbeat:Connect(function(dt)
         HudPing.TextColor3 = col
     end)
 end)
+end  -- end HUD scope
 -- ══════════════════════════════════════════════════════════════════
 -- STATE
 -- ══════════════════════════════════════════════════════════════════
@@ -245,15 +249,11 @@ local S = {
     AutoFace = false,
     BallESP = false,
     AbilityESP = false,
-    AutoSpam = false,
-    SmartSpam = false,
-    SmartSpamDist = 10,
     Triggerbot = false,
     Fullbright = false,
     Noclip = false,
     InfJump = false,
     ParryCount = 0,
-    SpamDelay = 0.05,
     WalkSpeed = 16,
     JumpPower = 50,
     LastParry = 0,
@@ -275,6 +275,7 @@ local VALID_KEYS = {
     "RYUU-KEY2o3i4j2o3232sxasdv",
     "09153552478",
     "x31THEGOAT",
+    "RYUU-KEYS0CF94TEDFGVasd4swdf",
 }
 local IsWhitelisted = false
 local PremiumActive = false
@@ -455,7 +456,7 @@ local function smoothFreeClosing(curDist, curTime)
 end
 local PrevBallPos = nil
 local PrevBallTime = 0
-local PARRY_RESET_TIME = 0.18  -- FIX 6: fixed reset, not tied to user cooldown slider
+S.ParryReset = 0.18
 local function FireParry()
     if S.DidParry then return end
     if os.clock() - S.LastParry < S.ParryCooldown then return end
@@ -468,7 +469,7 @@ local function FireParry()
         VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
         rc:Disconnect()
     end)
-    task.delay(PARRY_RESET_TIME, function() S.DidParry = false end)  -- FIX 6
+    task.delay(S.ParryReset, function() S.DidParry = false end)  -- FIX 6
 end
 local function StartEngine()
     if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
@@ -701,20 +702,19 @@ local function smoothClosing(curDist, curTime)
 end
 
 -- Adaptive ping: use min of last 3 samples for best-case compensation
-local PingMin = 60
-local PingMinSamples = {}
+local PingAdapt = {min=60, samples={}}
 task.spawn(function()
     while true do
         task.wait(1.5)
-        table.insert(PingMinSamples, PingMs)
-        if #PingMinSamples > 3 then table.remove(PingMinSamples, 1) end
+        table.insert(PingAdapt.samples, PingMs)
+        if #PingAdapt.samples > 3 then table.remove(PingAdapt.samples, 1) end
         local min = PingMs
-        for _, v in ipairs(PingMinSamples) do if v < min then min = v end end
-        PingMin = min
+        for _, v in ipairs(PingAdapt.samples) do if v < min then min = v end end
+        PingAdapt.min = min
     end
 end)
 
-local PREMIUM_RESET = 0.12  -- faster re-arm than free's 0.18
+S.PremReset = 0.12
 
 local function PremiumFire()
     if S.DidParry then return end
@@ -728,7 +728,7 @@ local function PremiumFire()
         VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
         rc:Disconnect()
     end)
-    task.delay(PREMIUM_RESET, function() S.DidParry = false end)
+    task.delay(S.PremReset, function() S.DidParry = false end)
 end
 
 local function StartPremiumEngine()
@@ -790,7 +790,7 @@ local function StartPremiumEngine()
 
         -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 15.0 then PremiumFire() end
+            if Dist <= 13.5 then PremiumFire() end
             return
         end
 
@@ -809,11 +809,11 @@ local function StartPremiumEngine()
         end
 
         -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
-        local hbox = P.HitboxTarget or 15.0
+        local hbox = P.HitboxTarget or 13.5
         -- Adaptive ping multiplier: very aggressive for premium
-        local pingFactor = PingMin <= 100 and 1.6 or (1.6 + ((PingMin - 100) / 100) * 0.8)
-        pingFactor = math.min(pingFactor, 6.0)
-        local pingComp = (PingMin / 1000) * effectiveSpeed * pingFactor
+        local pingFactor = PingAdapt.min <= 100 and 1.2 or (1.2 + ((PingAdapt.min - 100) / 100) * 0.65)
+        pingFactor = math.min(pingFactor, 4.5)
+        local pingComp = (PingAdapt.min / 1000) * effectiveSpeed * pingFactor
         local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
@@ -833,7 +833,7 @@ local function StartPremiumEngine()
         if P.CurveCrusher or S.AntiCurve then
             local sc = smoothClosing(Dist, now)
             if sc > 1.5 then
-                local curveFireAt = hbox + (PingMin / 1000) * sc
+                local curveFireAt = hbox + (PingAdapt.min / 1000) * sc
                 if Dist <= curveFireAt then
                     PremiumFire(); return
                 end
@@ -860,295 +860,7 @@ local function StopPremiumEngine()
     posHistQuad = {}
 end
 -- ══════════════════════════════════════════════════════════════════
--- SPAM
--- ══════════════════════════════════════════════════════════════════
-local SpamThr=nil
-local function StartAutoSpam()
-    if SpamThr then return end
-    SpamThr=task.spawn(function()
-        while S.AutoSpam do VIM:SendMouseButtonEvent(0,0,0,true,game,0); task.wait(S.SpamDelay) end
-        SpamThr=nil
-    end)
-end
-local function StartSmartSpam()
-    task.spawn(function()
-        while S.SmartSpam do
-            local hrp=GetHRP()
-            if hrp then
-                local close=false
-                for _,p in ipairs(Players:GetPlayers()) do
-                    if p~=Plr and p.Character then
-                        local oh=p.Character:FindFirstChild("HumanoidRootPart")
-                        if oh and (oh.Position-hrp.Position).Magnitude<=S.SmartSpamDist then close=true;break end
-                    end
-                end
-                if close then VIM:SendMouseButtonEvent(0,0,0,true,game,0);task.wait(0.015)
-                else task.wait(0.1) end
-            else task.wait(0.5) end
-        end
-    end)
-end
--- ══════════════════════════════════════════════════════════════════
--- MISC FEATURES
--- ══════════════════════════════════════════════════════════════════
-local function StartNoclip()
-    if Conn.Noclip then return end
-    Conn.Noclip=RunService.Stepped:Connect(function()
-        if not S.Noclip then return end
-        local c=Plr.Character; if not c then return end
-        for _,v in ipairs(c:GetDescendants()) do if v:IsA("BasePart") then v.CanCollide=false end end
-    end)
-end
-local function StartIJ()
-    if Conn.IJ then return end
-    Conn.IJ=UIS.JumpRequest:Connect(function()
-        if not S.InfJump then return end
-        local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
-        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end)
-end
-RunService.Heartbeat:Connect(function()
-    if S.WalkSpeed==16 and S.JumpPower==50 then return end
-    local h=Plr.Character and Plr.Character:FindFirstChildOfClass("Humanoid")
-    if not h then return end
-    if h.WalkSpeed~=S.WalkSpeed then h.WalkSpeed=S.WalkSpeed end
-    if h.JumpPower~=S.JumpPower then h.JumpPower=S.JumpPower end
-end)
-Plr.CharacterAdded:Connect(function()
-    task.wait(0.5)
-    if S.AutoParry then StartEngine() end
-    if S.InfJump then StartIJ() end
-    if S.Noclip then StartNoclip() end
-end)
--- ══════════════════════════════════════════════════════════════════
--- BALL ESP
--- ══════════════════════════════════════════════════════════════════
-local ESPBillboard=nil
-local function CleanESP()
-    pcall(function() if ESPBillboard then ESPBillboard:Destroy() end end)
-    ESPBillboard=nil
-    if Conn.ESPRender then Conn.ESPRender:Disconnect(); Conn.ESPRender=nil end
-end
-local function StartESP()
-    CleanESP()
-    local ball=GetBall(); if not ball then return end
-    local bb=Instance.new("BillboardGui",ball)
-    bb.AlwaysOnTop=true; bb.Size=UDim2.new(0,80,0,30); bb.StudsOffset=Vector3.new(0,3.5,0)
-    ESPBillboard=bb
-    local lbl=Instance.new("TextLabel",bb)
-    lbl.Size=UDim2.new(1,0,1,0); lbl.BackgroundTransparency=1
-    lbl.TextScaled=true; lbl.Font=Enum.Font.GothamBold; lbl.Text="?"
-    lbl.TextColor3=Color3.new(1,1,1)
-    Conn.ESPRender=RunService.Heartbeat:Connect(function()
-        if not ball or not ball.Parent then CleanESP(); return end
-        local tgt=ball:GetAttribute("target")
-        if tgt==Plr.Name then lbl.Text="⚠ YOU"; lbl.TextColor3=Color3.fromRGB(255,60,60)
-        else lbl.Text=tgt or "?"; lbl.TextColor3=Color3.fromRGB(60,255,120) end
-    end)
-end
--- ══════════════════════════════════════════════════════════════════
--- FULLBRIGHT
--- ══════════════════════════════════════════════════════════════════
-local fbA,fbO,fbB
-local function SetFB(on)
-    if on then fbA=Lighting.Ambient;fbO=Lighting.OutdoorAmbient;fbB=Lighting.Brightness
-        Lighting.Ambient=Color3.new(1,1,1);Lighting.OutdoorAmbient=Color3.new(1,1,1);Lighting.Brightness=2
-    else
-        if fbA then Lighting.Ambient=fbA end
-        if fbO then Lighting.OutdoorAmbient=fbO end
-        if fbB then Lighting.Brightness=fbB end
-    end
-end
--- ══════════════════════════════════════════════════════════════════
--- FPS BOOSTER
--- ══════════════════════════════════════════════════════════════════
-local FPS_Active=false; local FPS_Saved={effects={},casters={},fidelity={}}
-local FPS_Label_Ref=nil
-local function ApplyFPS(level)
-    if FPS_Active then return end; FPS_Active=true
-    FPS_Saved.tech=Lighting.Technology; FPS_Saved.shadow=Lighting.GlobalShadows
-    FPS_Saved.envD=Lighting.EnvironmentDiffuseScale; FPS_Saved.envS=Lighting.EnvironmentSpecularScale
-    pcall(function()
-        local tech={Enum.Technology.ShadowMap,Enum.Technology.Voxel,Enum.Technology.Compatibility}
-        Lighting.Technology=tech[level] or tech[2]
-    end)
-    if level>=2 then Lighting.GlobalShadows=false;Lighting.EnvironmentDiffuseScale=0;Lighting.EnvironmentSpecularScale=0 end
-    FPS_Saved.effects={}
-    for _,e in ipairs(Lighting:GetChildren()) do
-        if e:IsA("PostEffect") then table.insert(FPS_Saved.effects,{o=e,was=e.Enabled})
-            if level>=2 then pcall(function() e.Enabled=false end) end
-        end
-    end
-    if level>=2 then
-        FPS_Saved.casters={}; FPS_Saved.fidelity={}
-        pcall(function()
-            for _,v in ipairs(workspace:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    if v.CastShadow then table.insert(FPS_Saved.casters,v); v.CastShadow=false end
-                    if v.RenderFidelity~=Enum.RenderFidelity.Performance then
-                        table.insert(FPS_Saved.fidelity,{o=v,was=v.RenderFidelity})
-                        pcall(function() v.RenderFidelity=Enum.RenderFidelity.Performance end)
-                    end
-                end
-            end
-        end)
-        if Conn.FPSWatch then Conn.FPSWatch:Disconnect() end
-        Conn.FPSWatch=workspace.DescendantAdded:Connect(function(v)
-            if not FPS_Active then return end
-            if v:IsA("BasePart") then pcall(function() v.CastShadow=false;v.RenderFidelity=Enum.RenderFidelity.Performance end) end
-        end)
-    end
-end
-local function RemoveFPS()
-    if not FPS_Active then return end; FPS_Active=false
-    if Conn.FPSWatch then Conn.FPSWatch:Disconnect();Conn.FPSWatch=nil end
-    pcall(function() Lighting.Technology=FPS_Saved.tech end)
-    pcall(function() Lighting.GlobalShadows=FPS_Saved.shadow end)
-    pcall(function() Lighting.EnvironmentDiffuseScale=FPS_Saved.envD end)
-    pcall(function() Lighting.EnvironmentSpecularScale=FPS_Saved.envS end)
-    for _,e in ipairs(FPS_Saved.effects) do pcall(function() e.o.Enabled=e.was end) end
-    for _,v in ipairs(FPS_Saved.casters) do pcall(function() v.CastShadow=true end) end
-    for _,e in ipairs(FPS_Saved.fidelity) do pcall(function() e.o.RenderFidelity=e.was end) end
-end
-local FPS_Now=0
-task.spawn(function()
-    while true do
-        local t0=os.clock(); RunService.Heartbeat:Wait()
-        FPS_Now=math.floor(1/math.max(os.clock()-t0,0.001))
-        if FPS_Label_Ref then pcall(function()
-            local col=FPS_Now>=55 and Color3.fromRGB(34,197,110)
-                   or FPS_Now>=30 and Color3.fromRGB(255,200,50) or Color3.fromRGB(255,80,80)
-            FPS_Label_Ref.Text=("FPS: %d | %s"):format(FPS_Now,FPS_Active and "BOOST ON" or "OFF")
-            FPS_Label_Ref.TextColor3=col
-        end) end
-        task.wait(0.5)
-    end
-end)
--- ══════════════════════════════════════════════════════════════════
--- MANUAL SPAM WIDGET
--- ══════════════════════════════════════════════════════════════════
-local MSpamOn=false; local MSpamThr=nil
-local function DoStartMS()
-    if MSpamThr then return end
-    MSpamThr=task.spawn(function()
-        while MSpamOn do VIM:SendMouseButtonEvent(0,0,0,true,game,0); task.wait(0.008) end
-        MSpamThr=nil
-    end)
-end
-local function DoStopMS() MSpamOn=false end
-local C={
-    bg=Color3.fromRGB(20,20,28),panel=Color3.fromRGB(28,28,40),
-    accent=Color3.fromRGB(114,76,232),accentL=Color3.fromRGB(148,112,255),
-    text=Color3.fromRGB(240,240,248),sub=Color3.fromRGB(138,138,158),
-    border=Color3.fromRGB(42,42,60),green=Color3.fromRGB(34,197,110),
-    gDark=Color3.fromRGB(14,36,24),gPanel=Color3.fromRGB(18,44,30),
-}
-local MiniSG=Instance.new("ScreenGui"); MiniSG.Name="RyuuManualSpam"
-MiniSG.ResetOnSpawn=false; MiniSG.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-MiniSG.IgnoreGuiInset=true; MiniSG.Enabled=false
-pcall(function()
-    MiniSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui
-end)
-if not MiniSG.Parent then
-    pcall(function() MiniSG.Parent=Plr:WaitForChild("PlayerGui") end)
-end
-local MSh=Instance.new("ImageLabel",MiniSG); MSh.Size=UDim2.new(0,230,0,110)
-MSh.Position=UDim2.new(0.5,-107,1,-136); MSh.BackgroundTransparency=1
-MSh.Image="rbxassetid://5028857084"; MSh.ImageColor3=Color3.new(0,0,0)
-MSh.ImageTransparency=0.55; MSh.ZIndex=8
-local MC=Instance.new("Frame",MiniSG); MC.Name="Card"
-MC.Size=UDim2.new(0,218,0,98); MC.Position=UDim2.new(0.5,-109,1,-128)
-MC.BackgroundColor3=C.bg; MC.BorderSizePixel=0; MC.ZIndex=9
-Instance.new("UICorner",MC).CornerRadius=UDim.new(0,12)
-local MCStr=Instance.new("UIStroke",MC); MCStr.Color=C.border; MCStr.Thickness=1.5
-local MH2=Instance.new("Frame",MC); MH2.Size=UDim2.new(1,0,0,30)
-MH2.BackgroundColor3=C.panel; MH2.BorderSizePixel=0; MH2.ZIndex=10
-Instance.new("UICorner",MH2).CornerRadius=UDim.new(0,12)
-local MHF=Instance.new("Frame",MH2); MHF.Size=UDim2.new(1,0,0,12); MHF.Position=UDim2.new(0,0,1,-12)
-MHF.BackgroundColor3=C.panel; MHF.BorderSizePixel=0; MHF.ZIndex=10
-local MAL=Instance.new("Frame",MH2); MAL.Size=UDim2.new(0,50,0,2); MAL.Position=UDim2.new(0.5,-25,1,-1)
-MAL.BackgroundColor3=C.accent; MAL.BorderSizePixel=0; MAL.ZIndex=11
-Instance.new("UICorner",MAL).CornerRadius=UDim.new(1,0)
-local MDot2=Instance.new("Frame",MH2); MDot2.Size=UDim2.new(0,6,0,6); MDot2.Position=UDim2.new(0,10,0.5,-3)
-MDot2.BackgroundColor3=C.accent; MDot2.BorderSizePixel=0; MDot2.ZIndex=11
-Instance.new("UICorner",MDot2).CornerRadius=UDim.new(1,0)
-local MTit2=Instance.new("TextLabel",MH2); MTit2.Size=UDim2.new(1,-28,1,0); MTit2.Position=UDim2.new(0,22,0,0)
-MTit2.BackgroundTransparency=1; MTit2.Text="ZivX ◈ Manual Spam"; MTit2.TextColor3=C.sub
-MTit2.Font=Enum.Font.GothamBold; MTit2.TextSize=9; MTit2.TextXAlignment=Enum.TextXAlignment.Left; MTit2.ZIndex=11
-local MBtn=Instance.new("TextButton",MC); MBtn.Size=UDim2.new(1,-14,0,50); MBtn.Position=UDim2.new(0,7,0,37)
-MBtn.BackgroundColor3=C.panel; MBtn.BorderSizePixel=0; MBtn.Text=""; MBtn.AutoButtonColor=false; MBtn.ZIndex=10
-Instance.new("UICorner",MBtn).CornerRadius=UDim.new(0,9)
-local MBStr=Instance.new("UIStroke",MBtn); MBStr.Color=C.accent; MBStr.Thickness=1.5
-local MBDot=Instance.new("Frame",MBtn); MBDot.Size=UDim2.new(0,10,0,10); MBDot.Position=UDim2.new(0,14,0.5,-5)
-MBDot.BackgroundColor3=C.sub; MBDot.BorderSizePixel=0; MBDot.ZIndex=11
-Instance.new("UICorner",MBDot).CornerRadius=UDim.new(1,0)
-local MBLbl=Instance.new("TextLabel",MBtn); MBLbl.Size=UDim2.new(1,-70,0,20); MBLbl.Position=UDim2.new(0,32,0,7)
-MBLbl.BackgroundTransparency=1; MBLbl.Text="MANUAL SPAM"; MBLbl.TextColor3=C.text
-MBLbl.Font=Enum.Font.GothamBold; MBLbl.TextSize=13; MBLbl.TextXAlignment=Enum.TextXAlignment.Left; MBLbl.ZIndex=11
-local MBSub=Instance.new("TextLabel",MBtn); MBSub.Size=UDim2.new(1,-70,0,14); MBSub.Position=UDim2.new(0,32,0,28)
-MBSub.BackgroundTransparency=1; MBSub.Text="OFF — [E] to toggle"; MBSub.TextColor3=C.sub
-MBSub.Font=Enum.Font.Gotham; MBSub.TextSize=10; MBSub.TextXAlignment=Enum.TextXAlignment.Left; MBSub.ZIndex=11
-local MEP=Instance.new("TextLabel",MBtn); MEP.Size=UDim2.new(0,24,0,20); MEP.Position=UDim2.new(1,-34,0.5,-10)
-MEP.BackgroundColor3=Color3.fromRGB(32,24,58); MEP.TextColor3=C.accentL
-MEP.Font=Enum.Font.GothamBold; MEP.TextSize=10; MEP.Text="E"; MEP.BorderSizePixel=0; MEP.ZIndex=11
-Instance.new("UICorner",MEP).CornerRadius=UDim.new(0,5)
-local TIF=TweenInfo.new(0.14,Enum.EasingStyle.Quad)
-local function SetMSV(on)
-    if on then
-        TweenService:Create(MC,TIF,{BackgroundColor3=C.gDark}):Play()
-        TweenService:Create(MBtn,TIF,{BackgroundColor3=C.gPanel}):Play()
-        TweenService:Create(MBStr,TIF,{Color=C.green}):Play()
-        TweenService:Create(MCStr,TIF,{Color=C.green}):Play()
-        TweenService:Create(MAL,TIF,{BackgroundColor3=C.green}):Play()
-        TweenService:Create(MDot2,TIF,{BackgroundColor3=C.green}):Play()
-        MBDot.BackgroundColor3=C.green; MBLbl.TextColor3=C.green
-        MBSub.Text="ON ◈ SPAMMING"; MBSub.TextColor3=C.green
-        MEP.TextColor3=C.green; MEP.BackgroundColor3=Color3.fromRGB(14,36,24)
-    else
-        TweenService:Create(MC,TIF,{BackgroundColor3=C.bg}):Play()
-        TweenService:Create(MBtn,TIF,{BackgroundColor3=C.panel}):Play()
-        TweenService:Create(MBStr,TIF,{Color=C.accent}):Play()
-        TweenService:Create(MCStr,TIF,{Color=C.border}):Play()
-        TweenService:Create(MAL,TIF,{BackgroundColor3=C.accent}):Play()
-        TweenService:Create(MDot2,TIF,{BackgroundColor3=C.accent}):Play()
-        MBDot.BackgroundColor3=C.sub; MBLbl.TextColor3=C.text
-        MBSub.Text="OFF — [E] to toggle"; MBSub.TextColor3=C.sub
-        MEP.TextColor3=C.accentL; MEP.BackgroundColor3=Color3.fromRGB(32,24,58)
-    end
-end
-local function ToggleMS()
-    MSpamOn=not MSpamOn; SetMSV(MSpamOn)
-    if MSpamOn then DoStartMS() else DoStopMS() end
-end
-MBtn.MouseButton1Click:Connect(ToggleMS)
-UIS.InputBegan:Connect(function(i,gp)
-    if gp then return end
-    if i.KeyCode==Enum.KeyCode.E then ToggleMS() end
-end)
-local msDrag=false; local msDragSt=nil; local msCardSt=nil
-local function SyncShadow()
-    MSh.Position=UDim2.new(MC.Position.X.Scale,MC.Position.X.Offset-8,
-                            MC.Position.Y.Scale,MC.Position.Y.Offset-7)
-end
-MC.InputBegan:Connect(function(i)
-    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-        msDrag=true; msDragSt=i.Position; msCardSt=MC.Position end
-end)
-UIS.InputChanged:Connect(function(i)
-    if not msDrag then return end
-    if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
-        local d=i.Position-msDragSt
-        if d.Magnitude>4 then
-            MC.Position=UDim2.new(msCardSt.X.Scale,msCardSt.X.Offset+d.X,msCardSt.Y.Scale,msCardSt.Y.Offset+d.Y)
-            SyncShadow()
-        end
-    end
-end)
-UIS.InputEnded:Connect(function(i)
-    if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-        msDrag=false end
-end)
-SyncShadow()
+
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY ESP
 -- ══════════════════════════════════════════════════════════════════
@@ -1629,38 +1341,209 @@ T1:CreateToggle({Name="Emergency Parry",CurrentValue=true,Flag="EP",Callback=fun
 end})
 T1:CreateSlider({Name="Emergency Distance",Range={2,12},Increment=1,Suffix=" studs",
     CurrentValue=6,Flag="EPD",Callback=function(v) S.EmergencyDist=v end})
-T1:CreateDivider()
-T1:CreateSection("Spam")
-T1:CreateToggle({Name="Auto Spam",CurrentValue=false,Flag="AS",
-    Callback=function(v) S.AutoSpam=v; if v then StartAutoSpam() end end})
-T1:CreateSlider({Name="Spam Delay",Range={0.01,0.30},Increment=0.01,Suffix="s",
-    CurrentValue=0.05,Flag="ASD",Callback=function(v) S.SpamDelay=v end})
-T1:CreateDivider()
-T1:CreateSection("🧠 Smart Spam")
-T1:CreateLabel("Auto-fires when enemies are within range")
-T1:CreateToggle({Name="Smart Spam",CurrentValue=false,Flag="SS",Callback=function(v)
-    S.SmartSpam=v; if v then StartSmartSpam()
-        Rayfield:Notify({Title="Smart Spam ON",Content="Auto near enemies",Duration=3,Image=4483362458}) end
-end})
-T1:CreateSlider({Name="Smart Spam Range",Range={5,50},Increment=1,Suffix=" studs",
-    CurrentValue=10,Flag="SSR",Callback=function(v) S.SmartSpamDist=v end})
+
 T1:CreateDivider()
 T1:CreateSection("⚡ Manual Spam")
-T1:CreateLabel("Click button below ◈ [E] to toggle ◈ Draggable widget")
-T1:CreateButton({Name="⚡ Open Manual Spam Widget",Callback=function()
-    MiniSG.Enabled=not MiniSG.Enabled
-    if MiniSG.Enabled then
-        MC.Position=UDim2.new(0.5,-109,1,-128); SyncShadow()
-        MC.BackgroundTransparency=0.99
-        TweenService:Create(MC,TweenInfo.new(0.18,Enum.EasingStyle.Quad),{BackgroundTransparency=0}):Play()
-    end
+T1:CreateLabel("Opens a draggable widget — press [E] to toggle spam on/off.")
+T1:CreateLabel("Widget turns 🟢 green when actively spamming.")
+T1:CreateButton({Name="⚡ Open Manual Spam Widget", Callback=function()
+    if _G.RyuuOpenManualSpam then _G.RyuuOpenManualSpam() end
 end})
+T1:CreateDivider()
 T1:CreateKeybind({Name="Toggle Auto Parry [F5]",CurrentKeybind="F5",HoldToInteract=false,Flag="KB_AP",
     Callback=function()
         S.AutoParry=not S.AutoParry
         if S.AutoParry then StartEngine() else StopEngine() end
         Rayfield:Notify({Title="Auto Parry",Content=S.AutoParry and "ON ✓" or "OFF",Duration=2,Image=4483362458})
     end})
+
+do -- scope: manual spam widget
+local MSOn = false
+local MSThr = nil
+local MSSG = nil
+local MSCard = nil
+local MSShadow = nil
+
+local function DoStartMS()
+    if MSThr then return end
+    -- Fire click down+up on EVERY single Heartbeat frame — absolute maximum speed
+    MSThr = RunService.Heartbeat:Connect(function()
+        if not MSOn then
+            MSThr:Disconnect(); MSThr = nil; return
+        end
+        VIM:SendMouseButtonEvent(0,0,0,true,game,0)
+        VIM:SendMouseButtonEvent(0,0,0,false,game,0)
+    end)
+end
+
+local function DoStopMS()
+    MSOn = false
+    if MSThr then pcall(function() MSThr:Disconnect() end); MSThr = nil end
+end
+
+-- Colors
+local C_OFF_BG   = Color3.fromRGB(10, 6, 22)
+local C_OFF_BRD  = Color3.fromRGB(70, 35, 130)
+local C_OFF_TXT  = Color3.fromRGB(160, 130, 220)
+local C_OFF_SUB  = Color3.fromRGB(90, 70, 140)
+local C_ON_BG    = Color3.fromRGB(8, 32, 14)
+local C_ON_BRD   = Color3.fromRGB(30, 200, 80)
+local C_ON_TXT   = Color3.fromRGB(60, 255, 120)
+local C_ON_SUB   = Color3.fromRGB(30, 160, 70)
+
+local TIF = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+
+-- Build the floating GUI
+MSSG = Instance.new("ScreenGui")
+MSSG.Name = "RyuuManualSpam"
+MSSG.ResetOnSpawn = false
+MSSG.IgnoreGuiInset = true
+MSSG.DisplayOrder = 9990
+MSSG.Enabled = false
+pcall(function() MSSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
+if not MSSG.Parent then pcall(function() MSSG.Parent = Plr:WaitForChild("PlayerGui") end) end
+
+-- Shadow
+MSShadow = Instance.new("Frame", MSSG)
+MSShadow.Name = "Shadow"
+MSShadow.Size = UDim2.new(0, 170, 0, 54)
+MSShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+MSShadow.Position = UDim2.new(0.5, 4, 0.5, 4)
+MSShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+MSShadow.BackgroundTransparency = 0.55
+MSShadow.BorderSizePixel = 0
+Instance.new("UICorner", MSShadow).CornerRadius = UDim.new(0, 14)
+
+-- Main card (TextButton so tapping works on mobile too)
+MSCard = Instance.new("TextButton", MSSG)
+MSCard.Name = "Card"
+MSCard.Size = UDim2.new(0, 170, 0, 54)
+MSCard.AnchorPoint = Vector2.new(0.5, 0.5)
+MSCard.Position = UDim2.new(0.5, 0, 0.5, 0)
+MSCard.BackgroundColor3 = C_OFF_BG
+MSCard.BorderSizePixel = 0
+MSCard.Text = ""
+MSCard.AutoButtonColor = false
+MSCard.Active = true
+MSCard.Draggable = true
+Instance.new("UICorner", MSCard).CornerRadius = UDim.new(0, 14)
+local MSStroke = Instance.new("UIStroke", MSCard)
+MSStroke.Thickness = 1.5
+MSStroke.Color = C_OFF_BRD
+
+-- Status dot
+local MSDot = Instance.new("Frame", MSCard)
+MSDot.Size = UDim2.new(0, 8, 0, 8)
+MSDot.Position = UDim2.new(0, 14, 0.5, -14)
+MSDot.BackgroundColor3 = C_OFF_BRD
+MSDot.BorderSizePixel = 0
+Instance.new("UICorner", MSDot).CornerRadius = UDim.new(1, 0)
+
+-- Title
+local MSTit = Instance.new("TextLabel", MSCard)
+MSTit.Size = UDim2.new(1, -60, 0, 16)
+MSTit.Position = UDim2.new(0, 30, 0, 8)
+MSTit.BackgroundTransparency = 1
+MSTit.Text = "MANUAL SPAM"
+MSTit.Font = Enum.Font.GothamBlack
+MSTit.TextSize = 11
+MSTit.TextColor3 = C_OFF_TXT
+MSTit.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Status label
+local MSSub = Instance.new("TextLabel", MSCard)
+MSSub.Size = UDim2.new(1, -60, 0, 12)
+MSSub.Position = UDim2.new(0, 30, 0, 26)
+MSSub.BackgroundTransparency = 1
+MSSub.Text = "OFF — press [E] to toggle"
+MSSub.Font = Enum.Font.Gotham
+MSSub.TextSize = 9
+MSSub.TextColor3 = C_OFF_SUB
+MSSub.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Keybind badge
+local MSBadge = Instance.new("TextLabel", MSCard)
+MSBadge.Size = UDim2.new(0, 22, 0, 16)
+MSBadge.Position = UDim2.new(1, -30, 0.5, -8)
+MSBadge.BackgroundColor3 = Color3.fromRGB(25, 14, 50)
+MSBadge.BorderSizePixel = 0
+MSBadge.Text = "E"
+MSBadge.Font = Enum.Font.GothamBold
+MSBadge.TextSize = 9
+MSBadge.TextColor3 = C_OFF_BRD
+Instance.new("UICorner", MSBadge).CornerRadius = UDim.new(0, 6)
+
+-- Close button
+local MSClose = Instance.new("TextButton", MSCard)
+MSClose.Size = UDim2.new(0, 16, 0, 16)
+MSClose.Position = UDim2.new(1, -20, 0, 4)
+MSClose.BackgroundTransparency = 1
+MSClose.Text = "✕"
+MSClose.Font = Enum.Font.GothamBold
+MSClose.TextSize = 10
+MSClose.TextColor3 = Color3.fromRGB(90, 70, 130)
+
+-- Drag shadow sync
+MSCard:GetPropertyChangedSignal("Position"):Connect(function()
+    pcall(function()
+        MSShadow.Position = UDim2.new(
+            MSCard.Position.X.Scale,
+            MSCard.Position.X.Offset + 4,
+            MSCard.Position.Y.Scale,
+            MSCard.Position.Y.Offset + 4
+        )
+    end)
+end)
+
+local function SetMSVisual(on)
+    TweenService:Create(MSCard,   TIF, {BackgroundColor3 = on and C_ON_BG  or C_OFF_BG}):Play()
+    TweenService:Create(MSStroke, TIF, {Color            = on and C_ON_BRD or C_OFF_BRD}):Play()
+    TweenService:Create(MSTit,    TIF, {TextColor3       = on and C_ON_TXT or C_OFF_TXT}):Play()
+    TweenService:Create(MSSub,    TIF, {TextColor3       = on and C_ON_SUB or C_OFF_SUB}):Play()
+    TweenService:Create(MSDot,    TIF, {BackgroundColor3 = on and C_ON_BRD or C_OFF_BRD}):Play()
+    TweenService:Create(MSBadge,  TIF, {TextColor3       = on and C_ON_BRD or C_OFF_BRD}):Play()
+    MSSub.Text = on and "ON ◈ SPAMMING" or "OFF — press [E] to toggle"
+end
+
+local function ToggleMS()
+    MSOn = not MSOn
+    SetMSVisual(MSOn)
+    if MSOn then DoStartMS() else DoStopMS() end
+end
+
+-- [E] keybind
+UIS.InputBegan:Connect(function(inp, gp)
+    if gp then return end
+    if inp.KeyCode == Enum.KeyCode.E and MSSG.Enabled then
+        ToggleMS()
+    end
+end)
+
+-- Tap/click card to toggle spam (works on mobile + PC)
+MSCard.MouseButton1Click:Connect(function()
+    ToggleMS()
+end)
+
+-- Close button
+MSClose.MouseButton1Click:Connect(function()
+    if MSOn then MSOn=false; DoStopMS(); SetMSVisual(false) end
+    MSSG.Enabled = false
+end)
+
+-- Expose open function to T1 tab button
+_G.RyuuOpenManualSpam = function()
+    MSSG.Enabled = true
+    -- Slide in animation
+    MSCard.Position = UDim2.new(0.5, 0, 1.2, 0)
+    MSShadow.Position = UDim2.new(0.5, 4, 1.2, 4)
+    TweenService:Create(MSCard, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.5, 0, 0.5, 0)}):Play()
+    TweenService:Create(MSShadow, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+        {Position = UDim2.new(0.5, 4, 0.5, 4)}):Play()
+end
+
+end -- end manual spam widget scope
+
 -- ── TAB 3: VISUALS ───────────────────────────────────────────────
 local T3 = W:CreateTab("🎨 Visuals", nil)
 T3:CreateSection("Ball ESP")
@@ -1695,6 +1578,20 @@ T3:CreateToggle({Name="Ability ESP",CurrentValue=false,Flag="AESP",Callback=func
         Rayfield:Notify({Title="Ability ESP ◈ OFF",Content="Cards removed.",Duration=2,Image=4483362458})
     end
 end})
+T3:CreateDivider()
+T3:CreateSection("⚡ Ability Detector (Free)")
+T3:CreateLabel("Detects enemy ability activations and parries INSTANTLY.")
+T3:CreateLabel("Covers: Slashes of Fury, Pull, Infinity.")
+T3:CreateLabel("Fires before the ball even moves — ability-triggered parry.")
+T3:CreateToggle({Name="Ability Detector", CurrentValue=false, Flag="ADET",
+    Callback=function(v)
+        if v then
+            StartAbilDetect()
+            Rayfield:Notify({Title="⚡ Ability Detector ON",Content="3 abilities monitored.",Duration=3,Image=4483362458})
+        else
+            StopAbilDetect()
+        end
+    end})
 
 -- ── TAB 4: PLAYER ────────────────────────────────────────────────
 local T4 = W:CreateTab("🧍 Player", nil)
@@ -2405,7 +2302,382 @@ PT:CreateToggle({Name="Premium Ability ESP", CurrentValue=false, Flag="PAESP",
         end
     end})
 
+PT:CreateDivider()
+PT:CreateSection("⚡ Premium Ability Detector")
+PT:CreateLabel("10 ability signatures. Fires PremiumFire() the instant any activates.")
+PT:CreateLabel("Slashes of Fury · Time Hole · Slash of Duality · Dragon Spirit")
+PT:CreateLabel("Pull · Infinity · Phantom · Hell Hook · Thunder Dash · Doppelganger")
+PT:CreateLabel("⚠ 0.4s cooldown per enemy to prevent spam.")
+PT:CreateToggle({Name="Premium Ability Detector", CurrentValue=false, Flag="PADET",
+    Callback=function(v)
+        PremGuard(v, "PremAbilDetect", function(val)
+            if val then
+                StartPremAbilDetect()
+                Rayfield:Notify({Title="⚡ Prem Detector ON",Content="10 abilities monitored.",Duration=3,Image=4483362458})
+            else
+                StopPremAbilDetect()
+            end
+        end)
+    end})
+PT:CreateSlider({Name="Detect Cooldown (per enemy)",Range={10,100},Increment=5,CurrentValue=40,Suffix="0ms",Flag="PDETCD",
+    Callback=function(v)
+        if not PremiumUnlocked then return end
+        Det.cd = v / 100
+    end})
 
+
+-- Forward declarations for ability detector
+local StartAbilDetect, StopAbilDetect, StartPremAbilDetect, StopPremAbilDetect
+do
+-- ══════════════════════════════════════════════════════════════════
+-- ABILITY DETECTOR ENGINE ◈ Free + Premium
+-- ══════════════════════════════════════════════════════════════════
+-- Watches ALL players for ability animations/particles/state changes.
+-- When a dangerous ability activates on an enemy who has the ball,
+-- it instantly fires a preemptive parry BEFORE the ball even moves.
+--
+-- HOW IT WORKS:
+-- 1. Scans enemy characters every frame for known ability animation IDs,
+--    particle emitter names, and attribute changes that signal activation.
+-- 2. Checks if that enemy currently holds the ball (target == their name).
+-- 3. Fires parry immediately — bypasses the normal distance/ping logic.
+-- 4. Per-ability cooldown prevents double-firing.
+--
+-- Detected abilities and their signatures:
+--   Slashes of Fury  — AnimationTrack name or particle burst "SlashFury"
+--   Infinity         — "InfinityAura" particle or Attribute "AbilityActive"
+--   Time Hole        — "TimeHole" BasePart spawning near player
+--   Slash of Duality — "DualitySlash" animation or part
+--   Dragon Spirit    — "DragonCharge" particle burst
+--   Pull             — attribute "PullActive" or "AbilityActive"=Pull
+--   Doppelganger     — "Clone" part spawning on enemy
+--   Phantom          — enemy transparency drop (going invisible)
+--   Hell Hook        — "HookProjectile" part near enemy
+--   Thunder Dash     — "ThunderTrail" particle on enemy
+-- ══════════════════════════════════════════════════════════════════
+
+local Det = {conn=nil, pconn=nil, cds={}, cd=0.4}
+
+-- Ability signature definitions
+-- Each entry: name (for logging), check function(char, plr) -> bool
+local FREE_SIGS = {
+    -- Slashes of Fury: look for rapid animation or particle named SlashFury/FurySlash
+    {
+        name = "Slashes of Fury",
+        check = function(char, plr)
+            if not char then return false end
+            -- Check for active animation track with fury/slash in name
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local animator = hum:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        local n = track.Name:lower()
+                        if n:find("fury") or n:find("slash") or n:find("barrage") then
+                            return true
+                        end
+                    end
+                end
+            end
+            -- Check for fury particles on character
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("ParticleEmitter") then
+                    local n = v.Name:lower()
+                    if n:find("fury") or n:find("slash") then return true end
+                end
+                if v:IsA("BasePart") then
+                    local n = v.Name:lower()
+                    if n:find("slash") or n:find("fury") then return true end
+                end
+            end
+            return false
+        end,
+    },
+    -- Pull: watch for AbilityActive attribute or pull-named part
+    {
+        name = "Pull",
+        check = function(char, plr)
+            if not char then return false end
+            local aa = plr:GetAttribute("AbilityActive")
+            if aa and tostring(aa):lower():find("pull") then return true end
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name:lower():find("pull") then return true end
+            end
+            return false
+        end,
+    },
+    -- Infinity: InfinityAura particle or attribute
+    {
+        name = "Infinity",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                if (v:IsA("ParticleEmitter") or v:IsA("SelectionBox") or v:IsA("BasePart"))
+                    and v.Name:lower():find("infinity") then
+                    return true
+                end
+            end
+            return false
+        end,
+    },
+}
+
+-- Premium has all free sigs + more precise + faster poll
+local PREM_SIGS = {
+    -- Slashes of Fury (enhanced — also checks attribute + hit parts)
+    {
+        name = "Slashes of Fury",
+        check = function(char, plr)
+            if not char then return false end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local animator = hum:FindFirstChildOfClass("Animator")
+                if animator then
+                    for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                        local n = track.Name:lower()
+                        if n:find("fury") or n:find("slash") or n:find("barrage") or n:find("multi") then
+                            return true
+                        end
+                    end
+                end
+            end
+            for _, v in ipairs(char:GetDescendants()) do
+                local n = v.Name:lower()
+                if v:IsA("ParticleEmitter") and (n:find("fury") or n:find("slash")) then return true end
+                if v:IsA("BasePart") and (n:find("slash") or n:find("fury") or n:find("hit")) then return true end
+            end
+            local aa = plr:GetAttribute("AbilityActive")
+            if aa and tostring(aa):lower():find("fury") then return true end
+            return false
+        end,
+    },
+    -- Time Hole: circular/hole part spawning or attribute
+    {
+        name = "Time Hole",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                local n = v.Name:lower()
+                if (n:find("hole") or n:find("time") or n:find("vortex")) and
+                   (v:IsA("BasePart") or v:IsA("ParticleEmitter")) then return true end
+            end
+            -- Also scan workspace near this player for time hole part
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, v in ipairs(workspace:GetDescendants()) do
+                    if v:IsA("BasePart") then
+                        local n = v.Name:lower()
+                        if (n:find("hole") or n:find("timewarp")) and
+                           (v.Position - hrp.Position).Magnitude < 30 then
+                            return true
+                        end
+                    end
+                end
+            end
+            return false
+        end,
+    },
+    -- Slash of Duality: dual slash parts or animation
+    {
+        name = "Slash of Duality",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                local n = v.Name:lower()
+                if (n:find("dual") or n:find("duality")) and
+                   (v:IsA("BasePart") or v:IsA("ParticleEmitter")) then return true end
+            end
+            return false
+        end,
+    },
+    -- Dragon Spirit: dragon charge particle/part
+    {
+        name = "Dragon Spirit",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                local n = v.Name:lower()
+                if (n:find("dragon") or n:find("spirit") or n:find("charge")) and
+                   (v:IsA("BasePart") or v:IsA("ParticleEmitter")) then return true end
+            end
+            return false
+        end,
+    },
+    -- Pull
+    {
+        name = "Pull",
+        check = function(char, plr)
+            if not char then return false end
+            local aa = plr:GetAttribute("AbilityActive")
+            if aa and tostring(aa):lower():find("pull") then return true end
+            for _, v in ipairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name:lower():find("pull") then return true end
+            end
+            return false
+        end,
+    },
+    -- Infinity
+    {
+        name = "Infinity",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                if (v:IsA("ParticleEmitter") or v:IsA("BasePart"))
+                    and v.Name:lower():find("infinity") then return true end
+            end
+            return false
+        end,
+    },
+    -- Phantom: enemy goes semi-transparent (< 0.5 transparency)
+    {
+        name = "Phantom",
+        check = function(char, plr)
+            if not char then return false end
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp and hrp.Transparency > 0.4 then return true end
+            return false
+        end,
+    },
+    -- Hell Hook: hook projectile part near enemy
+    {
+        name = "Hell Hook",
+        check = function(char, plr)
+            if not char then return false end
+            local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    local n = v.Name:lower()
+                    if (n:find("hook") or n:find("hell")) and
+                       (v.Position - hrp.Position).Magnitude < 25 then return true end
+                end
+            end
+            return false
+        end,
+    },
+    -- Thunder Dash: thunder trail particle on enemy
+    {
+        name = "Thunder Dash",
+        check = function(char, plr)
+            if not char then return false end
+            for _, v in ipairs(char:GetDescendants()) do
+                local n = v.Name:lower()
+                if v:IsA("ParticleEmitter") and (n:find("thunder") or n:find("dash") or n:find("lightning")) then
+                    return true
+                end
+            end
+            return false
+        end,
+    },
+    -- Doppelganger: clone part near enemy
+    {
+        name = "Doppelganger",
+        check = function(char, plr)
+            if not char then return false end
+            local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return false end
+            for _, p2 in ipairs(Players:GetPlayers()) do
+                if p2 ~= plr and p2 ~= Plr then
+                    local c2 = p2.Character
+                    if c2 then
+                        local hrp2 = c2:FindFirstChild("HumanoidRootPart")
+                        if hrp2 and (hrp2.Position - hrp.Position).Magnitude < 5 then
+                            return true  -- two players occupying same space = clone
+                        end
+                    end
+                end
+            end
+            return false
+        end,
+    },
+}
+
+local function RunDetector(sigList, fireFn, pollRate)
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        pcall(function()
+            local ball = GetBall(); if not ball then return end
+            local tgt  = ball:GetAttribute("target"); if not tgt then return end
+            -- Only care about enemies who currently have the ball targeting them
+            -- AND who are not us (we only parry when they redirect back at us,
+            -- but ability detects should fire when ball is heading to us from them)
+            -- Actually: fire when the ball is targeting US — enemy already sent it
+            -- OR when enemy has ability active and ball is near them about to redirect
+            local myHRP = GetHRP(); if not myHRP then return end
+
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p == Plr then continue end
+                local char = p.Character; if not char then continue end
+                local hrp  = char:FindFirstChild("HumanoidRootPart"); if not hrp then continue end
+                local distToMe = (myHRP.Position - hrp.Position).Magnitude
+                if distToMe > 100 then continue end  -- too far, skip
+
+                -- Check if this enemy currently holds the ball (it's targeting them)
+                -- OR the ball was recently redirected by them at us
+                local ballNearEnemy = (hrp.Position - ball.Position).Magnitude < 20
+                local ballTargetsMe = tgt == Plr.Name
+
+                if not (ballNearEnemy or ballTargetsMe) then continue end
+
+                local now = os.clock()
+                local cdKey = p.Name
+                if Det.cds[cdKey] and now - Det.cds[cdKey] < Det.cd then continue end
+
+                -- Run ability signatures
+                for _, sig in ipairs(sigList) do
+                    if sig.check(char, p) then
+                        -- Ability detected — fire parry NOW
+                        Det.cds[cdKey] = now
+                        task.spawn(function()
+                            fireFn()
+                            Rayfield:Notify({
+                                Title = "⚡ ABILITY DETECTED",
+                                Content = sig.name .. " — parry fired!",
+                                Duration = 1.2,
+                                Image = 4483362458,
+                            })
+                        end)
+                        break
+                    end
+                end
+            end
+        end)
+    end)
+    return conn
+end
+
+local AbilDetect = {active=false, premActive=false}
+
+local function StartAbilDetect()
+    if Det.conn then Det.conn:Disconnect() end
+    Det.cds = {}
+    AbilDetect.active = true
+    Det.conn = RunDetector(FREE_SIGS, FireParry, 0)  -- heartbeat = every frame
+end
+local function StopAbilDetect()
+    AbilDetect.active = false
+    if Det.conn then Det.conn:Disconnect(); Det.conn = nil end
+end
+local function StartPremAbilDetect()
+    if PDet.conn then PDet.conn:Disconnect() end
+    Det.cds = {}
+    AbilDetect.premActive = true
+    PDet.conn = RunDetector(PREM_SIGS, PremiumFire, 0)
+end
+local function StopPremAbilDetect()
+    AbilDetect.premActive = false
+    if PDet.conn then PDet.conn:Disconnect(); PDet.conn = nil end
+end
+
+end -- ability detector do..end
+
+-- Forward declarations for premium backend 1
+local StartTrajectory, StopTrajectory
+local StartDistESP, StopDistESP
+local StartBallSpeedMeter, StopBallSpeedMeter
+local ApplyChams, RemoveChams
+local StartSafeZone, StopSafeZone
+local ApplyPremFPS, RemovePremFPS
+local SetGhost
+do
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM EXCLUSIVE FEATURES ◈ Backend systems
 -- ══════════════════════════════════════════════════════════════════
@@ -2600,15 +2872,14 @@ end
 
 -- ── 4. CHAMS (Enemy highlight through walls) ─────────────────────
 -- Makes all enemies glow a solid highlight color visible through walls.
-local ChamsActive = false
-local ChamsOriginals = {}
+local Chams = {active=false, orig={}}
 local function ApplyChams(col)
-    ChamsOriginals = {}
+    Chams.orig = {}
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= Plr and p.Character then
             for _, part in ipairs(p.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
-                    table.insert(ChamsOriginals, {
+                    table.insert(Chams.orig, {
                         part = part,
                         color = part.Color,
                         mat = part.Material,
@@ -2623,18 +2894,18 @@ local function ApplyChams(col)
             end
         end
     end
-    ChamsActive = true
+    Chams.active = true
 end
 local function RemoveChams()
-    for _, v in ipairs(ChamsOriginals) do
+    for _, v in ipairs(Chams.orig) do
         pcall(function()
             v.part.Color = v.color
             v.part.Material = v.mat
             v.part.CastShadow = v.cast
         end)
     end
-    ChamsOriginals = {}
-    ChamsActive = false
+    Chams.orig = {}
+    Chams.active = false
 end
 
 -- ── 5. SAFE ZONE INDICATOR ───────────────────────────────────────
@@ -2837,7 +3108,7 @@ PT:CreateDropdown({Name="Chams Color",
             Cyan=Color3.fromRGB(0,220,220), Yellow=Color3.fromRGB(255,220,40),
             White=Color3.fromRGB(240,240,255), Orange=Color3.fromRGB(255,120,20),
         }
-        if ChamsActive then RemoveChams(); ApplyChams(cols[s] or cols.Red) end
+        if Chams.active then RemoveChams(); ApplyChams(cols[s] or cols.Red) end
     end})
 PT:CreateToggle({Name="Enemy Chams", CurrentValue=false, Flag="PCHAMS",
     Callback=function(v) PremGuard(v,"Chams",function(val)
@@ -2906,6 +3177,16 @@ PT:CreateButton({Name="Check Premium Status", Callback=function()
     end
 end})
 
+end -- premium backend 1 do..end
+
+-- Forward declarations for premium backend 2
+local StartAutoDodge, StopAutoDodge
+local StartComboTracker, StopComboTracker
+local StartSilentBallHighlight, StopSilentBallHighlight
+local StartTargetAlert, StopTargetAlert
+local StartAntiBlock, StopAntiBlock
+local StartParrySound, StopParrySound
+do
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM FEATURES BATCH 2 ◈ More exclusives
 -- ══════════════════════════════════════════════════════════════════
@@ -3155,6 +3436,8 @@ end
 -- PREMIUM TAB ◈ Batch 2 UI additions
 -- ══════════════════════════════════════════════════════════════════
 PT:CreateDivider()
+end -- premium backend 2 do..end
+
 PT:CreateSection("💨 Auto Dodge")
 PT:CreateLabel("Strafes randomly when ball is ~18 studs away targeting you.")
 PT:CreateLabel("1.2s cooldown so it doesn't spam. Works with any parry engine.")
