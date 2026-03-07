@@ -389,7 +389,7 @@ end
 -- ══════════════════════════════════════════════════════════════════
 -- PING SAMPLER
 -- ══════════════════════════════════════════════════════════════════
-local PingMs = 40
+local PingMs = 60
 local PingBonus = 0
 local PingScale = 1.0
 local PingSamples = {}
@@ -576,7 +576,7 @@ local function StartEngine()
         end
 
         -- FIX 2+3: Full ping compensation, bigger hitbox
-        local hbox = 11.5
+        local hbox = 11.0
         local pingComp = (PingMs / 1000) * effectiveSpeed  -- FIX 2: was /2000
         local fireAt = hbox + pingComp
 
@@ -646,7 +646,7 @@ local P = {
     GodEmergency = false,
     CurveCrusher = false,
     AutoFace = false,
-    HitboxTarget = 11.5,    -- wider than free's 6.5 — catches everything
+    HitboxTarget = 12.0,    -- wider than free's 6.5 — catches everything
     SpeedBoostDetect = true,
     QuadCurvePredict = true,
 }
@@ -697,7 +697,7 @@ local function smoothClosing(curDist, curTime)
 end
 
 -- Adaptive ping: use min of last 3 samples for best-case compensation
-local PingMin = 40
+local PingMin = 60
 local PingMinSamples = {}
 task.spawn(function()
     while true do
