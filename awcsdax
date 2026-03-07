@@ -558,7 +558,7 @@ local function StartEngine()
 
         -- Slow/stationary ball
         if Speed < 1 then
-            if Dist <= 11.0 then FireParry() end
+            if Dist <= 10.0 then FireParry() end
             return
         end
 
@@ -576,8 +576,12 @@ local function StartEngine()
         end
 
         -- FIX 2+3: Full ping compensation, bigger hitbox
-        local hbox = 11.0
-        local pingComp = (PingMs / 1000) * effectiveSpeed  -- FIX 2: was /2000
+        local hbox = 10.0
+        -- Adaptive ping multiplier: low ping (0-100ms) = 1x, high ping (100ms+) = scales up
+        -- so laggy players fire much earlier to compensate
+        local pingFactor = PingMs <= 100 and 1.0 or (1.0 + ((PingMs - 100) / 100) * 0.5)
+        pingFactor = math.min(pingFactor, 4.0) -- cap at 4x so it doesn't go insane
+        local pingComp = (PingMs / 1000) * effectiveSpeed * pingFactor
         local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
@@ -806,7 +810,10 @@ local function StartPremiumEngine()
 
         -- Core fire: adaptive ping (min of last 3 samples), wider hitbox
         local hbox = P.HitboxTarget or 12.0
-        local pingComp = (PingMin / 1000) * effectiveSpeed  -- adaptive min ping
+        -- Adaptive ping multiplier: low ping (0-100ms) = 1x, high ping scales aggressively
+        local pingFactor = PingMin <= 100 and 1.0 or (1.0 + ((PingMin - 100) / 100) * 0.6)
+        pingFactor = math.min(pingFactor, 5.0) -- cap at 5x for premium
+        local pingComp = (PingMin / 1000) * effectiveSpeed * pingFactor
         local fireAt = hbox + pingComp
 
         if Dist <= fireAt then
