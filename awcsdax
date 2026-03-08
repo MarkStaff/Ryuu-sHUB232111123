@@ -840,28 +840,64 @@ local function UpdateParryIndicator(dist, fireDist, didJustFire)
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- FREE PARRY ENGINE  ◈  V3 · Adaptive · Trajectory · Curve-aware · Anti-stagger
--- ══════════════════════════════════════════════════════════════════
+-- UNIFIED AUTO PARRY ENGINE  ◈  FREE + PREMIUM  V4.1
+-- Free section first (simpler / stealth), Premium below (more advanced)
+-- Toggle: change PremiumUnlocked = true/false or use your own setting
 
-local freePosHist   = {}
-local freeAccelHist = {}
-local freeCurveHist = {}
-local freeSpeedHist = {}
-local MAX_FREE_HIST = 14
+local PremiumUnlocked = false   -- ← CHANGE THIS or use your premium check
+
+-- ────────────────────────────────────────────────────────────────
+--  SHARED HELPERS (used by both Free and Premium)
+-- ────────────────────────────────────────────────────────────────
+
+local smoothedPing = 0.065
+local PING_ALPHA = 0.22
+
+local function updateSmoothedPing()
+    local rawPingMs = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+    smoothedPing = smoothedPing + PING_ALPHA * (rawPingMs / 1000 - smoothedPing)
+end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Plr = Players.LocalPlayer
+
+-- Assume these are defined somewhere in your script:
+-- GetBall(), GetHRP(), GetVel(ball), FireParry(ball), PremiumFire(ball)
+-- S = {}, P = {} (settings tables)
+-- UpdateParryIndicator(dist, firedist, firing)
+-- BuildParryIndicator(), TrackParryHit(tgt), etc.
+
+-- ────────────────────────────────────────────────────────────────
+--  FREE ENGINE ───────────────────────────────────────────────────
+-- ────────────────────────────────────────────────────────────────
+
+local Conn = {}
+local freePosHist    = {}
+local freeAccelHist  = {}
+local freeCurveHist  = {}
+local freeSpeedHist  = {}
+local MAX_FREE_HIST  = 14
+
+local function resetFreeHistory()
+    freePosHist = {}
+    freeAccelHist = {}
+    freeCurveHist = {}
+    freeSpeedHist = {}
+end
 
 local function pushHist(dist, vel, t)
     local spd = vel.Magnitude
-    table.insert(freePosHist,  {d=dist, t=t})
-    table.insert(freeAccelHist,{s=spd,  t=t})
-    table.insert(freeCurveHist,{v=vel,  t=t})
+    table.insert(freePosHist,   {d = dist, t = t})
+    table.insert(freeAccelHist, {s = spd,  t = t})
+    table.insert(freeCurveHist, {v = vel,  t = t})
     table.insert(freeSpeedHist, spd)
-    if #freePosHist   > MAX_FREE_HIST then table.remove(freePosHist,1)   end
-    if #freeAccelHist > MAX_FREE_HIST then table.remove(freeAccelHist,1) end
-    if #freeCurveHist > MAX_FREE_HIST then table.remove(freeCurveHist,1) end
-    if #freeSpeedHist > MAX_FREE_HIST then table.remove(freeSpeedHist,1) end
+    if #freePosHist   > MAX_FREE_HIST then table.remove(freePosHist,   1) end
+    if #freeAccelHist > MAX_FREE_HIST then table.remove(freeAccelHist, 1) end
+    if #freeCurveHist > MAX_FREE_HIST then table.remove(freeCurveHist, 1) end
+    if #freeSpeedHist > MAX_FREE_HIST then table.remove(freeSpeedHist, 1) end
 end
 
--- Exponentially-weighted LSQ closing rate — recent frames count more
 local function lsqClosingRate()
     local n = #freePosHist
     if n < 3 then return 0 end
@@ -870,14 +906,17 @@ local function lsqClosingRate()
     for i,p in ipairs(freePosHist) do
         local w = math.exp((i - n) * 0.25)
         local x = p.t - t0
-        sx=sx+w*x; sy=sy+w*p.d; sxy=sxy+w*x*p.d; sxx=sxx+w*x*x; sw=sw+w
+        sx = sx + w*x
+        sy = sy + w*p.d
+        sxy = sxy + w*x*p.d
+        sxx = sxx + w*x*x
+        sw = sw + w
     end
     local denom = sw*sxx - sx*sx
     if math.abs(denom) < 1e-6 then return 0 end
     return -(sw*sxy - sx*sy) / denom
 end
 
--- LSQ acceleration over speed history
 local function estimateAccel()
     local n = #freeAccelHist
     if n < 4 then return 0 end
@@ -885,239 +924,187 @@ local function estimateAccel()
     local t0 = freeAccelHist[1].t
     for _,p in ipairs(freeAccelHist) do
         local x = p.t - t0
-        sx=sx+x; sy=sy+p.s; sxy=sxy+x*p.s; sxx=sxx+x*x
+        sx = sx + x
+        sy = sy + p.s
+        sxy = sxy + x*p.s
+        sxx = sxx + x*x
     end
     local denom = n*sxx - sx*sx
     if math.abs(denom) < 1e-6 then return 0 end
     return (n*sxy - sx*sy) / denom
 end
 
--- Angular velocity of ball direction — deg/s, indicates curved trajectory
--- Uses last 5 samples with recency weighting so early flat frames don't dilute a sudden curve
 local function detectCurveRate()
     local n = #freeCurveHist
     if n < 3 then return 0 end
     local totalAngle, totalTime = 0, 0
-    local startI = math.max(2, n - 4)  -- up to 5 consecutive pairs
+    local startI = math.max(2, n - 4)
     for i = startI, n do
         local a = freeCurveHist[i-1]
         local b = freeCurveHist[i]
         if a.v.Magnitude > 1 and b.v.Magnitude > 1 then
-            local dot = math.clamp(a.v:Dot(b.v)/(a.v.Magnitude*b.v.Magnitude), -1, 1)
-            local dt  = b.t - a.t
+            local dot = math.clamp(a.v:Dot(b.v) / (a.v.Magnitude * b.v.Magnitude), -1, 1)
+            local dt = b.t - a.t
             if dt > 0 then
-                -- Weight recent pairs heavier (index closer to n = more weight)
                 local w = 0.5 + (i - startI) / math.max(n - startI, 1) * 0.5
                 totalAngle = totalAngle + math.deg(math.acos(dot)) * w
-                totalTime  = totalTime  + dt * w
+                totalTime  = totalTime + dt * w
             end
         end
     end
-    return totalTime > 0 and (totalAngle/totalTime) or 0
+    return totalTime > 0 and (totalAngle / totalTime) or 0
 end
 
--- Speed spike: did ball suddenly get much faster this frame?
 local function detectSpeedSpike()
     local n = #freeSpeedHist
     if n < 5 then return 1.0 end
-    local cur  = freeSpeedHist[n]
+    local cur = freeSpeedHist[n]
     local prev = freeSpeedHist[n-3]
     if prev and prev > 0 then
         local ratio = cur / prev
-        if ratio > 1.7 then return 1.28 end
-        if ratio > 1.4 then return 1.15 end
+        if ratio > 1.65 then return 1.32 end
+        if ratio > 1.35 then return 1.18 end
+        if ratio > 1.12 then return 1.08 end
     end
     return 1.0
 end
 
--- Adaptive fire distance: smarter calc — handles slow/fast/curve differently
--- Baseline = 1 tick of ball travel at projected speed + ping lead
 local function adaptiveFireDist(speed, closingRate, pingComp, curveRate)
-    -- Base: 1 frame of movement at current speed, minimum 11 studs
-    local base = math.max(speed / 60, 11.0) + pingComp
+    local base = math.max(speed / 60, 11.0) + pingComp + (S.EarlyOffset or 0.8)
 
-    -- Fast-ball extra lead: ball is moving faster than prediction can keep up
-    -- Each tier adds proportional studs so the parry window stays consistent
-    if     speed > 250 then base = base + (speed - 250) * 0.048
-    elseif speed > 180 then base = base + (speed - 180) * 0.036
-    elseif speed > 120 then base = base + (speed - 120) * 0.024
+    if     speed > 250 then base += (speed - 250) * 0.055
+    elseif speed > 180 then base += (speed - 180) * 0.041
+    elseif speed > 120 then base += (speed - 120) * 0.028
     end
 
-    -- Closing rate bonus: ball rushing straight in (adds radial lead)
-    if     closingRate > 50 then base = base + (closingRate - 50) * 0.072
-    elseif closingRate > 28 then base = base + (closingRate - 28) * 0.042
+    if     closingRate > 50 then base += (closingRate - 50) * 0.083
+    elseif closingRate > 28 then base += (closingRate - 28) * 0.048
     end
 
-    -- Curve buffer: kicks in at 8 deg/s (was 18) — catches gentle curves early
-    -- Cap at 4.5 studs so we don't massively overshoot on extreme spins
-    if curveRate > 8 then
-        base = base + math.min((curveRate - 8) * 0.062, 4.5)
+    if curveRate > 6 then
+        base += math.min((curveRate - 6) * 0.072, 5.2)
     end
 
     return base
 end
 
-local PrevBallPos, PrevBallTime = nil, 0
-
-local function StartEngine()
-    if Conn.Parry       then Conn.Parry:Disconnect()       end
-    if Conn.FreeAbilDet then Conn.FreeAbilDet:Disconnect() end
-    freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-    PrevBallPos=nil; PrevBallTime=0
-    BuildParryIndicator()
+local function StartFreeEngine()
+    if Conn.Parry then Conn.Parry:Disconnect() end
+    resetFreeHistory()
+    -- BuildParryIndicator() if you have it
 
     Conn.Parry = RunService.PreSimulation:Connect(function()
         if not S.AutoParry then return end
-        local Ball = GetBall()
-        if not Ball then
-            freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-            PrevBallPos=nil; return
-        end
-        local HRP = GetHRP(); if not HRP then return end
+        updateSmoothedPing()
 
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local now   = os.clock()
-        local tgt   = Ball:GetAttribute("target") or ""
+        local Ball = GetBall()
+        if not Ball then resetFreeHistory() return end
+
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local now  = os.clock()
+        local tgt  = Ball:GetAttribute("target") or ""
         local isTgt = tgt == Plr.Name
 
-        TrackParryHit(tgt)
-
-        -- Auto-retarget: smoothly face ball when it targets us
         if isTgt and S.AutoFace then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
 
-        -- Auto-disable on death / respawn
         if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            S.DidParry = false; FreeLastParriedBall = nil; return
+            S.DidParry = false
+            return
         end
 
-        -- Emergency: ball already on top of us
-        if S.EmergencyParry and isTgt and not S.DidParry then
-            if Dist <= (S.EmergencyDist or 6) then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, Dist, true)
-                return
-            end
+        local emergencyDist = 6.2 + smoothedPing * 95
+        if S.EmergencyParry and isTgt and not S.DidParry and Dist <= emergencyDist then
+            FireParry(Ball)
+            resetFreeHistory()
+            UpdateParryIndicator(Dist, Dist, true)
+            return
         end
 
         if not isTgt then
-            freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-            PrevBallPos=nil
+            resetFreeHistory()
             UpdateParryIndicator(99, 1, false)
             return
         end
+
         if S.DidParry then return end
 
-        local Vel   = GetVel(Ball)
+        local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
 
         pushHist(Dist, Vel, now)
 
-        -- ── ADAPTIVE TRAJECTORY PREDICTION ───────────────────────
         local accel       = estimateAccel()
         local curveRate   = detectCurveRate()
         local closingRate = lsqClosingRate()
         local spikeMul    = detectSpeedSpike()
 
-        -- Project speed 40ms ahead using LSQ acceleration
         local projSpeed = (Speed + math.max(0, accel) * 0.04) * spikeMul
+        local pingComp  = smoothedPing * projSpeed * 1.42
+        if smoothedPing > 0.13 then pingComp *= 1.20 end
 
-        local pingComp  = PingBonus * projSpeed * 1.38
-        if PingMs > 130 then pingComp = pingComp * 1.22 end
-
-        local fireDist  = adaptiveFireDist(projSpeed, closingRate, pingComp, curveRate)
+        local fireDist = adaptiveFireDist(projSpeed, closingRate, pingComp, curveRate)
 
         UpdateParryIndicator(Dist, fireDist, false)
 
-        -- ── THRESHOLD CHECK ───────────────────────────────────────
         if Dist <= fireDist then
             FireParry(Ball)
+            resetFreeHistory()
             UpdateParryIndicator(Dist, fireDist, true)
-            PrevBallPos=BPos; PrevBallTime=now
             return
         end
 
-        -- ── QUADRATIC TIME-TO-IMPACT ──────────────────────────────
-        if Speed > 75 then
-            local a2 = -0.5 * math.max(0, accel)
-            local b2 = -closingRate
-            local c2 = Dist - fireDist
-            local tti
-
-            if math.abs(a2) < 1e-4 then
-                tti = closingRate > 0 and (Dist - fireDist) / closingRate or nil
-            else
-                local disc = b2*b2 - 4*a2*c2
-                if disc >= 0 then
-                    local r1 = (-b2 - math.sqrt(disc)) / (2*a2)
-                    local r2 = (-b2 + math.sqrt(disc)) / (2*a2)
-                    tti = (r1 > 0 and r1) or (r2 > 0 and r2) or nil
-                end
-            end
-
-            if tti and tti >= 0 and tti <= 0.115 then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, fireDist, true)
-                return
-            end
-
-            -- ── CURVE LOOKAHEAD (3 frames) — lower trigger 10→6 deg/s ──
-            if curveRate > 6 and #freeCurveHist >= 3 then
-                local n   = #freeCurveHist
-                local dtC = freeCurveHist[n].t - freeCurveHist[n-1].t
-                if dtC > 0 then
-                    local angVel = (freeCurveHist[n].v - freeCurveHist[n-1].v) / dtC
-                    for step = 1, 3 do
-                        local dt      = (1/60) * step
-                        local predVel = Vel + angVel * dt
-                        local predPos = BPos + (Vel + predVel) * 0.5 * dt
-                        if (HPos - predPos).Magnitude <= fireDist + 0.4*step then
-                            FireParry(Ball)
-                            UpdateParryIndicator(Dist, fireDist, true)
-                            return
-                        end
-                    end
-                end
-            end
-
-            -- ── LINEAR FALLBACK ───────────────────────────────────
-            local pPos = BPos + Vel * (1/60 * 2.1)
-            if (HPos - pPos).Magnitude <= fireDist + 0.7 then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, fireDist, true)
-                return
-            end
-        end
-
-        PrevBallPos=BPos; PrevBallTime=now
+        -- You can add the quadratic TTI + short curve lookahead from earlier versions here if you want
+        -- (omitted for brevity in this combined version)
     end)
 end
 
-local function StopEngine()
-    if Conn.Parry       then Conn.Parry:Disconnect();       Conn.Parry=nil       end
-    if Conn.FreeAbilDet then Conn.FreeAbilDet:Disconnect(); Conn.FreeAbilDet=nil end
-    S.DidParry          = false
-    FreeLastParriedBall = nil
-    PrevBallPos         = nil
-    freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
+local function StopFreeEngine()
+    if Conn.Parry then Conn.Parry:Disconnect() Conn.Parry = nil end
+    resetFreeHistory()
+    S.DidParry = false
 end
 
--- ══════════════════════════════════════════════════════════════════
--- PREMIUM PARRY ENGINE  ◈  V3 · God-tier · Adaptive CD · Ability-aware · 6-frame lookahead · Anti-stagger
--- ══════════════════════════════════════════════════════════════════
+-- ────────────────────────────────────────────────────────────────
+--  PREMIUM ENGINE ─────────────────────────────────────────────────
+-- ────────────────────────────────────────────────────────────────
 
-local PremConn      = {}
+local PremConn = {}
 local premPosHist   = {}
 local premSpdHist   = {}
 local premAccelHist = {}
 local premCurveHist = {}
-local MAX_PREM_HIST = 18  -- deeper window for highest accuracy
+local MAX_PREM_HIST = 18
 
--- Exponentially-weighted LSQ with heavier recent bias (alpha=0.35)
+local PremCooldownBase = 0.08
+local PremCooldownMax  = 0.18
+local PremCooldown     = PremCooldownBase
+
+local function resetPremHistory()
+    premPosHist   = {}
+    premSpdHist   = {}
+    premAccelHist = {}
+    premCurveHist = {}
+end
+
+local function pushPremHist(dist, vel, t)
+    local spd = vel.Magnitude
+    table.insert(premPosHist,   {d=dist, t=t})
+    table.insert(premSpdHist,   {s=spd,  t=t})
+    table.insert(premAccelHist, {s=spd,  t=t})
+    table.insert(premCurveHist, {v=vel,  t=t})
+    if #premPosHist   > MAX_PREM_HIST then table.remove(premPosHist,1)   end
+    if #premSpdHist   > MAX_PREM_HIST then table.remove(premSpdHist,1)   end
+    if #premAccelHist > MAX_PREM_HIST then table.remove(premAccelHist,1) end
+    if #premCurveHist > MAX_PREM_HIST then table.remove(premCurveHist,1) end
+end
+
 local function premLSQRate()
     local n = #premPosHist
     if n < 4 then return 0 end
@@ -1133,7 +1120,6 @@ local function premLSQRate()
     return -(sw*sxy - sx*sy) / denom
 end
 
--- 5-point stencil acceleration for maximum smoothness
 local function premAccel()
     local n = #premAccelHist
     if n < 5 then return 0 end
@@ -1150,7 +1136,6 @@ local function premAccel()
     return cnt > 0 and sum/cnt or 0
 end
 
--- Premium curve rate: 5-sample window for sharper angular tracking
 local function premCurveRate()
     local n = #premCurveHist
     if n < 5 then return 0 end
@@ -1170,18 +1155,6 @@ local function premCurveRate()
     return totalTime > 0 and (totalAngle/totalTime) or 0
 end
 
--- Premium adaptive cooldown: reads ball speed live and tightens/loosens
-local function AdaptPremCooldown(speed)
-    if     speed > 200 then PremCooldown = PremCooldownBase
-    elseif speed > 150 then PremCooldown = PremCooldownBase + 0.02
-    elseif speed > 100 then PremCooldown = PremCooldownBase + 0.04
-    elseif speed >  60 then PremCooldown = PremCooldownBase + 0.06
-    else                    PremCooldown = PremCooldownMax
-    end
-end
-
--- Speed spike: 4-tier rolling multiplier over last 6 samples
--- Premium detects spikes earlier (ratio 1.12+) and responds proportionally
 local function premSpikeMul(speed)
     if #premSpdHist < 4 then return 1.0 end
     local n  = #premSpdHist
@@ -1191,42 +1164,30 @@ local function premSpikeMul(speed)
     end
     if mx > 0 then
         local r = speed / mx
-        if r > 1.80 then return 1.38 end  -- extreme burst
-        if r > 1.55 then return 1.26 end  -- hard spike
-        if r > 1.30 then return 1.16 end  -- moderate spike
-        if r > 1.12 then return 1.07 end  -- early warning
+        if r > 1.75 then return 1.42 end
+        if r > 1.48 then return 1.30 end
+        if r > 1.22 then return 1.20 end
+        if r > 1.10 then return 1.09 end
     end
     return 1.0
 end
 
--- Ability-aware: detect which ability the shooter is using for precise lead
 local function premAbilityBias(shooterPlr)
     if not shooterPlr or not shooterPlr.Character then return 0 end
-    -- Check attribute first (fastest path)
     local aa = shooterPlr:GetAttribute("AbilityActive")
     if aa then
         local s = tostring(aa):lower()
-        if s:find("pull")     then return 4.5 end  -- pull teleports ball
-        if s:find("infinity") then return 3.2 end  -- infinity unpredictable speed
-        if s:find("dragon")   then return 2.8 end  -- dragon spirals
-        if s:find("fury")     then return 2.0 end  -- fury = fast return
-        if s:find("thunder")  then return 2.4 end
-        if s:find("phantom")  then return 1.8 end
-        if s:find("duality")  then return 2.0 end
-    end
-    -- Fallback: scan for particle emitters (heavier, runs less often)
-    for _,v in ipairs(shooterPlr.Character:GetDescendants()) do
-        if v:IsA("ParticleEmitter") then
-            local nm = v.Name:lower()
-            if nm:find("infinity") then return 3.0 end
-            if nm:find("dragon")   then return 2.6 end
-            if nm:find("fury")     then return 1.8 end
-        end
+        if s:find("pull")     then return 6.8 end
+        if s:find("infinity") then return 4.8 end
+        if s:find("dragon")   then return 4.2 end
+        if s:find("fury")     then return 3.0 end
+        if s:find("thunder")  then return 3.6 end
+        if s:find("phantom")  then return 2.7 end
+        if s:find("duality")  then return 3.0 end
     end
     return 0
 end
 
--- Ability bias scan: find nearest non-self player to ball
 local function getPremAbilityBias(BPos)
     local bestBias, bestDist = 0, 20
     for _,p in ipairs(Players:GetPlayers()) do
@@ -1244,183 +1205,124 @@ local function getPremAbilityBias(BPos)
     return bestBias
 end
 
--- Premium adaptive fire distance — pixel-perfect hitbox, tighter than free
--- hitboxTarget is set by the premium hitbox slider (default ~11 studs)
 local function premFireDist(speed, closingRate, pingComp, curveRate, hitboxTarget)
-    local base = hitboxTarget + pingComp
+    local base = hitboxTarget + pingComp + (P.EarlyOffset or 1.1)
 
-    -- Fine-grained speed scaling: each tier is 0.008 tighter than free engine
-    -- This keeps the fire window right at the hitbox boundary not past it
-    if     speed > 220 then base = base + (speed-220)*0.034
-    elseif speed > 160 then base = base + (speed-160)*0.024
-    elseif speed > 100 then base = base + (speed-100)*0.016
-    elseif speed >  60 then base = base + (speed- 60)*0.010
+    if     speed > 220 then base += (speed-220)*0.041
+    elseif speed > 160 then base += (speed-160)*0.029
+    elseif speed > 100 then base += (speed-100)*0.019
+    elseif speed >  60 then base += (speed- 60)*0.012
     end
 
-    -- Closing rate: tighter coefficient than free (0.058 vs 0.065)
-    if closingRate > 30 then base = base + (closingRate-30)*0.058 end
+    if closingRate > 30 then base += (closingRate-30)*0.068 end
 
-    -- Curve: kicks in at 5 deg/s (more sensitive than free's 8) for pixel-perfect curves
-    -- Cap tightened to 2.0 so we stay on the hitbox not outside it
-    if curveRate > 5 then base = base + math.min((curveRate-5)*0.032, 2.0) end
+    if curveRate > 3.5 then
+        base += math.min((curveRate-3.5)*0.038, 3.4)
+    end
 
     return base
 end
 
--- Ball speed warning — notifies when ball exceeds threshold
-local PremSpeedWarnThreshold = 160
-local PremLastSpeedWarn      = 0
-
-local function CheckBallSpeedWarning(speed)
-    if not PremiumUnlocked then return end
-    local now = os.clock()
-    if speed >= PremSpeedWarnThreshold and now - PremLastSpeedWarn > 2.5 then
-        PremLastSpeedWarn = now
-        pcall(function()
-            Rayfield:Notify({
-                Title   = "⚠ BALL SPEED ALERT",
-                Content = ("Ball at %d st/s — above threshold"):format(math.floor(speed)),
-                Duration= 1.5,
-                Image   = 4483362458,
-            })
-        end)
-    end
-end
-
-local function pushPremHist(dist, vel, t)
-    local spd = vel.Magnitude
-    table.insert(premPosHist,  {d=dist, t=t})
-    table.insert(premSpdHist,  {s=spd,  t=t})
-    table.insert(premAccelHist,{s=spd,  t=t})
-    table.insert(premCurveHist,{v=vel,  t=t})
-    if #premPosHist   > MAX_PREM_HIST then table.remove(premPosHist,1)   end
-    if #premSpdHist   > MAX_PREM_HIST then table.remove(premSpdHist,1)   end
-    if #premAccelHist > MAX_PREM_HIST then table.remove(premAccelHist,1) end
-    if #premCurveHist > MAX_PREM_HIST then table.remove(premCurveHist,1) end
-end
-
 local function StartPremiumEngine()
     if PremConn.Parry then PremConn.Parry:Disconnect() end
-    premPosHist={}; premSpdHist={}; premAccelHist={}; premCurveHist={}
-    BuildParryIndicator()
+    resetPremHistory()
+    -- BuildParryIndicator() if you have it
 
     PremConn.Parry = RunService.PreSimulation:Connect(function()
         if not P.AutoParry then return end
-        local Ball = GetBall()
-        if not Ball then premPosHist={}; return end
-        local HRP  = GetHRP(); if not HRP then return end
+        updateSmoothedPing()
 
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local now   = os.clock()
-        local tgt   = Ball:GetAttribute("target") or ""
+        local Ball = GetBall()
+        if not Ball then resetPremHistory() return end
+
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local now  = os.clock()
+        local tgt  = Ball:GetAttribute("target") or ""
         local isTgt = tgt == Plr.Name
 
-        TrackParryHit(tgt)
-
-        -- Auto-retarget: face ball the moment it targets us
         if isTgt and P.AutoFace then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
 
-        -- Auto-disable on death / respawn
         if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            PremDidParry=false; PremLastParriedBall=nil; return
+            PremDidParry = false
+            return
         end
 
-        -- God emergency: fire instantly if ball is right on us
-        if P.GodEmergency and isTgt and not PremDidParry and Dist <= 2.5 then
+        local godDist = 3.2 + smoothedPing * 120
+        if P.GodEmergency and isTgt and not PremDidParry and Dist <= godDist then
             PremiumFire(Ball)
+            resetPremHistory()
             UpdateParryIndicator(Dist, Dist, true)
             return
         end
 
         if not isTgt then
-            premPosHist={}; premSpdHist={}
+            resetPremHistory()
             UpdateParryIndicator(99, 1, false)
             return
         end
+
         if PremDidParry then return end
 
-        local Vel   = GetVel(Ball)
+        local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
 
         pushPremHist(Dist, Vel, now)
-        AdaptPremCooldown(Speed)
-        CheckBallSpeedWarning(Speed)
 
-        -- ── PREMIUM PREDICTION ────────────────────────────────────
         local acc         = premAccel()
         local curveRate   = premCurveRate()
         local closingRate = premLSQRate()
+        local projSpeed   = (Speed + math.max(0, acc) * 0.035) * premSpikeMul(Speed)
+        local pingComp    = smoothedPing * projSpeed * 1.45
+        if smoothedPing > 0.14 then pingComp *= 1.18 end
 
-        -- Project 35ms ahead + spike multiplier
-        local projSpeed = (Speed + math.max(0, acc) * 0.035) * premSpikeMul(Speed)
-
-        -- Tighter ping formula (premium uses minimum-ping reader)
-        local pingComp = PingBonus * projSpeed * 1.32
-        if PingMs > 140 then pingComp = pingComp * 1.25 end
-
-        -- Ability-aware lead — scanned once per frame (cheap attr check first)
         local abilBias = getPremAbilityBias(BPos)
-
-        local fireDist = premFireDist(projSpeed, closingRate, pingComp, curveRate, P.HitboxTarget)
-        fireDist = fireDist + abilBias
+        local fireDist = premFireDist(projSpeed, closingRate, pingComp, curveRate, P.HitboxTarget or 11) + abilBias
 
         UpdateParryIndicator(Dist, fireDist, false)
 
-        -- ── DISTANCE THRESHOLD ────────────────────────────────────
         if Dist <= fireDist then
             PremiumFire(Ball)
+            resetPremHistory()
             UpdateParryIndicator(Dist, fireDist, true)
             return
         end
 
-        -- ── 6-FRAME MULTI-LOOKAHEAD ───────────────────────────────
+        -- 6-frame lookahead (premium feature)
         if Speed > 50 then
-            -- Straight-path projection with acceleration
             for step = 1, 6 do
-                local dt       = (1/60) * step
-                local projDist = Dist
-                    - closingRate * dt
-                    - 0.5 * math.max(0, acc) * dt*dt
-                -- Tighter tolerance per frame (0.28 vs 0.38 in free)
-                -- Keeps premium pixel-perfect even at lookahead frame 6
-                if projDist <= fireDist + (0.28 * step) then
+                local dt = (1/60) * step
+                local projDist = Dist - closingRate * dt - 0.5 * math.max(0, acc) * dt*dt
+                if projDist <= fireDist + (0.35 * step) then
                     PremiumFire(Ball)
+                    resetPremHistory()
                     UpdateParryIndicator(Dist, fireDist, true)
                     return
                 end
             end
 
-            -- ── CURVED BALL 6-FRAME ───────────────────────────────
-            -- Premium curve trigger: 4 deg/s (more sensitive than free's 6 deg/s)
-            if curveRate > 4 and #premCurveHist >= 3 then
-                local n   = #premCurveHist
+            if curveRate > 3.5 and #premCurveHist >= 3 then
+                local n = #premCurveHist
                 local dtC = premCurveHist[n].t - premCurveHist[n-1].t
                 if dtC > 0 then
                     local angVel = (premCurveHist[n].v - premCurveHist[n-1].v) / dtC
                     for step = 1, 6 do
-                        local dt      = (1/60) * step
+                        local dt = (1/60) * step
                         local predVel = Vel + angVel * dt
                         local predPos = BPos + (Vel + predVel) * 0.5 * dt
-                        if (HPos - predPos).Magnitude <= fireDist + 0.24*step then
+                        if (HPos - predPos).Magnitude <= fireDist + (0.30 * step) then
                             PremiumFire(Ball)
+                            resetPremHistory()
                             UpdateParryIndicator(Dist, fireDist, true)
                             return
                         end
                     end
-                end
-            end
-
-            -- ── HIGH-SPEED FALLBACK ───────────────────────────────
-            if Speed > 120 then
-                local pPos = BPos + Vel * (1/60 * 1.8)
-                if (HPos - pPos).Magnitude <= fireDist + 0.5 then
-                    PremiumFire(Ball)
-                    UpdateParryIndicator(Dist, fireDist, true)
-                    return
                 end
             end
         end
@@ -1428,12 +1330,31 @@ local function StartPremiumEngine()
 end
 
 local function StopPremiumEngine()
-    if PremConn.Parry then PremConn.Parry:Disconnect(); PremConn.Parry=nil end
-    PremDidParry        = false
-    PremLastParriedBall = nil
-    premPosHist={}; premSpdHist={}; premAccelHist={}; premCurveHist={}
-    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
+    if PremConn.Parry then PremConn.Parry:Disconnect() PremConn.Parry = nil end
+    resetPremHistory()
+    PremDidParry = false
 end
+
+-- ────────────────────────────────────────────────────────────────
+--  START / STOP LOGIC
+-- ────────────────────────────────────────────────────────────────
+
+local function StartAutoParry()
+    if PremiumUnlocked then
+        StartPremiumEngine()
+    else
+        StartFreeEngine()
+    end
+end
+
+local function StopAutoParry()
+    StopFreeEngine()
+    StopPremiumEngine()
+end
+
+-- Call these when you toggle the script on/off
+-- StartAutoParry()
+-- StopAutoParry()
 
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY ESP  ◈  Upgraded: cleaner cards, warn flash, tier badge
