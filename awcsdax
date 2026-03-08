@@ -398,10 +398,12 @@ do
             end)
         end
         pcall(function()
-            local col = PingMs < 60  and Color3.fromRGB(34,197,110)
-                     or PingMs < 120 and Color3.fromRGB(255,200,50)
+            -- HUD shows PingRaw (real current ms), not the min-sampled value
+            local displayMs = math.floor(PingRaw > 0 and PingRaw or PingMs)
+            local col = displayMs < 60  and Color3.fromRGB(34,197,110)
+                     or displayMs < 120 and Color3.fromRGB(255,200,50)
                      or Color3.fromRGB(255,80,80)
-            HudPing.Text      = ("📶  Ping  —  %dms"):format(math.floor(PingMs))
+            HudPing.Text      = ("📶  %dms"):format(displayMs)
             HudPing.TextColor3= col
         end)
         pcall(function()
@@ -457,6 +459,7 @@ local PremiumActive   = false
 local EnteredKey      = ""
 local Conn            = {}
 
+-- ══════════════════════════════════════════════════════════════════
 -- ══════════════════════════════════════════════════════════════════
 -- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
@@ -570,9 +573,12 @@ local function GetVel(ball)
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- PING SAMPLER  ◈  Lowest sample mode — always reads the best ping seen
+-- PING SAMPLER
+--   PingMs  = lowest sample in window  → used for parry compensation
+--   PingRaw = exact latest reading     → shown on HUD (real ms)
 -- ══════════════════════════════════════════════════════════════════
-local PingMs      = 1
+local PingMs      = 1    -- lowest (for parry math)
+local PingRaw     = 0    -- real current ms (for HUD display)
 local PingBonus   = 0
 local PingScale   = 1.0
 local PingSamples = {}
@@ -584,17 +590,19 @@ task.spawn(function()
             return Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
         end)
         if ok and type(raw)=="number" and raw>0 then
+            PingRaw = raw  -- always store the unmodified reading for HUD
+
             table.insert(PingSamples, raw)
             if #PingSamples>12 then table.remove(PingSamples,1) end
 
-            -- Always use the LOWEST sample seen in the rolling window
+            -- PingMs = lowest sample in window (keeps parry compensation tight)
             local lowest = math.huge
             for _,v in ipairs(PingSamples) do
                 if v < lowest then lowest = v end
             end
             PingMs = lowest
 
-            -- Jitter kept for compensation math but doesn't inflate the display
+            -- Jitter = mean absolute deviation of last 4 samples
             if #PingSamples>=4 then
                 local n = #PingSamples
                 local recent = {PingSamples[n], PingSamples[n-1], PingSamples[n-2], PingSamples[n-3]}
@@ -604,10 +612,10 @@ task.spawn(function()
                 PingJitter = jDev/4
             end
 
-            -- Bonus uses lowest ping so compensation is minimal / fastest possible
+            -- PingBonus uses lowest ping for fastest possible compensation
             PingBonus = (PingMs/1000) * PingScale
         end
-        task.wait(0.5)  -- sample twice as fast so we catch low spikes sooner
+        task.wait(0.5)
     end
 end)
 
@@ -620,9 +628,12 @@ task.spawn(function()
                 local col = PingMs<60 and Color3.fromRGB(34,197,110)
                          or PingMs<120 and Color3.fromRGB(255,200,50)
                          or Color3.fromRGB(255,80,80)
-                PingLabel.Text      = ("Ping: %dms  |  +%.3fs"):format(
-                    math.floor(PingMs), PingBonus)
-                PingLabel.TextColor3= col
+                local realMs = math.floor(PingRaw > 0 and PingRaw or PingMs)
+                local col2 = realMs<60 and Color3.fromRGB(34,197,110)
+                          or realMs<120 and Color3.fromRGB(255,200,50)
+                          or Color3.fromRGB(255,80,80)
+                PingLabel.Text      = ("Real: %dms  |  Comp: +%.3fs"):format(realMs, PingBonus)
+                PingLabel.TextColor3= col2
             end)
         end
     end
