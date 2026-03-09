@@ -50,204 +50,407 @@ local function makeStub()
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- INTRO SCREEN  ◈  Clean text-only, no dragon
+-- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
--- FREE INTRO  ◈  Minimal dark + progress bar
+local VALID_KEYS = {
+    "RYUU-KEY1434s9df9sdfsdf",
+    "RYUU-KEY1a0da90sdacsdaasdx",
+    "RYUU-KEY2o3i4j2o3232sxasdv",
+    "09153552478",
+}
+local DEVICE_FILE = "ryuu_device.txt"
+local LOCK_FILE   = "ryuu_keys.txt"
+
+local function GetDeviceID()
+    local ok, stored = pcall(function() return readfile(DEVICE_FILE) end)
+    if ok and stored and #stored >= 16 then
+        return stored:match("^%s*(.-)%s*$")
+    end
+    local parts = {}
+    pcall(function()
+        local id = tostring(game:GetService("RbxAnalyticsService"):GetClientId())
+        if id and #id > 4 then table.insert(parts, id) end
+    end)
+    pcall(function() table.insert(parts, tostring(Plr.UserId)) end)
+    table.insert(parts, tostring(math.random(100000,999999)))
+    table.insert(parts, tostring(os.time()))
+    local raw  = table.concat(parts,"-")
+    local hash = 0
+    for i=1,#raw do hash=(hash*31+string.byte(raw,i))%0xFFFFFFFF end
+    local deviceID = string.format("DEV-%08X-%08X-%06d",
+        hash, (hash*1000003)%0xFFFFFFFF, math.random(100000,999999))
+    pcall(function() writefile(DEVICE_FILE, deviceID) end)
+    return deviceID
+end
+
+local function LoadLocks()
+    local ok, data = pcall(function() return readfile(LOCK_FILE) end)
+    if not ok or not data or data=="" then return {} end
+    local locks = {}
+    for line in data:gmatch("[^\n]+") do
+        local k,d = line:match("^(.+)=(.+)$")
+        if k and d then locks[k]=d end
+    end
+    return locks
+end
+
+local function SaveLocks(locks)
+    local lines={}
+    for k,d in pairs(locks) do table.insert(lines,k.."="..d) end
+    pcall(function() writefile(LOCK_FILE,table.concat(lines,"\n")) end)
+end
+
+local function ValidateKey(key)
+    if not key or #key<4 then return "invalid" end
+    local k = key:match("^%s*(.-)%s*$")
+    local keyExists = false
+    for _,v in ipairs(VALID_KEYS) do
+        if v==k then keyExists=true; break end
+    end
+    if not keyExists then return "invalid" end
+    local myDevice = GetDeviceID()
+    local locks    = LoadLocks()
+    if locks[k]==nil then
+        locks[k]=myDevice; SaveLocks(locks); return "ok"
+    elseif locks[k]==myDevice then
+        return "ok"
+    else
+        return "locked_other"
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- INTRO  ◈  Holographic Boot Sequence (no key gate — free)
 -- ══════════════════════════════════════════════════════════════════
 do
     local IntroSG = Instance.new("ScreenGui")
-    IntroSG.Name           = "RyuuIntro"
-    IntroSG.ResetOnSpawn   = false
-    IntroSG.IgnoreGuiInset = true
-    IntroSG.DisplayOrder   = 9999
+    IntroSG.Name="RyuuIntro"; IntroSG.ResetOnSpawn=false
+    IntroSG.IgnoreGuiInset=true; IntroSG.DisplayOrder=99999
     pcall(function() IntroSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
     if not IntroSG.Parent then pcall(function() IntroSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-    -- Pure black background
+    -- Sound helper
+    local function playSound(id, vol, pitch)
+        pcall(function()
+            local s = Instance.new("Sound", workspace)
+            s.SoundId = "rbxassetid://"..id; s.Volume = vol or 0.6
+            s.PlaybackSpeed = pitch or 1; s.RollOffMaxDistance = 0
+            s:Play(); game:GetService("Debris"):AddItem(s, 4)
+        end)
+    end
+
+    local scanRunning = true
+
+    -- ── PHASE 1: White flash ──────────────────────────────────────
+    local Flash = Instance.new("Frame", IntroSG)
+    Flash.Size=UDim2.new(1,0,1,0); Flash.BackgroundColor3=Color3.fromRGB(255,255,255)
+    Flash.BackgroundTransparency=0; Flash.BorderSizePixel=0; Flash.ZIndex=100
+    playSound(6042053626, 0.8, 1.4)
+    TweenService:Create(Flash, TweenInfo.new(0.18, Enum.EasingStyle.Quad),
+        {BackgroundTransparency=1}):Play()
+    task.wait(0.22)
+
+    -- ── DARK BASE ────────────────────────────────────────────────
     local BG = Instance.new("Frame", IntroSG)
-    BG.Size = UDim2.new(1,0,1,0)
-    BG.BackgroundColor3 = Color3.fromRGB(4,2,10)
-    BG.BorderSizePixel  = 0
+    BG.Size=UDim2.new(1,0,1,0); BG.BackgroundColor3=Color3.fromRGB(2,1,6)
+    BG.BackgroundTransparency=0; BG.BorderSizePixel=0; BG.ZIndex=1
 
-    -- Very faint center glow — barely visible, just depth
+    -- Radial center glow
     local Glow = Instance.new("Frame", BG)
-    Glow.AnchorPoint = Vector2.new(0.5,0.5)
-    Glow.Position    = UDim2.new(0.5,0,0.46,0)
-    Glow.Size        = UDim2.new(0,500,0,260)
-    Glow.BackgroundColor3 = Color3.fromRGB(55,10,130)
-    Glow.BackgroundTransparency = 0.93
-    Glow.BorderSizePixel = 0
-    Glow.ZIndex = 1
-    Instance.new("UICorner", Glow).CornerRadius = UDim.new(1,0)
+    Glow.AnchorPoint=Vector2.new(0.5,0.5); Glow.Position=UDim2.new(0.5,0,0.46,0)
+    Glow.Size=UDim2.new(0,600,0,300); Glow.BackgroundColor3=Color3.fromRGB(55,10,140)
+    Glow.BackgroundTransparency=0.94; Glow.BorderSizePixel=0; Glow.ZIndex=1
+    Instance.new("UICorner",Glow).CornerRadius=UDim.new(1,0)
 
-    -- Logo text  ◈ RYUU
-    local Logo = Instance.new("TextLabel", BG)
-    Logo.AnchorPoint = Vector2.new(0.5,0.5)
-    Logo.Position    = UDim2.new(0.5,0,0.42,0)
-    Logo.Size        = UDim2.new(0,320,0,64)
-    Logo.BackgroundTransparency = 1
-    Logo.Text        = "◈  RYUU"
-    Logo.Font        = Enum.Font.GothamBlack
-    Logo.TextSize    = 48
-    Logo.TextColor3  = Color3.fromRGB(255,255,255)
-    Logo.TextTransparency = 1
-    Logo.ZIndex      = 3
-    local LGrad = Instance.new("UIGradient", Logo)
-    LGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0,   Color3.fromRGB(130,45,255)),
-        ColorSequenceKeypoint.new(0.38,Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(0.62,Color3.fromRGB(255,255,255)),
-        ColorSequenceKeypoint.new(1,   Color3.fromRGB(130,45,255)),
-    }
-    LGrad.Rotation = 0
+    -- ── DENSE SCAN LINE GRID ─────────────────────────────────────
+    local ScanContainer = Instance.new("Frame", IntroSG)
+    ScanContainer.Size=UDim2.new(1,0,1,0); ScanContainer.BackgroundTransparency=1
+    ScanContainer.BorderSizePixel=0; ScanContainer.ZIndex=2; ScanContainer.ClipsDescendants=true
 
-    -- Version tag
-    local VerLbl = Instance.new("TextLabel", BG)
-    VerLbl.AnchorPoint = Vector2.new(0.5,0.5)
-    VerLbl.Position    = UDim2.new(0.5,0,0.52,0)
-    VerLbl.Size        = UDim2.new(0,220,0,16)
-    VerLbl.BackgroundTransparency = 1
-    VerLbl.Text        = "V 2  ·  H U B  S C R I P T"
-    VerLbl.Font        = Enum.Font.GothamBold
-    VerLbl.TextSize    = 10
-    VerLbl.TextColor3  = Color3.fromRGB(100,55,200)
-    VerLbl.TextTransparency = 1
-    VerLbl.ZIndex      = 3
+    local lineCount = 45
+    local scanLines = {}
+    for i = 1, lineCount do
+        local line = Instance.new("Frame", ScanContainer)
+        line.Size = UDim2.new(1,0,0,1)
+        line.Position = UDim2.new(0,0,(i-1)/lineCount,0)
+        line.BackgroundColor3 = Color3.fromRGB(80,220,255)
+        line.BackgroundTransparency = 0.72; line.BorderSizePixel=0; line.ZIndex=2
+        table.insert(scanLines, line)
+    end
 
-    -- Thin horizontal divider line
-    local Divider = Instance.new("Frame", BG)
-    Divider.AnchorPoint = Vector2.new(0.5,0.5)
-    Divider.Position    = UDim2.new(0.5,0,0.61,0)
-    Divider.Size        = UDim2.new(0,0,0,1)
-    Divider.BackgroundColor3 = Color3.fromRGB(80,35,170)
-    Divider.BorderSizePixel  = 0
-    Divider.ZIndex = 3
+    -- Animated scan-line sweep (lines drift downward)
+    task.spawn(function()
+        local offset = 0
+        while scanRunning do
+            offset = (offset + 0.016) % 1
+            for i, line in ipairs(scanLines) do
+                local base = (i-1)/lineCount
+                local y = (base + offset) % 1
+                local brightness = math.abs(math.sin(y * math.pi * 3))
+                pcall(function()
+                    line.BackgroundTransparency = 0.55 + brightness * 0.38
+                    line.Position = UDim2.new(0,0,y,0)
+                end)
+            end
+            task.wait(0.018)
+        end
+    end)
 
-    -- Loading status steps — shown one by one as bar fills
-    local STEPS = {
-        "Initializing...",
-        "Loading modules...",
-        "Connecting to Rayfield...",
-        "Configuring parry engine...",
-        "Almost ready...",
-    }
+    -- Vertical grid lines (holographic matrix)
+    local GridContainer = Instance.new("Frame", IntroSG)
+    GridContainer.Size=UDim2.new(1,0,1,0); GridContainer.BackgroundTransparency=1
+    GridContainer.BorderSizePixel=0; GridContainer.ZIndex=3
+    for i = 1, 16 do
+        local vl = Instance.new("Frame", GridContainer)
+        vl.Size=UDim2.new(0,1,1,0); vl.Position=UDim2.new(i/16,0,0,0)
+        vl.BackgroundColor3=Color3.fromRGB(0,160,220); vl.BackgroundTransparency=0.88
+        vl.BorderSizePixel=0; vl.ZIndex=3
+    end
+    for i = 1, 9 do
+        local hl = Instance.new("Frame", GridContainer)
+        hl.Size=UDim2.new(1,0,0,1); hl.Position=UDim2.new(0,0,i/9,0)
+        hl.BackgroundColor3=Color3.fromRGB(0,160,220); hl.BackgroundTransparency=0.88
+        hl.BorderSizePixel=0; hl.ZIndex=3
+    end
 
-    -- Progress bar container
-    local BarBG = Instance.new("Frame", BG)
-    BarBG.AnchorPoint = Vector2.new(0.5,0.5)
-    BarBG.Position    = UDim2.new(0.5,0,0.72,0)
-    BarBG.Size        = UDim2.new(0,280,0,4)
-    BarBG.BackgroundColor3 = Color3.fromRGB(20,9,45)
-    BarBG.BorderSizePixel  = 0
-    BarBG.ZIndex = 3
-    Instance.new("UICorner", BarBG).CornerRadius = UDim.new(1,0)
-
-    -- Filled bar
-    local Bar = Instance.new("Frame", BarBG)
-    Bar.Size = UDim2.new(0,0,1,0)
-    Bar.BackgroundColor3 = Color3.fromRGB(130,50,255)
-    Bar.BorderSizePixel  = 0
-    Bar.ZIndex = 4
-    Instance.new("UICorner", Bar).CornerRadius = UDim.new(1,0)
-    local BarGrad = Instance.new("UIGradient", Bar)
-    BarGrad.Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(90,25,200)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(210,120,255)),
+    -- ── VERTICAL SWEEP BEAM (L→R) ────────────────────────────────
+    local VSweep = Instance.new("Frame", IntroSG)
+    VSweep.Size=UDim2.new(0,3,1,0); VSweep.Position=UDim2.new(-0.05,0,0,0)
+    VSweep.BackgroundColor3=Color3.fromRGB(120,240,255); VSweep.BackgroundTransparency=0.3
+    VSweep.BorderSizePixel=0; VSweep.ZIndex=8
+    local VSweepGlow = Instance.new("UIGradient", VSweep)
+    VSweepGlow.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(0,0,0)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(180,255,255)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0)),
+    }; VSweepGlow.Rotation=90
+    local VBloom = Instance.new("Frame", IntroSG)
+    VBloom.Size=UDim2.new(0,50,1,0); VBloom.Position=UDim2.new(-0.1,0,0,0)
+    VBloom.BackgroundColor3=Color3.fromRGB(60,180,255); VBloom.BackgroundTransparency=0.82
+    VBloom.BorderSizePixel=0; VBloom.ZIndex=7
+    local BloomGrad = Instance.new("UIGradient", VBloom)
+    BloomGrad.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(0,0,0)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(60,180,255)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0)),
     }
 
-    -- Shimmer sweep on bar
-    local Shimmer = Instance.new("Frame", Bar)
-    Shimmer.Size = UDim2.new(0,30,1,0)
-    Shimmer.Position = UDim2.new(-0.2,0,0,0)
-    Shimmer.BackgroundColor3 = Color3.fromRGB(255,255,255)
-    Shimmer.BackgroundTransparency = 0.72
-    Shimmer.BorderSizePixel = 0
-    Shimmer.ZIndex = 5
-    Instance.new("UICorner", Shimmer).CornerRadius = UDim.new(1,0)
+    playSound(9119713951, 0.5, 1.0)
+    TweenService:Create(VSweep, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {Position=UDim2.new(1.05,0,0,0)}):Play()
+    TweenService:Create(VBloom, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {Position=UDim2.new(1.0,0,0,0)}):Play()
+    task.wait(0.3)
 
-    -- Percentage label
-    local PctLbl = Instance.new("TextLabel", BG)
-    PctLbl.AnchorPoint = Vector2.new(1,0.5)
-    PctLbl.Position    = UDim2.new(0.5,150,0,0)  -- right of bar, set Y in animation
-    PctLbl.Size        = UDim2.new(0,40,0,16)
-    PctLbl.BackgroundTransparency = 1
-    PctLbl.Text        = "0%"
-    PctLbl.Font        = Enum.Font.GothamBold
-    PctLbl.TextSize    = 10
-    PctLbl.TextColor3  = Color3.fromRGB(110,60,210)
-    PctLbl.ZIndex      = 4
-    PctLbl.Position    = UDim2.new(0.5,152,0.72,-8)
+    -- ── CENTER HOLOGRAPHIC CARD ───────────────────────────────────
+    local Card = Instance.new("Frame", IntroSG)
+    Card.AnchorPoint=Vector2.new(0.5,0.5); Card.Position=UDim2.new(0.5,0,0.5,0)
+    Card.Size=UDim2.new(0,0,0,0); Card.BackgroundColor3=Color3.fromRGB(4,14,22)
+    Card.BackgroundTransparency=0; Card.BorderSizePixel=0; Card.ZIndex=10
+    Instance.new("UICorner",Card).CornerRadius=UDim.new(0,16)
+    local CardStroke = Instance.new("UIStroke", Card)
+    CardStroke.Thickness=1.8; CardStroke.Color=Color3.fromRGB(0,210,255); CardStroke.Transparency=0.1
+    local CardGrad = Instance.new("UIGradient", Card)
+    CardGrad.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(5,20,35)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(3,10,18)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(5,20,35)),
+    }; CardGrad.Rotation=135
 
-    -- Status text below bar
-    local StatusLbl = Instance.new("TextLabel", BG)
-    StatusLbl.AnchorPoint = Vector2.new(0.5,0.5)
-    StatusLbl.Position    = UDim2.new(0.5,0,0.79,0)
-    StatusLbl.Size        = UDim2.new(0,280,0,16)
-    StatusLbl.BackgroundTransparency = 1
-    StatusLbl.Text        = STEPS[1]
-    StatusLbl.Font        = Enum.Font.Gotham
-    StatusLbl.TextSize    = 10
-    StatusLbl.TextColor3  = Color3.fromRGB(75,42,145)
-    StatusLbl.ZIndex      = 3
+    -- Card top accent
+    local Accent = Instance.new("Frame", Card)
+    Accent.Size=UDim2.new(1,0,0,2); Accent.Position=UDim2.new(0,0,0,0)
+    Accent.BackgroundColor3=Color3.fromRGB(0,210,255); Accent.BorderSizePixel=0; Accent.ZIndex=11
+    Instance.new("UICorner",Accent).CornerRadius=UDim.new(0,16)
 
+    -- PREMIUM badge (top-right)
+    local Badge = Instance.new("TextLabel", Card)
+    Badge.AnchorPoint=Vector2.new(1,0); Badge.Position=UDim2.new(1,-10,0,8)
+    Badge.Size=UDim2.new(0,72,0,18); Badge.BackgroundColor3=Color3.fromRGB(0,50,80)
+    Badge.BorderSizePixel=0; Badge.Text="FREE"; Badge.Font=Enum.Font.GothamBlack
+    Badge.TextSize=9; Badge.TextColor3=Color3.fromRGB(0,220,255); Badge.TextTransparency=1; Badge.ZIndex=12
+    Instance.new("UICorner",Badge).CornerRadius=UDim.new(0,5)
+    local BadgeStroke=Instance.new("UIStroke",Badge); BadgeStroke.Thickness=1; BadgeStroke.Color=Color3.fromRGB(0,180,255)
+
+    -- ◈ icon
+    local IconLbl = Instance.new("TextLabel", Card)
+    IconLbl.AnchorPoint=Vector2.new(0,0.5); IconLbl.Position=UDim2.new(0,18,0,62)
+    IconLbl.Size=UDim2.new(0,44,0,44); IconLbl.BackgroundTransparency=1; IconLbl.Text="◈"
+    IconLbl.Font=Enum.Font.GothamBlack; IconLbl.TextSize=36
+    IconLbl.TextColor3=Color3.fromRGB(0,210,255); IconLbl.TextTransparency=1; IconLbl.ZIndex=12
+
+    -- Main headline
+    local Headline = Instance.new("TextLabel", Card)
+    Headline.AnchorPoint=Vector2.new(0,0.5); Headline.Position=UDim2.new(0,70,0,52)
+    Headline.Size=UDim2.new(1,-80,0,30); Headline.BackgroundTransparency=1
+    Headline.Text="RYUU  HUB"; Headline.Font=Enum.Font.GothamBlack; Headline.TextSize=28
+    Headline.TextTransparency=1; Headline.TextXAlignment=Enum.TextXAlignment.Left; Headline.ZIndex=12
+    local HLGrad = Instance.new("UIGradient", Headline)
+    HLGrad.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(0,200,255)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,255)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(0,200,255)),
+    }
+
+    -- Sub line
+    local SubLbl = Instance.new("TextLabel", Card)
+    SubLbl.AnchorPoint=Vector2.new(0,0.5); SubLbl.Position=UDim2.new(0,70,0,82)
+    SubLbl.Size=UDim2.new(1,-80,0,16); SubLbl.BackgroundTransparency=1
+    SubLbl.Text="V 2   ·   by ZivX   ·   Loading..."; SubLbl.Font=Enum.Font.Gotham; SubLbl.TextSize=10
+    SubLbl.TextColor3=Color3.fromRGB(0,160,200); SubLbl.TextTransparency=1
+    SubLbl.TextXAlignment=Enum.TextXAlignment.Left; SubLbl.ZIndex=12
+
+    -- Divider inside card
+    local CDivider = Instance.new("Frame", Card)
+    CDivider.Size=UDim2.new(0,0,0,1); CDivider.Position=UDim2.new(0,18,0,104)
+    CDivider.BackgroundColor3=Color3.fromRGB(0,160,210); CDivider.BorderSizePixel=0; CDivider.ZIndex=11
+
+    -- Progress bar inside card
+    local CBarBG = Instance.new("Frame", Card)
+    CBarBG.Size=UDim2.new(1,-36,0,4); CBarBG.Position=UDim2.new(0,18,0,116)
+    CBarBG.BackgroundColor3=Color3.fromRGB(0,20,40); CBarBG.BorderSizePixel=0; CBarBG.ZIndex=11
+    Instance.new("UICorner",CBarBG).CornerRadius=UDim.new(1,0)
+    local CBar = Instance.new("Frame", CBarBG)
+    CBar.Size=UDim2.new(0,0,1,0); CBar.BackgroundColor3=Color3.fromRGB(0,200,255)
+    CBar.BorderSizePixel=0; CBar.ZIndex=12
+    Instance.new("UICorner",CBar).CornerRadius=UDim.new(1,0)
+    local CBarGrad = Instance.new("UIGradient", CBar)
+    CBarGrad.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(0,140,220)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(80,255,255)),
+    }
+    local CBarShimmer = Instance.new("Frame", CBar)
+    CBarShimmer.Size=UDim2.new(0,30,1,0); CBarShimmer.Position=UDim2.new(-0.2,0,0,0)
+    CBarShimmer.BackgroundColor3=Color3.fromRGB(255,255,255); CBarShimmer.BackgroundTransparency=0.7
+    CBarShimmer.BorderSizePixel=0; CBarShimmer.ZIndex=13
+    Instance.new("UICorner",CBarShimmer).CornerRadius=UDim.new(1,0)
+
+    -- Status label below card
+    local StatusLbl = Instance.new("TextLabel", IntroSG)
+    StatusLbl.AnchorPoint=Vector2.new(0.5,0.5); StatusLbl.Position=UDim2.new(0.5,0,0.72,0)
+    StatusLbl.Size=UDim2.new(0,340,0,14); StatusLbl.BackgroundTransparency=1
+    StatusLbl.Text="Initializing..."; StatusLbl.Font=Enum.Font.Gotham; StatusLbl.TextSize=10
+    StatusLbl.TextColor3=Color3.fromRGB(0,160,200); StatusLbl.ZIndex=8
+
+    -- ── ANIMATE SEQUENCE ─────────────────────────────────────────
     local loadDone = false
 
     task.spawn(function()
-        -- Fade logo in cleanly
-        task.wait(0.08)
-        TweenService:Create(Logo, TweenInfo.new(0.35, Enum.EasingStyle.Quad),
-            {TextTransparency=0}):Play()
+        -- Pop card open
+        playSound(4590662766, 0.65, 1.1)
+        TweenService:Create(Card,
+            TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Size=UDim2.new(0,360,0,140)}):Play()
         task.wait(0.22)
-        TweenService:Create(VerLbl, TweenInfo.new(0.25), {TextTransparency=0}):Play()
+
+        -- Fade in card elements
+        TweenService:Create(Badge, TweenInfo.new(0.18), {TextTransparency=0}):Play()
+        TweenService:Create(IconLbl, TweenInfo.new(0.2), {TextTransparency=0}):Play()
+        task.wait(0.1)
+        TweenService:Create(Headline, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {TextTransparency=0}):Play()
+        task.wait(0.12)
+        TweenService:Create(SubLbl, TweenInfo.new(0.2), {TextTransparency=0}):Play()
         task.wait(0.18)
+        TweenService:Create(CDivider, TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+            {Size=UDim2.new(1,-36,0,1)}):Play()
+        task.wait(0.1)
 
-        -- Expand divider line
-        TweenService:Create(Divider, TweenInfo.new(0.3, Enum.EasingStyle.Quad),
-            {Size=UDim2.new(0,280,0,1)}):Play()
-        task.wait(0.2)
+        -- Loading steps with bar animation
+        local STEPS = {
+            "Initializing engine...",
+            "Loading Rayfield...",
+            "Configuring parry core...",
+            "Connecting to services...",
+            "Starting systems...",
+        }
 
-        -- Shimmer loop on bar
+        -- Shimmer loop
         task.spawn(function()
             while not loadDone do
                 pcall(function()
-                    Shimmer.Position = UDim2.new(-0.15,0,0,0)
-                    TweenService:Create(Shimmer,
-                        TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut),
-                        {Position=UDim2.new(1.1,0,0,0)}):Play()
+                    CBarShimmer.Position=UDim2.new(-0.15,0,0,0)
+                    TweenService:Create(CBarShimmer,
+                        TweenInfo.new(0.65,Enum.EasingStyle.Quad,Enum.EasingDirection.InOut),
+                        {Position=UDim2.new(1.15,0,0,0)}):Play()
                 end)
-                task.wait(1.1)
+                task.wait(1.0)
             end
         end)
 
-        -- Step-based progress — cycles through STEPS as bar fills
         local stepCount = #STEPS
         for i, stepText in ipairs(STEPS) do
             if loadDone then break end
             local pct = i / stepCount
             StatusLbl.Text = stepText
-            TweenService:Create(Bar,
-                TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                {Size=UDim2.new(pct * 0.88, 0, 1, 0)}):Play()
-            -- Animate percentage counter
-            local startPct = math.floor((i-1)/stepCount * 88)
-            local endPct   = math.floor(pct * 88)
-            task.spawn(function()
-                for p = startPct, endPct do
-                    pcall(function() PctLbl.Text = p.."%" end)
-                    task.wait(0.45 / math.max(endPct - startPct, 1))
-                end
-            end)
+            TweenService:Create(CBar,
+                TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                {Size=UDim2.new(pct * 0.85,0,1,0)}):Play()
             task.wait(0.38)
         end
 
-        -- Wait for Rayfield to actually finish loading
-        local waitTick = 0
-        while not loadDone and waitTick < 8 do
-            task.wait(0.1); waitTick = waitTick + 0.1
+        -- Wait for Rayfield
+        local w = 0
+        while not loadDone and w < 8 do task.wait(0.1); w=w+0.1 end
+
+        -- Snap to 100% green
+        SubLbl.Text = "V 2   ·   by ZivX   ·   Ready!"
+        StatusLbl.Text = "Ready"
+        StatusLbl.TextColor3 = Color3.fromRGB(50,220,110)
+        TweenService:Create(CBar, TweenInfo.new(0.18),
+            {Size=UDim2.new(1,0,1,0), BackgroundColor3=Color3.fromRGB(35,200,90)}):Play()
+        TweenService:Create(CBarBG, TweenInfo.new(0.18),
+            {BackgroundColor3=Color3.fromRGB(8,35,18)}):Play()
+        TweenService:Create(CDivider, TweenInfo.new(0.18),
+            {BackgroundColor3=Color3.fromRGB(35,200,90)}):Play()
+        TweenService:Create(CardStroke, TweenInfo.new(0.2),
+            {Color=Color3.fromRGB(35,220,100)}):Play()
+        TweenService:Create(Accent, TweenInfo.new(0.2),
+            {BackgroundColor3=Color3.fromRGB(35,220,100)}):Play()
+
+        -- Second confirm sweep (right → left)
+        task.wait(0.25)
+        playSound(6042053626, 0.5, 0.85)
+        local VSweep2 = Instance.new("Frame", IntroSG)
+        VSweep2.Size=UDim2.new(0,2,1,0); VSweep2.Position=UDim2.new(1.05,0,0,0)
+        VSweep2.BackgroundColor3=Color3.fromRGB(80,255,200); VSweep2.BackgroundTransparency=0.4
+        VSweep2.BorderSizePixel=0; VSweep2.ZIndex=9
+        TweenService:Create(VSweep2, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Position=UDim2.new(-0.05,0,0,0)}):Play()
+        task.wait(0.4)
+
+        -- Border glow pulse → white flash → fade
+        TweenService:Create(CardStroke, TweenInfo.new(0.1),
+            {Color=Color3.fromRGB(255,255,255), Thickness=3.5}):Play()
+        task.wait(0.12)
+        TweenService:Create(CardStroke, TweenInfo.new(0.4),
+            {Color=Color3.fromRGB(35,220,100), Thickness=1.8}):Play()
+        task.wait(0.5)
+
+        scanRunning = false
+
+        -- Fade scan lines
+        for _, line in ipairs(scanLines) do
+            TweenService:Create(line, TweenInfo.new(0.3), {BackgroundTransparency=1}):Play()
         end
+        TweenService:Create(GridContainer, TweenInfo.new(0.4), {BackgroundTransparency=1}):Play()
+        task.wait(0.5)
+
+        -- Final black fade-out
+        local ft = TweenInfo.new(0.38)
+        TweenService:Create(BG,       ft, {BackgroundTransparency=1}):Play()
+        TweenService:Create(Card,     ft, {BackgroundTransparency=1}):Play()
+        TweenService:Create(CardStroke, ft, {Transparency=1}):Play()
+        TweenService:Create(Headline, ft, {TextTransparency=1}):Play()
+        TweenService:Create(SubLbl,   ft, {TextTransparency=1}):Play()
+        TweenService:Create(IconLbl,  ft, {TextTransparency=1}):Play()
+        TweenService:Create(Badge,    ft, {TextTransparency=1}):Play()
+        TweenService:Create(StatusLbl, ft, {TextTransparency=1}):Play()
+        task.wait(0.42)
+        pcall(function() IntroSG:Destroy() end)
     end)
 
-    -- Load Rayfield
+    -- ── Load Rayfield (parallel) ──────────────────────────────────
     local RF_URLS = {
         "https://sirius.menu/rayfield",
         "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
@@ -264,38 +467,8 @@ do
     end
 
     loadDone = true
-
-    pcall(function()
-        -- Snap bar to 100%
-        StatusLbl.Text    = "Ready"
-        StatusLbl.TextColor3 = Color3.fromRGB(50,200,110)
-        PctLbl.Text       = "100%"
-        PctLbl.TextColor3 = Color3.fromRGB(50,200,110)
-        TweenService:Create(Bar, TweenInfo.new(0.18),
-            {Size=UDim2.new(1,0,1,0), BackgroundColor3=Color3.fromRGB(35,180,90)}):Play()
-        TweenService:Create(BarBG, TweenInfo.new(0.18),
-            {BackgroundColor3=Color3.fromRGB(12,40,20)}):Play()
-        TweenService:Create(Divider, TweenInfo.new(0.18),
-            {BackgroundColor3=Color3.fromRGB(35,180,90)}):Play()
-    end)
-
-    task.wait(0.55)
-
-    -- Fade out — everything collapses to black
-    pcall(function()
-        local fade = Instance.new("Frame", IntroSG)
-        fade.Size = UDim2.new(1,0,1,0)
-        fade.BackgroundColor3 = Color3.fromRGB(4,2,10)
-        fade.BackgroundTransparency = 1
-        fade.BorderSizePixel = 0
-        fade.ZIndex = 999
-        TweenService:Create(fade, TweenInfo.new(0.4, Enum.EasingStyle.Quad),
-            {BackgroundTransparency=0}):Play()
-        task.wait(0.45)
-    end)
-
-    pcall(function() IntroSG:Destroy() end)
 end
+
 
 -- ══════════════════════════════════════════════════════════════════
 -- ALWAYS-ON HUD  ◈  Upgraded layout
@@ -459,79 +632,7 @@ local PremiumActive   = false
 local EnteredKey      = ""
 local Conn            = {}
 
--- ══════════════════════════════════════════════════════════════════
--- ══════════════════════════════════════════════════════════════════
--- KEY SYSTEM
--- ══════════════════════════════════════════════════════════════════
-local VALID_KEYS = {
-    "RYUU-KEY1434s9df9sdfsdf",
-    "RYUU-KEY1a0da90sdacsdaasdx",
-    "RYUU-KEY2o3i4j2o3232sxasdv",
-    "09153552478",
-    "x31THEGOAT",
-    "RYUU-KEYS0CF94TEDFGVasd4swdf",
-	"Dinglestroups",
-}
-local DEVICE_FILE = "ryuu_device.txt"
-local LOCK_FILE   = "ryuu_keys.txt"
 
-local function GetDeviceID()
-    local ok, stored = pcall(function() return readfile(DEVICE_FILE) end)
-    if ok and stored and #stored >= 16 then
-        return stored:match("^%s*(.-)%s*$")
-    end
-    local parts = {}
-    pcall(function()
-        local id = tostring(game:GetService("RbxAnalyticsService"):GetClientId())
-        if id and #id > 4 then table.insert(parts, id) end
-    end)
-    pcall(function() table.insert(parts, tostring(Plr.UserId)) end)
-    table.insert(parts, tostring(math.random(100000,999999)))
-    table.insert(parts, tostring(os.time()))
-    local raw  = table.concat(parts,"-")
-    local hash = 0
-    for i=1,#raw do hash=(hash*31+string.byte(raw,i))%0xFFFFFFFF end
-    local deviceID = string.format("DEV-%08X-%08X-%06d",
-        hash, (hash*1000003)%0xFFFFFFFF, math.random(100000,999999))
-    pcall(function() writefile(DEVICE_FILE, deviceID) end)
-    return deviceID
-end
-
-local function LoadLocks()
-    local ok, data = pcall(function() return readfile(LOCK_FILE) end)
-    if not ok or not data or data=="" then return {} end
-    local locks = {}
-    for line in data:gmatch("[^\n]+") do
-        local k,d = line:match("^(.+)=(.+)$")
-        if k and d then locks[k]=d end
-    end
-    return locks
-end
-
-local function SaveLocks(locks)
-    local lines={}
-    for k,d in pairs(locks) do table.insert(lines,k.."="..d) end
-    pcall(function() writefile(LOCK_FILE,table.concat(lines,"\n")) end)
-end
-
-local function ValidateKey(key)
-    if not key or #key<4 then return "invalid" end
-    local k = key:match("^%s*(.-)%s*$")
-    local keyExists = false
-    for _,v in ipairs(VALID_KEYS) do
-        if v==k then keyExists=true; break end
-    end
-    if not keyExists then return "invalid" end
-    local myDevice = GetDeviceID()
-    local locks    = LoadLocks()
-    if locks[k]==nil then
-        locks[k]=myDevice; SaveLocks(locks); return "ok"
-    elseif locks[k]==myDevice then
-        return "ok"
-    else
-        return "locked_other"
-    end
-end
 
 -- ══════════════════════════════════════════════════════════════════
 -- BALL / PLAYER HELPERS
@@ -707,16 +808,25 @@ local PremCooldownMax   = 0.22   -- ceiling
 local PremLastParry     = 0
 local PremDidParry      = false
 
+local PremConn = {}  -- connection table for premium engine (shared scope)
+local PremSpeedWarnThreshold = 160
+local PremLastSpeedWarn      = 0
+
 local function AdaptPremCooldown(speed)
     -- Fast ball = tighter cooldown, slow ball = looser
-    if speed > 180 then
-        PremCooldown = PremCooldownBase
-    elseif speed > 120 then
-        PremCooldown = PremCooldownBase + 0.03
-    elseif speed > 60 then
-        PremCooldown = PremCooldownBase + 0.05
-    else
-        PremCooldown = PremCooldownMax
+    if     speed > 200 then PremCooldown = PremCooldownBase
+    elseif speed > 140 then PremCooldown = PremCooldownBase + 0.02
+    elseif speed >  80 then PremCooldown = PremCooldownBase + 0.04
+    else                    PremCooldown = PremCooldownMax
+    end
+end
+
+local function CheckBallSpeedWarning(speed)
+    if not PremiumUnlocked then return end
+    local now = os.clock()
+    if speed >= PremSpeedWarnThreshold and now - PremLastSpeedWarn > 2.5 then
+        PremLastSpeedWarn = now
+        -- notification removed (caused frame drops)
     end
 end
 
@@ -840,139 +950,40 @@ local function UpdateParryIndicator(dist, fireDist, didJustFire)
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- FREE PARRY ENGINE  ◈  V3 · Adaptive · Trajectory · Curve-aware · Anti-stagger
+-- FREE PARRY ENGINE  ◈  Blade Ball · Pure distance + dot-product
+-- ══════════════════════════════════════════════════════════════════
+-- DESIGN: No history, no regression, no curve math.
+--   Fire condition:
+--     1. Ball is targeting us
+--     2. Ball is actually moving TOWARD us  (dot product < 0)
+--     3. Distance ≤ fireDist  (hitbox + ping lead)
+--     4. On odd/behind angles: use a tight fallback dist so we never
+--        fire on balls flying past us sideways
+--
+-- Blade Ball parry hitbox ≈ 6 studs radius.
+-- We fire at exactly that edge + one ping-length of lead.
 -- ══════════════════════════════════════════════════════════════════
 
-local freePosHist   = {}
-local freeAccelHist = {}
-local freeCurveHist = {}
-local freeSpeedHist = {}
-local MAX_FREE_HIST = 14
+-- How many studs of extra lead to add per 100ms of ping
+-- Keeps the window consistent across connections
+local FREE_PING_LEAD_PER_100MS = 0.9  -- studs
 
-local function pushHist(dist, vel, t)
-    local spd = vel.Magnitude
-    table.insert(freePosHist,  {d=dist, t=t})
-    table.insert(freeAccelHist,{s=spd,  t=t})
-    table.insert(freeCurveHist,{v=vel,  t=t})
-    table.insert(freeSpeedHist, spd)
-    if #freePosHist   > MAX_FREE_HIST then table.remove(freePosHist,1)   end
-    if #freeAccelHist > MAX_FREE_HIST then table.remove(freeAccelHist,1) end
-    if #freeCurveHist > MAX_FREE_HIST then table.remove(freeCurveHist,1) end
-    if #freeSpeedHist > MAX_FREE_HIST then table.remove(freeSpeedHist,1) end
-end
-
--- Exponentially-weighted LSQ closing rate — recent frames count more
-local function lsqClosingRate()
-    local n = #freePosHist
-    if n < 3 then return 0 end
-    local sx,sy,sxy,sxx,sw = 0,0,0,0,0
-    local t0 = freePosHist[1].t
-    for i,p in ipairs(freePosHist) do
-        local w = math.exp((i - n) * 0.25)
-        local x = p.t - t0
-        sx=sx+w*x; sy=sy+w*p.d; sxy=sxy+w*x*p.d; sxx=sxx+w*x*x; sw=sw+w
-    end
-    local denom = sw*sxx - sx*sx
-    if math.abs(denom) < 1e-6 then return 0 end
-    return -(sw*sxy - sx*sy) / denom
-end
-
--- LSQ acceleration over speed history
-local function estimateAccel()
-    local n = #freeAccelHist
-    if n < 4 then return 0 end
-    local sx,sy,sxy,sxx = 0,0,0,0
-    local t0 = freeAccelHist[1].t
-    for _,p in ipairs(freeAccelHist) do
-        local x = p.t - t0
-        sx=sx+x; sy=sy+p.s; sxy=sxy+x*p.s; sxx=sxx+x*x
-    end
-    local denom = n*sxx - sx*sx
-    if math.abs(denom) < 1e-6 then return 0 end
-    return (n*sxy - sx*sy) / denom
-end
-
--- Angular velocity of ball direction — deg/s, indicates curved trajectory
--- Uses last 5 samples with recency weighting so early flat frames don't dilute a sudden curve
-local function detectCurveRate()
-    local n = #freeCurveHist
-    if n < 3 then return 0 end
-    local totalAngle, totalTime = 0, 0
-    local startI = math.max(2, n - 4)  -- up to 5 consecutive pairs
-    for i = startI, n do
-        local a = freeCurveHist[i-1]
-        local b = freeCurveHist[i]
-        if a.v.Magnitude > 1 and b.v.Magnitude > 1 then
-            local dot = math.clamp(a.v:Dot(b.v)/(a.v.Magnitude*b.v.Magnitude), -1, 1)
-            local dt  = b.t - a.t
-            if dt > 0 then
-                -- Weight recent pairs heavier (index closer to n = more weight)
-                local w = 0.5 + (i - startI) / math.max(n - startI, 1) * 0.5
-                totalAngle = totalAngle + math.deg(math.acos(dot)) * w
-                totalTime  = totalTime  + dt * w
-            end
-        end
-    end
-    return totalTime > 0 and (totalAngle/totalTime) or 0
-end
-
--- Speed spike: did ball suddenly get much faster this frame?
-local function detectSpeedSpike()
-    local n = #freeSpeedHist
-    if n < 5 then return 1.0 end
-    local cur  = freeSpeedHist[n]
-    local prev = freeSpeedHist[n-3]
-    if prev and prev > 0 then
-        local ratio = cur / prev
-        if ratio > 1.7 then return 1.28 end
-        if ratio > 1.4 then return 1.15 end
-    end
-    return 1.0
-end
-
--- Adaptive fire distance: smarter calc — handles slow/fast/curve differently
--- Baseline = 1 tick of ball travel at projected speed + ping lead
-local function adaptiveFireDist(speed, closingRate, pingComp, curveRate)
-    -- Base: 1 frame of movement at current speed, minimum 11 studs
-    local base = math.max(speed / 60, 11.0) + pingComp
-
-    -- Fast-ball extra lead: ball is moving faster than prediction can keep up
-    -- Each tier adds proportional studs so the parry window stays consistent
-    if     speed > 250 then base = base + (speed - 250) * 0.048
-    elseif speed > 180 then base = base + (speed - 180) * 0.036
-    elseif speed > 120 then base = base + (speed - 120) * 0.024
-    end
-
-    -- Closing rate bonus: ball rushing straight in (adds radial lead)
-    if     closingRate > 50 then base = base + (closingRate - 50) * 0.072
-    elseif closingRate > 28 then base = base + (closingRate - 28) * 0.042
-    end
-
-    -- Curve buffer: kicks in at 8 deg/s (was 18) — catches gentle curves early
-    -- Cap at 4.5 studs so we don't massively overshoot on extreme spins
-    if curveRate > 8 then
-        base = base + math.min((curveRate - 8) * 0.062, 4.5)
-    end
-
-    return base
-end
+-- Base hitbox radius for Blade Ball (confirmed ~6 studs)
+local FREE_HITBOX = 6.2
 
 local PrevBallPos, PrevBallTime = nil, 0
 
 local function StartEngine()
     if Conn.Parry       then Conn.Parry:Disconnect()       end
     if Conn.FreeAbilDet then Conn.FreeAbilDet:Disconnect() end
-    freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-    PrevBallPos=nil; PrevBallTime=0
+    PrevBallPos   = nil; PrevBallTime = 0
+    FreeSpeedHist = {}
     BuildParryIndicator()
 
     Conn.Parry = RunService.PreSimulation:Connect(function()
         if not S.AutoParry then return end
         local Ball = GetBall()
-        if not Ball then
-            freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
-            PrevBallPos=nil; return
-        end
+        if not Ball then PrevBallPos=nil; return end
         local HRP = GetHRP(); if not HRP then return end
 
         local BPos  = Ball.Position
@@ -984,27 +995,17 @@ local function StartEngine()
 
         TrackParryHit(tgt)
 
-        -- Auto-retarget: smoothly face ball when it targets us
+        -- Auto-face: rotate toward ball when it targets us
         if isTgt and S.AutoFace then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
 
-        -- Auto-disable on death / respawn
+        -- Auto-reset on death / respawn
         if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            S.DidParry = false; FreeLastParriedBall = nil; return
-        end
-
-        -- Emergency: ball already on top of us
-        if S.EmergencyParry and isTgt and not S.DidParry then
-            if Dist <= (S.EmergencyDist or 6) then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, Dist, true)
-                return
-            end
+            S.DidParry=false; FreeLastParriedBall=nil; return
         end
 
         if not isTgt then
-            freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
             PrevBallPos=nil
             UpdateParryIndicator(99, 1, false)
             return
@@ -1014,81 +1015,82 @@ local function StartEngine()
         local Vel   = GetVel(Ball)
         local Speed = Vel.Magnitude
 
-        pushHist(Dist, Vel, now)
+        -- ── DOT PRODUCT: is ball closing on us? ─────────────────
+        local toPlayer  = (HPos - BPos)
+        local dotVal    = Vel:Dot(toPlayer)
+        local isClosing = dotVal > -(Speed * 0.15)
 
-        -- ── ADAPTIVE TRAJECTORY PREDICTION ───────────────────────
-        local accel       = estimateAccel()
-        local curveRate   = detectCurveRate()
-        local closingRate = lsqClosingRate()
-        local spikeMul    = detectSpeedSpike()
+        -- ── ADAPTIVE HITBOX  ──────────────────────────────────────
+        -- Core idea: hitbox is NOT fixed. It grows as the ball gets faster
+        -- and shrinks when the ball is slow. This means:
+        --   slow ball  (≤30 st/s)  → minimum hitbox (~4.8 studs)  no early fires
+        --   medium ball (30-120)   → smooth ramp up
+        --   fast ball  (120-220)   → hitbox near max (~7.8 studs)
+        --   very fast  (220+)      → capped at 8.8 studs + spike bonus
+        --
+        -- We also track the last 6 speed readings to detect sudden spikes
+        -- (e.g. Pull ability, speed boost) and inflate the hitbox instantly.
 
-        -- Project speed 40ms ahead using LSQ acceleration
-        local projSpeed = (Speed + math.max(0, accel) * 0.04) * spikeMul
+        -- Speed history ring buffer (6 samples, one per frame)
+        FreeSpeedHist = FreeSpeedHist or {}
+        table.insert(FreeSpeedHist, Speed)
+        if #FreeSpeedHist > 6 then table.remove(FreeSpeedHist, 1) end
 
-        local pingComp  = PingBonus * projSpeed * 1.38
-        if PingMs > 130 then pingComp = pingComp * 1.22 end
+        -- Detect spike: compare current speed to 3-sample-ago speed
+        local spikeMul = 1.0
+        if #FreeSpeedHist >= 4 then
+            local prev3 = FreeSpeedHist[#FreeSpeedHist - 3]
+            if prev3 and prev3 > 1 then
+                local ratio = Speed / prev3
+                if     ratio > 2.0 then spikeMul = 1.30  -- huge spike (Pull/boost)
+                elseif ratio > 1.5 then spikeMul = 1.18
+                elseif ratio > 1.2 then spikeMul = 1.08
+                end
+            end
+        end
 
-        local fireDist  = adaptiveFireDist(projSpeed, closingRate, pingComp, curveRate)
+        -- Smooth exponential curve: grows quickly in mid-range, plateaus at top
+        -- t = normalised speed 0→1 over [0, 260 studs/s]
+        local FREE_SPD_REF = 260
+        local FREE_HB_MIN  = 4.8   -- studs at speed 0
+        local FREE_HB_MAX  = 8.8   -- studs at speed >= FREE_SPD_REF
+        local t = math.clamp(Speed / FREE_SPD_REF, 0, 1)
+        -- ease-in-out quad: slow ramp → fast middle → plateau
+        local curve = t < 0.5 and (2 * t * t) or (1 - (-2*t+2)^2 / 2)
+        local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * spikeMul  -- inflate on speed spikes
+
+        -- Ping lead: distance ball travels during one ping window
+        -- Scale the coefficient down slightly for slow balls (less slop needed)
+        local pingScale = math.clamp(Speed / 120, 0.4, 1.0)
+        local pingLead  = (PingRaw / 1000) * Speed * FREE_PING_LEAD_PER_100MS / 0.1
+        pingLead = math.min(pingLead * pingScale, 3.0)
+
+        local fireDist = dynamicHitbox + pingLead
 
         UpdateParryIndicator(Dist, fireDist, false)
 
-        -- ── THRESHOLD CHECK ───────────────────────────────────────
-        if Dist <= fireDist then
+        -- ── FIRE CHECK ────────────────────────────────────────────
+        if isClosing and Dist <= fireDist then
             FireParry(Ball)
             UpdateParryIndicator(Dist, fireDist, true)
             PrevBallPos=BPos; PrevBallTime=now
             return
         end
 
-        -- ── QUADRATIC TIME-TO-IMPACT ──────────────────────────────
-        if Speed > 75 then
-            local a2 = -0.5 * math.max(0, accel)
-            local b2 = -closingRate
-            local c2 = Dist - fireDist
-            local tti
-
-            if math.abs(a2) < 1e-4 then
-                tti = closingRate > 0 and (Dist - fireDist) / closingRate or nil
-            else
-                local disc = b2*b2 - 4*a2*c2
-                if disc >= 0 then
-                    local r1 = (-b2 - math.sqrt(disc)) / (2*a2)
-                    local r2 = (-b2 + math.sqrt(disc)) / (2*a2)
-                    tti = (r1 > 0 and r1) or (r2 > 0 and r2) or nil
+        -- ── SPEED-SCALED LOOKAHEAD ────────────────────────────────
+        -- Frames to look ahead scales with speed so fast balls never skip us
+        if Speed > 60 and isClosing then
+            local dt        = 1/60
+            local maxFrames = Speed > 220 and 4 or Speed > 160 and 3 or Speed > 100 and 2 or 1
+            for step = 1, maxFrames do
+                local nextPos  = BPos + Vel * (dt * step)
+                local nextDist = (HPos - nextPos).Magnitude
+                if nextDist <= fireDist then
+                    FireParry(Ball)
+                    UpdateParryIndicator(Dist, fireDist, true)
+                    return
                 end
-            end
-
-            if tti and tti >= 0 and tti <= 0.115 then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, fireDist, true)
-                return
-            end
-
-            -- ── CURVE LOOKAHEAD (3 frames) — lower trigger 10→6 deg/s ──
-            if curveRate > 6 and #freeCurveHist >= 3 then
-                local n   = #freeCurveHist
-                local dtC = freeCurveHist[n].t - freeCurveHist[n-1].t
-                if dtC > 0 then
-                    local angVel = (freeCurveHist[n].v - freeCurveHist[n-1].v) / dtC
-                    for step = 1, 3 do
-                        local dt      = (1/60) * step
-                        local predVel = Vel + angVel * dt
-                        local predPos = BPos + (Vel + predVel) * 0.5 * dt
-                        if (HPos - predPos).Magnitude <= fireDist + 0.4*step then
-                            FireParry(Ball)
-                            UpdateParryIndicator(Dist, fireDist, true)
-                            return
-                        end
-                    end
-                end
-            end
-
-            -- ── LINEAR FALLBACK ───────────────────────────────────
-            local pPos = BPos + Vel * (1/60 * 2.1)
-            if (HPos - pPos).Magnitude <= fireDist + 0.7 then
-                FireParry(Ball)
-                UpdateParryIndicator(Dist, fireDist, true)
-                return
             end
         end
 
@@ -1102,212 +1104,35 @@ local function StopEngine()
     S.DidParry          = false
     FreeLastParriedBall = nil
     PrevBallPos         = nil
-    freePosHist={}; freeAccelHist={}; freeCurveHist={}; freeSpeedHist={}
+    FreeSpeedHist       = {}  -- reset speed history so stale data doesn't bleed in
     if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
 end
 
+
 -- ══════════════════════════════════════════════════════════════════
--- PREMIUM PARRY ENGINE  ◈  V3 · God-tier · Adaptive CD · Ability-aware · 6-frame lookahead · Anti-stagger
+-- PREMIUM PARRY ENGINE  ◈  Blade Ball · Pure distance + dot-product · Tighter
+-- ══════════════════════════════════════════════════════════════════
+-- Same clean approach as free engine.
+-- Differences vs free:
+--   • Hitbox radius controlled by HitboxTarget slider (default 5.8)
+--   • Ping lead coefficient slightly smaller (tighter window)
+--   • 2-frame lookahead instead of 1 (covers speed boost edge cases)
+--   • God emergency fires at 2.5 studs regardless of dot product
+--   • Adaptive cooldown: shrinks at high ball speed
 -- ══════════════════════════════════════════════════════════════════
 
-local PremConn      = {}
-local premPosHist   = {}
-local premSpdHist   = {}
-local premAccelHist = {}
-local premCurveHist = {}
-local MAX_PREM_HIST = 18  -- deeper window for highest accuracy
-
--- Exponentially-weighted LSQ with heavier recent bias (alpha=0.35)
-local function premLSQRate()
-    local n = #premPosHist
-    if n < 4 then return 0 end
-    local sx,sy,sxy,sxx,sw = 0,0,0,0,0
-    local t0 = premPosHist[1].t
-    for i,p in ipairs(premPosHist) do
-        local w = math.exp((i - n) * 0.35)
-        local x = p.t - t0
-        sx=sx+w*x; sy=sy+w*p.d; sxy=sxy+w*x*p.d; sxx=sxx+w*x*x; sw=sw+w
-    end
-    local denom = sw*sxx - sx*sx
-    if math.abs(denom) < 1e-6 then return 0 end
-    return -(sw*sxy - sx*sy) / denom
-end
-
--- 5-point stencil acceleration for maximum smoothness
-local function premAccel()
-    local n = #premAccelHist
-    if n < 5 then return 0 end
-    local pts = {}
-    for i = n-4, n do table.insert(pts, premAccelHist[i]) end
-    local sum, cnt = 0, 0
-    for i = 1, #pts-1 do
-        local dt = pts[i+1].t - pts[i].t
-        if dt > 0 then
-            sum = sum + (pts[i+1].s - pts[i].s) / dt
-            cnt = cnt + 1
-        end
-    end
-    return cnt > 0 and sum/cnt or 0
-end
-
--- Premium curve rate: 5-sample window for sharper angular tracking
-local function premCurveRate()
-    local n = #premCurveHist
-    if n < 5 then return 0 end
-    local totalAngle, totalTime = 0, 0
-    for i = n-3, n do
-        local a = premCurveHist[i-1]
-        local b = premCurveHist[i]
-        if a.v.Magnitude > 1 and b.v.Magnitude > 1 then
-            local dot = math.clamp(a.v:Dot(b.v)/(a.v.Magnitude*b.v.Magnitude), -1, 1)
-            local dt  = b.t - a.t
-            if dt > 0 then
-                totalAngle = totalAngle + math.deg(math.acos(dot))
-                totalTime  = totalTime  + dt
-            end
-        end
-    end
-    return totalTime > 0 and (totalAngle/totalTime) or 0
-end
-
--- Premium adaptive cooldown: reads ball speed live and tightens/loosens
-local function AdaptPremCooldown(speed)
-    if     speed > 200 then PremCooldown = PremCooldownBase
-    elseif speed > 150 then PremCooldown = PremCooldownBase + 0.02
-    elseif speed > 100 then PremCooldown = PremCooldownBase + 0.04
-    elseif speed >  60 then PremCooldown = PremCooldownBase + 0.06
-    else                    PremCooldown = PremCooldownMax
-    end
-end
-
--- Speed spike: 4-tier rolling multiplier over last 6 samples
--- Premium detects spikes earlier (ratio 1.12+) and responds proportionally
-local function premSpikeMul(speed)
-    if #premSpdHist < 4 then return 1.0 end
-    local n  = #premSpdHist
-    local mx = 0
-    for i = math.max(1, n-5), n do
-        if premSpdHist[i] and premSpdHist[i].s > mx then mx = premSpdHist[i].s end
-    end
-    if mx > 0 then
-        local r = speed / mx
-        if r > 1.80 then return 1.38 end  -- extreme burst
-        if r > 1.55 then return 1.26 end  -- hard spike
-        if r > 1.30 then return 1.16 end  -- moderate spike
-        if r > 1.12 then return 1.07 end  -- early warning
-    end
-    return 1.0
-end
-
--- Ability-aware: detect which ability the shooter is using for precise lead
-local function premAbilityBias(shooterPlr)
-    if not shooterPlr or not shooterPlr.Character then return 0 end
-    -- Check attribute first (fastest path)
-    local aa = shooterPlr:GetAttribute("AbilityActive")
-    if aa then
-        local s = tostring(aa):lower()
-        if s:find("pull")     then return 4.5 end  -- pull teleports ball
-        if s:find("infinity") then return 3.2 end  -- infinity unpredictable speed
-        if s:find("dragon")   then return 2.8 end  -- dragon spirals
-        if s:find("fury")     then return 2.0 end  -- fury = fast return
-        if s:find("thunder")  then return 2.4 end
-        if s:find("phantom")  then return 1.8 end
-        if s:find("duality")  then return 2.0 end
-    end
-    -- Fallback: scan for particle emitters (heavier, runs less often)
-    for _,v in ipairs(shooterPlr.Character:GetDescendants()) do
-        if v:IsA("ParticleEmitter") then
-            local nm = v.Name:lower()
-            if nm:find("infinity") then return 3.0 end
-            if nm:find("dragon")   then return 2.6 end
-            if nm:find("fury")     then return 1.8 end
-        end
-    end
-    return 0
-end
-
--- Ability bias scan: find nearest non-self player to ball
-local function getPremAbilityBias(BPos)
-    local bestBias, bestDist = 0, 20
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p ~= Plr and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local d = (hrp.Position - BPos).Magnitude
-                if d < bestDist then
-                    bestDist = d
-                    bestBias = premAbilityBias(p)
-                end
-            end
-        end
-    end
-    return bestBias
-end
-
--- Premium adaptive fire distance — pixel-perfect hitbox, tighter than free
--- hitboxTarget is set by the premium hitbox slider (default ~11 studs)
-local function premFireDist(speed, closingRate, pingComp, curveRate, hitboxTarget)
-    local base = hitboxTarget + pingComp
-
-    -- Fine-grained speed scaling: each tier is 0.008 tighter than free engine
-    -- This keeps the fire window right at the hitbox boundary not past it
-    if     speed > 220 then base = base + (speed-220)*0.034
-    elseif speed > 160 then base = base + (speed-160)*0.024
-    elseif speed > 100 then base = base + (speed-100)*0.016
-    elseif speed >  60 then base = base + (speed- 60)*0.010
-    end
-
-    -- Closing rate: tighter coefficient than free (0.058 vs 0.065)
-    if closingRate > 30 then base = base + (closingRate-30)*0.058 end
-
-    -- Curve: kicks in at 5 deg/s (more sensitive than free's 8) for pixel-perfect curves
-    -- Cap tightened to 2.0 so we stay on the hitbox not outside it
-    if curveRate > 5 then base = base + math.min((curveRate-5)*0.032, 2.0) end
-
-    return base
-end
-
--- Ball speed warning — notifies when ball exceeds threshold
-local PremSpeedWarnThreshold = 160
-local PremLastSpeedWarn      = 0
-
-local function CheckBallSpeedWarning(speed)
-    if not PremiumUnlocked then return end
-    local now = os.clock()
-    if speed >= PremSpeedWarnThreshold and now - PremLastSpeedWarn > 2.5 then
-        PremLastSpeedWarn = now
-        pcall(function()
-            Rayfield:Notify({
-                Title   = "⚠ BALL SPEED ALERT",
-                Content = ("Ball at %d st/s — above threshold"):format(math.floor(speed)),
-                Duration= 1.5,
-                Image   = 4483362458,
-            })
-        end)
-    end
-end
-
-local function pushPremHist(dist, vel, t)
-    local spd = vel.Magnitude
-    table.insert(premPosHist,  {d=dist, t=t})
-    table.insert(premSpdHist,  {s=spd,  t=t})
-    table.insert(premAccelHist,{s=spd,  t=t})
-    table.insert(premCurveHist,{v=vel,  t=t})
-    if #premPosHist   > MAX_PREM_HIST then table.remove(premPosHist,1)   end
-    if #premSpdHist   > MAX_PREM_HIST then table.remove(premSpdHist,1)   end
-    if #premAccelHist > MAX_PREM_HIST then table.remove(premAccelHist,1) end
-    if #premCurveHist > MAX_PREM_HIST then table.remove(premCurveHist,1) end
-end
+local PREM_PING_LEAD_PER_100MS = 0.75  -- slightly tighter than free
+-- PremConn, AdaptPremCooldown, CheckBallSpeedWarning declared above (shared scope)
 
 local function StartPremiumEngine()
     if PremConn.Parry then PremConn.Parry:Disconnect() end
-    premPosHist={}; premSpdHist={}; premAccelHist={}; premCurveHist={}
+    PremSpeedHist = {}
     BuildParryIndicator()
 
     PremConn.Parry = RunService.PreSimulation:Connect(function()
         if not P.AutoParry then return end
         local Ball = GetBall()
-        if not Ball then premPosHist={}; return end
+        if not Ball then return end
         local HRP  = GetHRP(); if not HRP then return end
 
         local BPos  = Ball.Position
@@ -1319,17 +1144,17 @@ local function StartPremiumEngine()
 
         TrackParryHit(tgt)
 
-        -- Auto-retarget: face ball the moment it targets us
+        -- Auto-face
         if isTgt and P.AutoFace then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
 
-        -- Auto-disable on death / respawn
+        -- Auto-reset on death / respawn
         if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
             PremDidParry=false; PremLastParriedBall=nil; return
         end
 
-        -- God emergency: fire instantly if ball is right on us
+        -- God emergency: fire instantly at extreme close range
         if P.GodEmergency and isTgt and not PremDidParry and Dist <= 2.5 then
             PremiumFire(Ball)
             UpdateParryIndicator(Dist, Dist, true)
@@ -1337,7 +1162,6 @@ local function StartPremiumEngine()
         end
 
         if not isTgt then
-            premPosHist={}; premSpdHist={}
             UpdateParryIndicator(99, 1, false)
             return
         end
@@ -1346,78 +1170,86 @@ local function StartPremiumEngine()
         local Vel   = GetVel(Ball)
         local Speed = Vel.Magnitude
 
-        pushPremHist(Dist, Vel, now)
         AdaptPremCooldown(Speed)
         CheckBallSpeedWarning(Speed)
 
-        -- ── PREMIUM PREDICTION ────────────────────────────────────
-        local acc         = premAccel()
-        local curveRate   = premCurveRate()
-        local closingRate = premLSQRate()
+        -- ── DOT PRODUCT: closing check ────────────────────────────
+        local toPlayer  = HPos - BPos
+        local dotVal    = Vel:Dot(toPlayer)
+        local isClosing = dotVal > -(Speed * 0.12)  -- tighter tolerance than free
 
-        -- Project 35ms ahead + spike multiplier
-        local projSpeed = (Speed + math.max(0, acc) * 0.035) * premSpikeMul(Speed)
+        -- ── ADAPTIVE HITBOX  ──────────────────────────────────────
+        -- Premium version — tighter base, finer spike detection, acceleration
+        -- awareness using the last 8 speed samples (more history than free).
+        --
+        --   P.HitboxTarget = slider-set minimum (slow ball floor)
+        --   PREM_EXPAND    = max studs added at full speed (tighter than free)
+        --   acceleration   = detected from history → pre-inflates hitbox so
+        --                    a ball that is ACTIVELY SPEEDING UP gets a slightly
+        --                    bigger window before it arrives, not after.
 
-        -- Tighter ping formula (premium uses minimum-ping reader)
-        local pingComp = PingBonus * projSpeed * 1.32
-        if PingMs > 140 then pingComp = pingComp * 1.25 end
+        PremSpeedHist = PremSpeedHist or {}
+        table.insert(PremSpeedHist, Speed)
+        if #PremSpeedHist > 8 then table.remove(PremSpeedHist, 1) end
 
-        -- Ability-aware lead — scanned once per frame (cheap attr check first)
-        local abilBias = getPremAbilityBias(BPos)
+        -- Spike detection: ratio vs 4 samples ago
+        local premSpikeMul = 1.0
+        if #PremSpeedHist >= 5 then
+            local prev4 = PremSpeedHist[#PremSpeedHist - 4]
+            if prev4 and prev4 > 1 then
+                local ratio = Speed / prev4
+                if     ratio > 2.2 then premSpikeMul = 1.28
+                elseif ratio > 1.6 then premSpikeMul = 1.16
+                elseif ratio > 1.25 then premSpikeMul = 1.07
+                end
+            end
+        end
 
-        local fireDist = premFireDist(projSpeed, closingRate, pingComp, curveRate, P.HitboxTarget)
-        fireDist = fireDist + abilBias
+        -- Acceleration estimate (st/s²): positive = speeding up
+        local accel = 0
+        if #PremSpeedHist >= 3 then
+            local n   = #PremSpeedHist
+            local dv  = PremSpeedHist[n] - PremSpeedHist[n-2]
+            accel = dv / (2 / 60)  -- two frames apart at 60fps
+        end
+        -- Forward-compensate: if ball is accelerating, treat speed as slightly higher
+        local projSpeed = Speed + math.max(0, accel) * (1/60)
+
+        -- Smooth ease-out curve on projected speed (premium uses projected, not raw)
+        local PREM_SPD_REF = 240
+        local PREM_HB_MIN  = P.HitboxTarget            -- slider floor (default 4.0)
+        local PREM_HB_MAX  = P.HitboxTarget + 3.0      -- ceiling = floor + 3 studs
+        local t = math.clamp(projSpeed / PREM_SPD_REF, 0, 1)
+        -- ease-out cubic: fast ramp at low speed, plateau at high speed
+        local curve = 1 - (1 - t)^3
+        local dynamicHitbox = PREM_HB_MIN + (PREM_HB_MAX - PREM_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * premSpikeMul
+
+        -- Ping lead — tighter cap than free, scaled by speed
+        local pingScale = math.clamp(projSpeed / 100, 0.35, 1.0)
+        local pingLead  = (PingRaw / 1000) * projSpeed * PREM_PING_LEAD_PER_100MS / 0.1
+        pingLead = math.min(pingLead * pingScale, 2.4)
+
+        local fireDist = dynamicHitbox + pingLead
 
         UpdateParryIndicator(Dist, fireDist, false)
 
-        -- ── DISTANCE THRESHOLD ────────────────────────────────────
-        if Dist <= fireDist then
+        -- ── FIRE CHECK ────────────────────────────────────────────
+        if isClosing and Dist <= fireDist then
             PremiumFire(Ball)
             UpdateParryIndicator(Dist, fireDist, true)
             return
         end
 
-        -- ── 6-FRAME MULTI-LOOKAHEAD ───────────────────────────────
-        if Speed > 50 then
-            -- Straight-path projection with acceleration
-            for step = 1, 6 do
-                local dt       = (1/60) * step
-                local projDist = Dist
-                    - closingRate * dt
-                    - 0.5 * math.max(0, acc) * dt*dt
-                -- Tighter tolerance per frame (0.28 vs 0.38 in free)
-                -- Keeps premium pixel-perfect even at lookahead frame 6
-                if projDist <= fireDist + (0.28 * step) then
-                    PremiumFire(Ball)
-                    UpdateParryIndicator(Dist, fireDist, true)
-                    return
-                end
-            end
-
-            -- ── CURVED BALL 6-FRAME ───────────────────────────────
-            -- Premium curve trigger: 4 deg/s (more sensitive than free's 6 deg/s)
-            if curveRate > 4 and #premCurveHist >= 3 then
-                local n   = #premCurveHist
-                local dtC = premCurveHist[n].t - premCurveHist[n-1].t
-                if dtC > 0 then
-                    local angVel = (premCurveHist[n].v - premCurveHist[n-1].v) / dtC
-                    for step = 1, 6 do
-                        local dt      = (1/60) * step
-                        local predVel = Vel + angVel * dt
-                        local predPos = BPos + (Vel + predVel) * 0.5 * dt
-                        if (HPos - predPos).Magnitude <= fireDist + 0.24*step then
-                            PremiumFire(Ball)
-                            UpdateParryIndicator(Dist, fireDist, true)
-                            return
-                        end
-                    end
-                end
-            end
-
-            -- ── HIGH-SPEED FALLBACK ───────────────────────────────
-            if Speed > 120 then
-                local pPos = BPos + Vel * (1/60 * 1.8)
-                if (HPos - pPos).Magnitude <= fireDist + 0.5 then
+        -- ── SPEED-SCALED LOOKAHEAD ────────────────────────────────
+        -- Premium gets one more lookahead frame than free at all speed tiers
+        if Speed > 60 and isClosing then
+            local dt        = 1/60
+            local maxFrames = Speed > 220 and 5 or Speed > 160 and 4 or Speed > 100 and 3 or 2
+            for step = 1, maxFrames do
+                local nextPos  = BPos + Vel * (dt * step)
+                local nextDist = (HPos - nextPos).Magnitude
+                if nextDist <= fireDist then
                     PremiumFire(Ball)
                     UpdateParryIndicator(Dist, fireDist, true)
                     return
@@ -1431,9 +1263,10 @@ local function StopPremiumEngine()
     if PremConn.Parry then PremConn.Parry:Disconnect(); PremConn.Parry=nil end
     PremDidParry        = false
     PremLastParriedBall = nil
-    premPosHist={}; premSpdHist={}; premAccelHist={}; premCurveHist={}
+    PremSpeedHist       = {}  -- reset speed history so stale data doesn't bleed in
     if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
 end
+
 
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY ESP  ◈  Upgraded: cleaner cards, warn flash, tier badge
@@ -1867,11 +1700,7 @@ local function RunDetector(sigList, fireFn)
                 for _,sig in ipairs(sigList) do
                     if sig.check(char,p) then
                         Det.cds[cdKey]=now
-                        task.spawn(function()
-                            fireFn()
-                            Rayfield:Notify({Title="⚡ ABILITY DETECTED",
-                                Content=sig.name.." — parry fired!",Duration=1.2,Image=4483362458})
-                        end)
+                        fireFn()  -- no notification — caused frame drops
                         break
                     end
                 end
@@ -2021,359 +1850,740 @@ end
 Plr.CharacterAdded:Connect(function(char) task.wait(0.5); HookSwordApply(char) end)
 if Plr.Character then HookSwordApply(Plr.Character) end
 
--- ══════════════════════════════════════════════════════════════════
--- PREMIUM UNLOCK ANIMATION  ◈  Holographic scan lines + flash + sound
--- ══════════════════════════════════════════════════════════════════
-local function PlayUnlockAnimation()
-    task.spawn(function()
-        local AnimSG = Instance.new("ScreenGui")
-        AnimSG.Name           = "RyuuPremAnim"
-        AnimSG.ResetOnSpawn   = false
-        AnimSG.IgnoreGuiInset = true
-        AnimSG.DisplayOrder   = 99999
-        pcall(function() AnimSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
-        if not AnimSG.Parent then pcall(function() AnimSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-        -- ── SOUNDS ───────────────────────────────────────────────
-        local function playSound(id, vol, pitch)
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM FEATURES  ◈  State + All Functions
+-- ══════════════════════════════════════════════════════════════════
+
+-- ── PREMIUM STATE TABLE ───────────────────────────────────────────
+local PF = {
+    -- Parry extras
+    ParrySound     = false,
+    AntiBlock      = false,
+    TimingRandom   = false,
+    ComboTracker   = false,
+    ComboCount     = 0,
+    ComboLastParry = 0,
+    AutoChat       = false,
+    -- Prediction
+    TrajectoryESP  = false,
+    BallSpeedMeter = false,
+    TimeToImpact   = false,
+    TargetAlert    = false,
+    -- ESP / Visual
+    DistESP        = false,
+    Chams          = false,
+    BallHighlight  = false,
+    RainbowTrail   = false,
+    -- Movement
+    AutoDodge      = false,
+    SpeedOnParry   = false,
+    SpeedOnParryAmt= 40,
+    GhostMode      = false,
+    -- HUD / UI
+    PremFPS        = false,
+    PremFPSCap     = 0,
+    BallSpeedMeter = false,
+    KillTracker    = false,
+    KillCount      = 0,
+    PremWatermark  = false,
+    SafeZoneWarn   = false,
+}
+
+-- ── AUTO CHAT ──────────────────────────────────────────────────────
+local AUTO_CHAT_MSGS = {
+    "nice try 😏",
+    "too slow ⚡",
+    "skill issue 💯",
+    "not even close 🎯",
+    "touch grass 🌿",
+    "L + ratio 😴",
+}
+local AutoChatIdx = 1
+local AutoChatLastTime = 0
+
+local function DoAutoChat()
+    if not PF.AutoChat or not PremiumUnlocked then return end
+    local now = os.clock()
+    if now - AutoChatLastTime < 3 then return end  -- cooldown
+    AutoChatLastTime = now
+    local msg = AUTO_CHAT_MSGS[AutoChatIdx]
+    AutoChatIdx = (AutoChatIdx % #AUTO_CHAT_MSGS) + 1
+    pcall(function()
+        local ts = game:GetService("TextService")
+        local chatSvc = game:GetService("Chat")
+        chatSvc:Chat(Plr.Character and Plr.Character:FindFirstChild("Head"), msg, Enum.ChatColor.White)
+    end)
+    -- Fallback: use StarterGui chat
+    pcall(function()
+        game:GetService("ReplicatedStorage"):FindFirstChild("DefaultChatSystemChatEvents")
+            :FindFirstChild("SayMessageRequest"):FireServer(msg, "All")
+    end)
+end
+
+-- ── KILL TRACKER WIDGET ────────────────────────────────────────────
+local KillSG = nil
+local KillLbl = nil
+
+local function BuildKillWidget()
+    if KillSG then pcall(function() KillSG:Destroy() end) end
+    KillSG = Instance.new("ScreenGui")
+    KillSG.Name = "RyuuKills"; KillSG.ResetOnSpawn = false
+    KillSG.IgnoreGuiInset = true; KillSG.DisplayOrder = 9992
+    pcall(function() KillSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not KillSG.Parent then pcall(function() KillSG.Parent=Plr:WaitForChild("PlayerGui") end) end
+
+    local KFrame = Instance.new("Frame", KillSG)
+    KFrame.AnchorPoint = Vector2.new(1,0)
+    KFrame.Position = UDim2.new(1,-14,0,130)
+    KFrame.Size = UDim2.new(0,150,0,46)
+    KFrame.BackgroundColor3 = Color3.fromRGB(5,12,20)
+    KFrame.BackgroundTransparency = 0.2; KFrame.BorderSizePixel = 0
+    Instance.new("UICorner",KFrame).CornerRadius = UDim.new(0,10)
+    local KStr = Instance.new("UIStroke",KFrame)
+    KStr.Thickness = 1.2; KStr.Color = Color3.fromRGB(255,60,60); KStr.Transparency = 0.3
+
+    local KAccent = Instance.new("Frame",KFrame)
+    KAccent.Size = UDim2.new(1,0,0,2); KAccent.BackgroundColor3 = Color3.fromRGB(255,60,60)
+    KAccent.BorderSizePixel = 0
+    Instance.new("UICorner",KAccent).CornerRadius = UDim.new(0,10)
+
+    local KTitle = Instance.new("TextLabel",KFrame)
+    KTitle.Size = UDim2.new(1,-8,0,13); KTitle.Position = UDim2.new(0,6,0,6)
+    KTitle.BackgroundTransparency = 1; KTitle.Text = "☠  KILLS"
+    KTitle.Font = Enum.Font.GothamBlack; KTitle.TextSize = 9
+    KTitle.TextColor3 = Color3.fromRGB(255,80,80); KTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+    KillLbl = Instance.new("TextLabel",KFrame)
+    KillLbl.Size = UDim2.new(1,-8,0,22); KillLbl.Position = UDim2.new(0,6,0,20)
+    KillLbl.BackgroundTransparency = 1; KillLbl.Text = "0"
+    KillLbl.Font = Enum.Font.GothamBlack; KillLbl.TextSize = 20
+    KillLbl.TextColor3 = Color3.fromRGB(255,90,90); KillLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local KGrad = Instance.new("UIGradient",KillLbl)
+    KGrad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(255,60,60)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(255,160,80))}
+end
+
+local function IncrementKill()
+    if not PF.KillTracker or not PremiumUnlocked then return end
+    PF.KillCount = PF.KillCount + 1
+    pcall(function()
+        if KillLbl then KillLbl.Text = tostring(PF.KillCount) end
+    end)
+    Rayfield:Notify({Title="☠ Kill Tracked",
+        Content="Offensive parries: "..PF.KillCount,Duration=2,Image=4483362458})
+end
+
+-- ── TRAJECTORY ESP ─────────────────────────────────────────────────
+local TrajSG = nil
+local TrajConnActive = false
+
+local function BuildTrajectoryESP()
+    if TrajSG then pcall(function() TrajSG:Destroy() end) end
+    TrajSG = Instance.new("ScreenGui")
+    TrajSG.Name = "RyuuTraj"; TrajSG.ResetOnSpawn = false
+    TrajSG.IgnoreGuiInset = true; TrajSG.DisplayOrder = 9989
+    pcall(function() TrajSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not TrajSG.Parent then pcall(function() TrajSG.Parent=Plr:WaitForChild("PlayerGui") end) end
+
+    -- Neon line (solid) from ball position to predicted impact
+    local Line = Instance.new("Frame", TrajSG)
+    Line.BackgroundColor3 = Color3.fromRGB(255,60,60)
+    Line.BorderSizePixel = 0; Line.ZIndex = 5; Line.Visible = false
+    Instance.new("UICorner",Line).CornerRadius = UDim.new(1,0)
+    -- Glow behind line
+    local LineGlow = Instance.new("Frame", TrajSG)
+    LineGlow.BackgroundColor3 = Color3.fromRGB(255,80,80)
+    LineGlow.BackgroundTransparency = 0.7; LineGlow.BorderSizePixel = 0; LineGlow.ZIndex = 4; LineGlow.Visible = false
+    Instance.new("UICorner",LineGlow).CornerRadius = UDim.new(1,0)
+    -- Arrow tip triangle (just a rotated frame)
+    local Arrow = Instance.new("Frame", TrajSG)
+    Arrow.AnchorPoint = Vector2.new(0.5,0.5)
+    Arrow.Size = UDim2.new(0,10,0,10); Arrow.BorderSizePixel = 0
+    Arrow.BackgroundColor3 = Color3.fromRGB(255,60,60); Arrow.ZIndex = 6; Arrow.Visible = false
+    Instance.new("UICorner",Arrow).CornerRadius = UDim.new(0,2)
+
+    TrajConnActive = true
+    RunService.Heartbeat:Connect(function()
+        if not PF.TrajectoryESP or not PremiumUnlocked then
+            Line.Visible = false; LineGlow.Visible = false; Arrow.Visible = false; return
+        end
+        local ball = GetBall(); if not ball then Line.Visible=false; LineGlow.Visible=false; Arrow.Visible=false; return end
+        local hrp = GetHRP(); if not hrp then Line.Visible=false; LineGlow.Visible=false; Arrow.Visible=false; return end
+        local vel = GetVel(ball); local spd = vel.Magnitude
+        if spd < 2 then Line.Visible=false; LineGlow.Visible=false; Arrow.Visible=false; return end
+
+        local isTgt = (ball:GetAttribute("target") or "") == Plr.Name
+        local ahead = ball.Position + vel.Unit * math.min(spd * 0.5, 50)
+        local sp1, on1 = Cam:WorldToViewportPoint(ball.Position)
+        local sp2, on2 = Cam:WorldToViewportPoint(ahead)
+        if not on1 then Line.Visible=false; LineGlow.Visible=false; Arrow.Visible=false; return end
+
+        local dx = sp2.X - sp1.X; local dy = sp2.Y - sp1.Y
+        local len = math.sqrt(dx*dx + dy*dy)
+        if len < 3 then return end
+        local rot = math.deg(math.atan2(dy, dx))
+        local col = isTgt and Color3.fromRGB(255,50,50) or Color3.fromRGB(0,200,255)
+        local glowCol = isTgt and Color3.fromRGB(255,100,100) or Color3.fromRGB(60,210,255)
+
+        pcall(function()
+            Line.Visible=true; Line.BackgroundColor3=col
+            Line.Size=UDim2.new(0,len,0,2)
+            Line.Position=UDim2.new(0,sp1.X,0,sp1.Y-1)
+            Line.Rotation=rot
+            LineGlow.Visible=true; LineGlow.BackgroundColor3=glowCol
+            LineGlow.Size=UDim2.new(0,len,0,6)
+            LineGlow.Position=UDim2.new(0,sp1.X,0,sp1.Y-3)
+            LineGlow.Rotation=rot
+            -- Arrow tip at end point
+            Arrow.Visible=true; Arrow.BackgroundColor3=col
+            Arrow.Position=UDim2.new(0,sp2.X,0,sp2.Y)
+            Arrow.Rotation=rot+45
+        end)
+    end)
+end
+
+-- ── DIST ESP HEARTBEAT LOOP ────────────────────────────────────────
+local DistESPBBs = {}
+
+local function UpdateDistESP()
+    -- Clean dead entries
+    for plr,bb in pairs(DistESPBBs) do
+        if not plr.Parent then
+            pcall(function() bb:Destroy() end); DistESPBBs[plr]=nil
+        end
+    end
+    if not PF.DistESP or not PremiumUnlocked then
+        for _,bb in pairs(DistESPBBs) do pcall(function() bb:Destroy() end) end
+        DistESPBBs = {}; return
+    end
+    local hrp = GetHRP(); if not hrp then return end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p == Plr then continue end
+        local char = p.Character; if not char then continue end
+        local head = char:FindFirstChild("Head"); if not head then continue end
+        local pHRP = char:FindFirstChild("HumanoidRootPart"); if not pHRP then continue end
+        if not DistESPBBs[p] or not DistESPBBs[p].Parent then
+            local bb = Instance.new("BillboardGui")
+            bb.Name="RyuuDistESP"; bb.AlwaysOnTop=true
+            bb.Size=UDim2.new(0,90,0,18); bb.StudsOffset=Vector3.new(0,3,0)
+            bb.MaxDistance=130; bb.Parent=head
+            local lbl = Instance.new("TextLabel",bb)
+            lbl.Name="D"; lbl.Size=UDim2.new(1,0,1,0); lbl.BackgroundTransparency=1
+            lbl.Font=Enum.Font.GothamBold; lbl.TextSize=11; lbl.TextStrokeTransparency=0.5
+            lbl.TextColor3=Color3.fromRGB(0,220,255)
+            DistESPBBs[p] = bb
+        end
+        local dist = (hrp.Position - pHRP.Position).Magnitude
+        local lbl = DistESPBBs[p]:FindFirstChild("D")
+        if lbl then
+            local col = dist<12 and Color3.fromRGB(255,70,70) or dist<35 and Color3.fromRGB(255,200,40) or Color3.fromRGB(0,220,255)
+            lbl.Text = ("%.0f st  %s"):format(dist, p.Name)
+            lbl.TextColor3 = col
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if PF.DistESP and PremiumUnlocked then UpdateDistESP() end
+end)
+
+-- ── CHAMS ──────────────────────────────────────────────────────────
+local ChamParts = {}
+
+local function ApplyChams(on)
+    if not on then
+        for part, data in pairs(ChamParts) do
             pcall(function()
-                local s = Instance.new("Sound", workspace)
-                s.SoundId   = "rbxassetid://"..id
-                s.Volume    = vol or 0.6
-                s.PlaybackSpeed = pitch or 1
-                s.RollOffMaxDistance = 0
-                s:Play()
-                game:GetService("Debris"):AddItem(s, 4)
+                if part and part.Parent then
+                    part.Material = data.mat; part.Color = data.col
+                end
             end)
         end
-
-        -- ── PHASE 1: Flash white then go dark ────────────────────
-        local Flash = Instance.new("Frame", AnimSG)
-        Flash.Size = UDim2.new(1,0,1,0)
-        Flash.BackgroundColor3 = Color3.fromRGB(255,255,255)
-        Flash.BackgroundTransparency = 0
-        Flash.BorderSizePixel = 0
-        Flash.ZIndex = 100
-
-        -- Camera shutter / unlock crack sound
-        playSound(6042053626, 0.8, 1.4)
-
-        TweenService:Create(Flash, TweenInfo.new(0.18, Enum.EasingStyle.Quad),
-            {BackgroundTransparency=1}):Play()
-        task.wait(0.22)
-
-        -- ── DARK BASE ─────────────────────────────────────────────
-        local BG = Instance.new("Frame", AnimSG)
-        BG.Size = UDim2.new(1,0,1,0)
-        BG.BackgroundColor3 = Color3.fromRGB(2,1,6)
-        BG.BackgroundTransparency = 0
-        BG.BorderSizePixel = 0
-        BG.ZIndex = 1
-
-        -- ── SCAN LINES ────────────────────────────────────────────
-        -- Dense horizontal lines across the entire screen
-        local ScanContainer = Instance.new("Frame", AnimSG)
-        ScanContainer.Size = UDim2.new(1,0,1,0)
-        ScanContainer.BackgroundTransparency = 1
-        ScanContainer.BorderSizePixel = 0
-        ScanContainer.ZIndex = 2
-        ScanContainer.ClipsDescendants = true
-
-        local lineCount = 40
-        local scanLines = {}
-        for i = 1, lineCount do
-            local line = Instance.new("Frame", ScanContainer)
-            line.Size = UDim2.new(1,0,0,1)
-            line.Position = UDim2.new(0,0, (i-1)/lineCount, 0)
-            line.BackgroundColor3 = Color3.fromRGB(80,220,255)
-            line.BackgroundTransparency = 0.72
-            line.BorderSizePixel = 0
-            line.ZIndex = 2
-            table.insert(scanLines, line)
-        end
-
-        -- Animate scan lines: sweep downward then flicker
-        local scanRunning = true
-        task.spawn(function()
-            local offset = 0
-            while scanRunning do
-                offset = (offset + 0.018) % 1
-                for i, line in ipairs(scanLines) do
-                    local base = (i-1)/lineCount
-                    local y = (base + offset) % 1
-                    local brightness = math.abs(math.sin(y * math.pi * 3))
-                    line.BackgroundTransparency = 0.55 + brightness * 0.38
-                    line.Position = UDim2.new(0,0, y, 0)
+        ChamParts = {}; return
+    end
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p ~= Plr and p.Character then
+            for _,part in ipairs(p.Character:GetDescendants()) do
+                if part:IsA("BasePart") and not ChamParts[part] then
+                    ChamParts[part] = {mat=part.Material, col=part.Color}
+                    pcall(function()
+                        part.Material = Enum.Material.Neon
+                        part.Color = Color3.fromRGB(0,200,255)
+                    end)
                 end
-                task.wait(0.02)
+            end
+        end
+    end
+end
+
+-- New players auto-cham
+Players.PlayerAdded:Connect(function(p)
+    p.CharacterAdded:Connect(function()
+        task.wait(1)
+        if PF.Chams and PremiumUnlocked then ApplyChams(true) end
+    end)
+end)
+
+-- ── TIME TO IMPACT (TTI) ───────────────────────────────────────────
+local TTISg = nil
+
+local function BuildTTI()
+    if TTISg then pcall(function() TTISg:Destroy() end) end
+    TTISg = Instance.new("ScreenGui")
+    TTISg.Name="RyuuTTI"; TTISg.ResetOnSpawn=false
+    TTISg.IgnoreGuiInset=true; TTISg.DisplayOrder=9991
+    pcall(function() TTISg.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not TTISg.Parent then pcall(function() TTISg.Parent=Plr:WaitForChild("PlayerGui") end) end
+
+    local TTIFrame = Instance.new("Frame",TTISg)
+    TTIFrame.AnchorPoint=Vector2.new(0.5,0); TTIFrame.Position=UDim2.new(0.5,0,0,20)
+    TTIFrame.Size=UDim2.new(0,150,0,30); TTIFrame.BackgroundColor3=Color3.fromRGB(4,12,20)
+    TTIFrame.BackgroundTransparency=0.18; TTIFrame.BorderSizePixel=0; TTIFrame.Visible=false
+    Instance.new("UICorner",TTIFrame).CornerRadius=UDim.new(0,8)
+    local TTIStr=Instance.new("UIStroke",TTIFrame)
+    TTIStr.Thickness=1.2; TTIStr.Color=Color3.fromRGB(0,180,255); TTIStr.Transparency=0.3
+
+    local TTILabel=Instance.new("TextLabel",TTIFrame)
+    TTILabel.Size=UDim2.new(1,0,1,0); TTILabel.BackgroundTransparency=1
+    TTILabel.Text="⏱  --.-s"; TTILabel.Font=Enum.Font.GothamBold; TTILabel.TextSize=13
+    TTILabel.TextColor3=Color3.fromRGB(0,220,255)
+
+    RunService.Heartbeat:Connect(function()
+        if not PF.TimeToImpact or not PremiumUnlocked then
+            pcall(function() TTIFrame.Visible=false end); return
+        end
+        local ball=GetBall(); local hrp=GetHRP()
+        if not ball or not hrp then TTIFrame.Visible=false; return end
+        local tgt=ball:GetAttribute("target") or ""
+        if tgt~=Plr.Name then TTIFrame.Visible=false; return end
+        local vel=GetVel(ball); local spd=vel.Magnitude
+        if spd<1 then TTIFrame.Visible=false; return end
+        local dist=(hrp.Position-ball.Position).Magnitude
+        local tti=dist/spd
+        local col=tti<0.3 and Color3.fromRGB(255,60,60) or tti<0.6 and Color3.fromRGB(255,200,40) or Color3.fromRGB(0,220,255)
+        pcall(function()
+            TTIFrame.Visible=true
+            TTILabel.Text=("⏱  %.2fs"):format(tti)
+            TTILabel.TextColor3=col; TTIStr.Color=col
+        end)
+    end)
+end
+
+-- ── BALL SPEED METER ───────────────────────────────────────────────
+local SpeedMeterSG = nil
+
+local function BuildSpeedMeter()
+    if SpeedMeterSG then pcall(function() SpeedMeterSG:Destroy() end) end
+    SpeedMeterSG = Instance.new("ScreenGui")
+    SpeedMeterSG.Name="RyuuSpeedMeter"; SpeedMeterSG.ResetOnSpawn=false
+    SpeedMeterSG.IgnoreGuiInset=true; SpeedMeterSG.DisplayOrder=9993
+    pcall(function() SpeedMeterSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not SpeedMeterSG.Parent then pcall(function() SpeedMeterSG.Parent=Plr:WaitForChild("PlayerGui") end) end
+
+    local SMFrame=Instance.new("Frame",SpeedMeterSG)
+    SMFrame.AnchorPoint=Vector2.new(0.5,1); SMFrame.Position=UDim2.new(0.5,0,1,-60)
+    SMFrame.Size=UDim2.new(0,200,0,62); SMFrame.BackgroundColor3=Color3.fromRGB(4,12,20)
+    SMFrame.BackgroundTransparency=0.18; SMFrame.BorderSizePixel=0
+    Instance.new("UICorner",SMFrame).CornerRadius=UDim.new(0,10)
+    local SMStr=Instance.new("UIStroke",SMFrame)
+    SMStr.Thickness=1.2; SMStr.Color=Color3.fromRGB(0,180,255); SMStr.Transparency=0.3
+
+    local SMAccent=Instance.new("Frame",SMFrame)
+    SMAccent.Size=UDim2.new(1,0,0,2); SMAccent.BackgroundColor3=Color3.fromRGB(0,200,255)
+    SMAccent.BorderSizePixel=0
+    Instance.new("UICorner",SMAccent).CornerRadius=UDim.new(0,10)
+
+    local SMTitle=Instance.new("TextLabel",SMFrame)
+    SMTitle.Size=UDim2.new(1,-8,0,13); SMTitle.Position=UDim2.new(0,8,0,5)
+    SMTitle.BackgroundTransparency=1; SMTitle.Text="⚡  BALL SPEED"
+    SMTitle.Font=Enum.Font.GothamBlack; SMTitle.TextSize=9
+    SMTitle.TextColor3=Color3.fromRGB(0,170,220); SMTitle.TextXAlignment=Enum.TextXAlignment.Left
+
+    local SMVal=Instance.new("TextLabel",SMFrame)
+    SMVal.Size=UDim2.new(0,100,0,22); SMVal.Position=UDim2.new(0,8,0,20)
+    SMVal.BackgroundTransparency=1; SMVal.Text="-- st/s"
+    SMVal.Font=Enum.Font.GothamBlack; SMVal.TextSize=18
+    SMVal.TextColor3=Color3.fromRGB(0,220,255); SMVal.TextXAlignment=Enum.TextXAlignment.Left
+
+    -- Mini bar graph (12 bars)
+    local GraphBG=Instance.new("Frame",SMFrame)
+    GraphBG.Size=UDim2.new(1,-16,0,16); GraphBG.Position=UDim2.new(0,8,0,44)
+    GraphBG.BackgroundColor3=Color3.fromRGB(0,20,35); GraphBG.BorderSizePixel=0
+    Instance.new("UICorner",GraphBG).CornerRadius=UDim.new(0,4)
+
+    local graphBars={}
+    for i=1,12 do
+        local bar=Instance.new("Frame",GraphBG)
+        bar.AnchorPoint=Vector2.new(0,1); bar.Position=UDim2.new(0,(i-1)*15,1,-1)
+        bar.Size=UDim2.new(0,10,0,2); bar.BackgroundColor3=Color3.fromRGB(0,180,255)
+        bar.BorderSizePixel=0
+        Instance.new("UICorner",bar).CornerRadius=UDim.new(0,2)
+        table.insert(graphBars,bar)
+    end
+
+    local speedHist={}
+    RunService.Heartbeat:Connect(function()
+        if not PF.BallSpeedMeter or not PremiumUnlocked then return end
+        local ball=GetBall(); if not ball then return end
+        local spd=GetVel(ball).Magnitude
+        table.insert(speedHist,spd); if #speedHist>12 then table.remove(speedHist,1) end
+        local maxS=1
+        for _,v in ipairs(speedHist) do if v>maxS then maxS=v end end
+        pcall(function()
+            local col=spd>220 and Color3.fromRGB(255,70,70) or spd>120 and Color3.fromRGB(255,200,40) or Color3.fromRGB(0,220,255)
+            SMVal.Text=("%.0f st/s"):format(spd); SMVal.TextColor3=col; SMStr.Color=col
+            for i,bar in ipairs(graphBars) do
+                local h=speedHist[i] or 0
+                local ratio=math.clamp(h/maxS,0,1)
+                bar.Size=UDim2.new(0,10,0,math.max(2,math.floor(ratio*14)))
+                bar.BackgroundColor3=h>220 and Color3.fromRGB(255,70,70) or h>120 and Color3.fromRGB(255,180,40) or Color3.fromRGB(0,180,255)
             end
         end)
+    end)
+end
 
-        -- ── VERTICAL SCAN SWEEP LINE ──────────────────────────────
-        -- A single bright vertical bar sweeping left to right
-        local VSweep = Instance.new("Frame", AnimSG)
-        VSweep.Size = UDim2.new(0,3,1,0)
-        VSweep.Position = UDim2.new(-0.05,0,0,0)
-        VSweep.BackgroundColor3 = Color3.fromRGB(120,240,255)
-        VSweep.BackgroundTransparency = 0.3
-        VSweep.BorderSizePixel = 0
-        VSweep.ZIndex = 8
-        local VSweepGlow = Instance.new("UIGradient", VSweep)
-        VSweepGlow.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180,255,255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-        }
-        VSweepGlow.Rotation = 90
+-- ── TARGET ALERT (red edge flash) ─────────────────────────────────
+local AlertSG = nil
+local alertActive = false
 
-        -- Wider glow trail
-        local VSweepBloom = Instance.new("Frame", AnimSG)
-        VSweepBloom.Size = UDim2.new(0,40,1,0)
-        VSweepBloom.Position = UDim2.new(-0.1,0,0,0)
-        VSweepBloom.BackgroundColor3 = Color3.fromRGB(60,180,255)
-        VSweepBloom.BackgroundTransparency = 0.82
-        VSweepBloom.BorderSizePixel = 0
-        VSweepBloom.ZIndex = 7
-        local BloomGrad = Instance.new("UIGradient", VSweepBloom)
-        BloomGrad.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(60,180,255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
-        }
+local function BuildTargetAlert()
+    if AlertSG then pcall(function() AlertSG:Destroy() end) end
+    AlertSG=Instance.new("ScreenGui")
+    AlertSG.Name="RyuuAlert"; AlertSG.ResetOnSpawn=false
+    AlertSG.IgnoreGuiInset=true; AlertSG.DisplayOrder=9990
+    pcall(function() AlertSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not AlertSG.Parent then pcall(function() AlertSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-        -- Holo scan sound (electric hum)
-        playSound(9119713951, 0.5, 1.0)
+    local function makeEdge(size, pos)
+        local f=Instance.new("Frame",AlertSG)
+        f.Size=size; f.Position=pos; f.BackgroundColor3=Color3.fromRGB(255,50,50)
+        f.BackgroundTransparency=1; f.BorderSizePixel=0; f.ZIndex=5; return f
+    end
+    local edges={
+        makeEdge(UDim2.new(1,0,0,5), UDim2.new(0,0,0,0)),   -- top
+        makeEdge(UDim2.new(1,0,0,5), UDim2.new(0,0,1,-5)),   -- bottom
+        makeEdge(UDim2.new(0,5,1,0), UDim2.new(0,0,0,0)),    -- left
+        makeEdge(UDim2.new(0,5,1,0), UDim2.new(1,-5,0,0)),   -- right
+    }
 
-        -- Sweep across in 0.55s
-        TweenService:Create(VSweep, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {Position=UDim2.new(1.05,0,0,0)}):Play()
-        TweenService:Create(VSweepBloom, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {Position=UDim2.new(1.0,0,0,0)}):Play()
-
-        task.wait(0.2)
-
-        -- ── HOLOGRAPHIC GRID OVERLAY ──────────────────────────────
-        -- Vertical grid lines fading in
-        local GridContainer = Instance.new("Frame", AnimSG)
-        GridContainer.Size = UDim2.new(1,0,1,0)
-        GridContainer.BackgroundTransparency = 1
-        GridContainer.BorderSizePixel = 0
-        GridContainer.ZIndex = 3
-
-        local gridCols = 14
-        for i = 1, gridCols do
-            local vl = Instance.new("Frame", GridContainer)
-            vl.Size = UDim2.new(0,1,1,0)
-            vl.Position = UDim2.new(i/gridCols,0,0,0)
-            vl.BackgroundColor3 = Color3.fromRGB(0,160,220)
-            vl.BackgroundTransparency = 0.88
-            vl.BorderSizePixel = 0
-            vl.ZIndex = 3
+    RunService.Heartbeat:Connect(function()
+        if not PF.TargetAlert or not PremiumUnlocked then
+            for _,e in ipairs(edges) do pcall(function() e.BackgroundTransparency=1 end) end
+            alertActive=false; return
         end
-        local gridRows = 8
-        for i = 1, gridRows do
-            local hl = Instance.new("Frame", GridContainer)
-            hl.Size = UDim2.new(1,0,0,1)
-            hl.Position = UDim2.new(0,0,i/gridRows,0)
-            hl.BackgroundColor3 = Color3.fromRGB(0,160,220)
-            hl.BackgroundTransparency = 0.88
-            hl.BorderSizePixel = 0
-            hl.ZIndex = 3
+        local ball=GetBall(); if not ball then return end
+        local nowTgt=(ball:GetAttribute("target") or "")==Plr.Name
+        if nowTgt then
+            local t=os.clock()*8
+            local alpha=math.abs(math.sin(t))*0.6+0.05
+            for _,e in ipairs(edges) do pcall(function() e.BackgroundTransparency=1-alpha end) end
+        else
+            for _,e in ipairs(edges) do pcall(function() e.BackgroundTransparency=1 end) end
         end
+    end)
+end
 
-        task.wait(0.38)
+-- ── SAFE ZONE WARNING (vignette) ───────────────────────────────────
+local SafeZoneSG=nil
 
-        -- ── CENTER CARD ───────────────────────────────────────────
-        local Card = Instance.new("Frame", AnimSG)
-        Card.AnchorPoint = Vector2.new(0.5,0.5)
-        Card.Position    = UDim2.new(0.5,0,0.5,0)
-        Card.Size        = UDim2.new(0,0,0,0)
-        Card.BackgroundColor3 = Color3.fromRGB(4,14,22)
-        Card.BackgroundTransparency = 0
-        Card.BorderSizePixel = 0
-        Card.ZIndex = 10
-        Instance.new("UICorner", Card).CornerRadius = UDim.new(0,16)
+local function BuildSafeZoneWarning()
+    if SafeZoneSG then pcall(function() SafeZoneSG:Destroy() end) end
+    SafeZoneSG=Instance.new("ScreenGui")
+    SafeZoneSG.Name="RyuuSafeZone"; SafeZoneSG.ResetOnSpawn=false
+    SafeZoneSG.IgnoreGuiInset=true; SafeZoneSG.DisplayOrder=9988
+    pcall(function() SafeZoneSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not SafeZoneSG.Parent then pcall(function() SafeZoneSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-        -- Card border — cyan holo glow
-        local CardStroke = Instance.new("UIStroke", Card)
-        CardStroke.Thickness = 1.8
-        CardStroke.Color     = Color3.fromRGB(0,210,255)
-        CardStroke.Transparency = 0.1
+    -- Orange vignette edges
+    local function makeVig(size,pos)
+        local f=Instance.new("Frame",SafeZoneSG)
+        f.Size=size; f.Position=pos; f.BackgroundColor3=Color3.fromRGB(255,130,0)
+        f.BackgroundTransparency=1; f.BorderSizePixel=0; f.ZIndex=3; return f
+    end
+    local vigEdges={
+        makeVig(UDim2.new(1,0,0,8),UDim2.new(0,0,0,0)),
+        makeVig(UDim2.new(1,0,0,8),UDim2.new(0,0,1,-8)),
+        makeVig(UDim2.new(0,8,1,0),UDim2.new(0,0,0,0)),
+        makeVig(UDim2.new(0,8,1,0),UDim2.new(1,-8,0,0)),
+    }
+    local WarnLbl=Instance.new("TextLabel",SafeZoneSG)
+    WarnLbl.AnchorPoint=Vector2.new(0.5,0); WarnLbl.Position=UDim2.new(0.5,0,0,8)
+    WarnLbl.Size=UDim2.new(0,160,0,20); WarnLbl.BackgroundTransparency=1
+    WarnLbl.Text="⚠  EXPOSED — STAY ALERT"; WarnLbl.Font=Enum.Font.GothamBold; WarnLbl.TextSize=11
+    WarnLbl.TextColor3=Color3.fromRGB(255,160,30); WarnLbl.Visible=false; WarnLbl.ZIndex=4
 
-        -- Card inner gradient
-        local CardGrad = Instance.new("UIGradient", Card)
-        CardGrad.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0,   Color3.fromRGB(5,20,35)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(3,10,18)),
-            ColorSequenceKeypoint.new(1,   Color3.fromRGB(5,20,35)),
-        }
-        CardGrad.Rotation = 135
-
-        -- Pop card open
-        playSound(4590662766, 0.65, 1.1)
-        TweenService:Create(Card,
-            TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            {Size=UDim2.new(0,340,0,160)}):Play()
-        task.wait(0.22)
-
-        -- Top cyan accent bar on card
-        local Accent = Instance.new("Frame", Card)
-        Accent.Size = UDim2.new(1,0,0,2)
-        Accent.Position = UDim2.new(0,0,0,0)
-        Accent.BackgroundColor3 = Color3.fromRGB(0,210,255)
-        Accent.BorderSizePixel = 0
-        Accent.ZIndex = 11
-        Instance.new("UICorner", Accent).CornerRadius = UDim.new(0,16)
-
-        -- Small holo badge top-right
-        local Badge = Instance.new("TextLabel", Card)
-        Badge.AnchorPoint = Vector2.new(1,0)
-        Badge.Position = UDim2.new(1,-10,0,8)
-        Badge.Size = UDim2.new(0,72,0,18)
-        Badge.BackgroundColor3 = Color3.fromRGB(0,50,80)
-        Badge.BorderSizePixel = 0
-        Badge.Text = "PREMIUM"
-        Badge.Font = Enum.Font.GothamBlack
-        Badge.TextSize = 9
-        Badge.TextColor3 = Color3.fromRGB(0,220,255)
-        Badge.TextTransparency = 1
-        Badge.ZIndex = 12
-        Instance.new("UICorner", Badge).CornerRadius = UDim.new(0,5)
-        local BadgeStroke = Instance.new("UIStroke", Badge)
-        BadgeStroke.Thickness = 1; BadgeStroke.Color = Color3.fromRGB(0,180,255)
-        TweenService:Create(Badge, TweenInfo.new(0.18), {TextTransparency=0}):Play()
-
-        -- ◈ icon
-        local IconLbl = Instance.new("TextLabel", Card)
-        IconLbl.AnchorPoint = Vector2.new(0,0.5)
-        IconLbl.Position = UDim2.new(0,18,0,62)
-        IconLbl.Size = UDim2.new(0,44,0,44)
-        IconLbl.BackgroundTransparency = 1
-        IconLbl.Text = "◈"
-        IconLbl.Font = Enum.Font.GothamBlack
-        IconLbl.TextSize = 36
-        IconLbl.TextColor3 = Color3.fromRGB(0,210,255)
-        IconLbl.TextTransparency = 1
-        IconLbl.ZIndex = 12
-        TweenService:Create(IconLbl, TweenInfo.new(0.2), {TextTransparency=0}):Play()
-
-        -- Main headline
-        local Headline = Instance.new("TextLabel", Card)
-        Headline.AnchorPoint = Vector2.new(0,0.5)
-        Headline.Position = UDim2.new(0,70,0,52)
-        Headline.Size = UDim2.new(1,-80,0,30)
-        Headline.BackgroundTransparency = 1
-        Headline.Text = "UNLOCKED"
-        Headline.Font = Enum.Font.GothamBlack
-        Headline.TextSize = 28
-        Headline.TextTransparency = 1
-        Headline.TextXAlignment = Enum.TextXAlignment.Left
-        Headline.ZIndex = 12
-        local HLGrad = Instance.new("UIGradient", Headline)
-        HLGrad.Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0,   Color3.fromRGB(0,200,255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255,255,255)),
-            ColorSequenceKeypoint.new(1,   Color3.fromRGB(0,200,255)),
-        }
-        TweenService:Create(Headline, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            {TextTransparency=0}):Play()
-
-        -- Sub line
-        local SubLbl = Instance.new("TextLabel", Card)
-        SubLbl.AnchorPoint = Vector2.new(0,0.5)
-        SubLbl.Position = UDim2.new(0,70,0,82)
-        SubLbl.Size = UDim2.new(1,-80,0,16)
-        SubLbl.BackgroundTransparency = 1
-        SubLbl.Text = "Ryuu's HUB  ·  All premium features active"
-        SubLbl.Font = Enum.Font.Gotham
-        SubLbl.TextSize = 10
-        SubLbl.TextColor3 = Color3.fromRGB(0,160,200)
-        SubLbl.TextTransparency = 1
-        SubLbl.TextXAlignment = Enum.TextXAlignment.Left
-        SubLbl.ZIndex = 12
-        TweenService:Create(SubLbl, TweenInfo.new(0.2), {TextTransparency=0}):Play()
-
-        -- Divider inside card
-        local CDivider = Instance.new("Frame", Card)
-        CDivider.Size = UDim2.new(0,0,0,1)
-        CDivider.Position = UDim2.new(0,18,0,104)
-        CDivider.BackgroundColor3 = Color3.fromRGB(0,160,210)
-        CDivider.BorderSizePixel = 0
-        CDivider.ZIndex = 11
-        TweenService:Create(CDivider, TweenInfo.new(0.3, Enum.EasingStyle.Quad),
-            {Size=UDim2.new(1,-36,0,1)}):Play()
-
-        -- Feature tags at bottom of card
-        local tagNames = {"Auto Parry", "Ability Det.", "Prem ESP", "Quintic Pred."}
-        for i, tag in ipairs(tagNames) do
-            local tf = Instance.new("TextLabel", Card)
-            tf.Size = UDim2.new(0,72,0,16)
-            tf.Position = UDim2.new(0, 18+(i-1)*78, 0, 116)
-            tf.BackgroundColor3 = Color3.fromRGB(0,35,55)
-            tf.BorderSizePixel = 0
-            tf.Text = tag
-            tf.Font = Enum.Font.GothamBold
-            tf.TextSize = 9
-            tf.TextColor3 = Color3.fromRGB(0,180,230)
-            tf.TextTransparency = 1
-            tf.ZIndex = 12
-            Instance.new("UICorner", tf).CornerRadius = UDim.new(0,4)
-            local tfs = Instance.new("UIStroke", tf)
-            tfs.Thickness=1; tfs.Color=Color3.fromRGB(0,140,190); tfs.Transparency=0.4
-            TweenService:Create(tf, TweenInfo.new(0.18, Enum.EasingStyle.Quad),
-                {TextTransparency=0}):Play()
-            task.wait(0.06)
+    RunService.Heartbeat:Connect(function()
+        if not PF.SafeZoneWarn or not PremiumUnlocked then
+            for _,e in ipairs(vigEdges) do pcall(function() e.BackgroundTransparency=1 end) end
+            pcall(function() WarnLbl.Visible=false end); return
         end
-
-        -- ── SECOND SWEEP: confirm sweep right to left ─────────────
-        task.wait(0.1)
-        playSound(6042053626, 0.5, 0.85)
-        local VSweep2 = Instance.new("Frame", AnimSG)
-        VSweep2.Size = UDim2.new(0,2,1,0)
-        VSweep2.Position = UDim2.new(1.05,0,0,0)
-        VSweep2.BackgroundColor3 = Color3.fromRGB(80,255,200)
-        VSweep2.BackgroundTransparency = 0.4
-        VSweep2.BorderSizePixel = 0
-        VSweep2.ZIndex = 9
-        TweenService:Create(VSweep2, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {Position=UDim2.new(-0.05,0,0,0)}):Play()
-        task.wait(0.45)
-
-        -- ── BORDER GLOW PULSE ─────────────────────────────────────
-        TweenService:Create(CardStroke, TweenInfo.new(0.15),
-            {Color=Color3.fromRGB(255,255,255), Thickness=3}):Play()
-        task.wait(0.15)
-        TweenService:Create(CardStroke, TweenInfo.new(0.4),
-            {Color=Color3.fromRGB(0,210,255), Thickness=1.8}):Play()
-
-        -- ── SCAN LINE FLICKER THEN FADE ───────────────────────────
-        task.wait(0.6)
-        scanRunning = false
-        TweenService:Create(ScanContainer, TweenInfo.new(0.3),
-            {BackgroundTransparency=1}):Play()
-        for _, line in ipairs(scanLines) do
-            TweenService:Create(line, TweenInfo.new(0.3),
-                {BackgroundTransparency=1}):Play()
+        local ball=GetBall()
+        local exposed=ball and (ball:GetAttribute("target") or "")==Plr.Name
+        if exposed then
+            local t=os.clock()*3
+            local alpha=math.abs(math.sin(t))*0.45+0.05
+            for _,e in ipairs(vigEdges) do pcall(function() e.BackgroundTransparency=1-alpha end) end
+            pcall(function() WarnLbl.Visible=true end)
+        else
+            for _,e in ipairs(vigEdges) do pcall(function() e.BackgroundTransparency=1 end) end
+            pcall(function() WarnLbl.Visible=false end)
         end
-        TweenService:Create(GridContainer, TweenInfo.new(0.4),
-            {BackgroundTransparency=1}):Play()
+    end)
+end
 
-        task.wait(1.2)
+-- ── PREMIUM WATERMARK ──────────────────────────────────────────────
+local WatermarkSG=nil
 
-        -- ── FADE OUT ──────────────────────────────────────────────
-        local ft = TweenInfo.new(0.35)
-        TweenService:Create(BG,    ft, {BackgroundTransparency=1}):Play()
-        TweenService:Create(Card,  ft, {BackgroundTransparency=1}):Play()
-        TweenService:Create(CardStroke, ft, {Transparency=1}):Play()
-        TweenService:Create(Headline, ft, {TextTransparency=1}):Play()
-        TweenService:Create(SubLbl,   ft, {TextTransparency=1}):Play()
-        TweenService:Create(IconLbl,  ft, {TextTransparency=1}):Play()
-        TweenService:Create(Badge,    ft, {TextTransparency=1}):Play()
-        TweenService:Create(Accent, ft, {BackgroundTransparency=1}):Play()
-        TweenService:Create(CDivider, ft, {BackgroundTransparency=1}):Play()
+local function BuildWatermark()
+    if WatermarkSG then pcall(function() WatermarkSG:Destroy() end) end
+    WatermarkSG=Instance.new("ScreenGui")
+    WatermarkSG.Name="RyuuWatermark"; WatermarkSG.ResetOnSpawn=false
+    WatermarkSG.IgnoreGuiInset=true; WatermarkSG.DisplayOrder=9987
+    pcall(function() WatermarkSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not WatermarkSG.Parent then pcall(function() WatermarkSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-        task.wait(0.4)
-        pcall(function() AnimSG:Destroy() end)
+    local WMFrame=Instance.new("Frame",WatermarkSG)
+    WMFrame.AnchorPoint=Vector2.new(0,1); WMFrame.Position=UDim2.new(0,10,1,-10)
+    WMFrame.Size=UDim2.new(0,190,0,28); WMFrame.BackgroundColor3=Color3.fromRGB(3,10,20)
+    WMFrame.BackgroundTransparency=0.2; WMFrame.BorderSizePixel=0
+    Instance.new("UICorner",WMFrame).CornerRadius=UDim.new(0,8)
+    local WMStr=Instance.new("UIStroke",WMFrame)
+    WMStr.Thickness=1; WMStr.Color=Color3.fromRGB(0,180,255); WMStr.Transparency=0.3
+    local WMAccent=Instance.new("Frame",WMFrame)
+    WMAccent.Size=UDim2.new(1,0,0,2); WMAccent.BackgroundColor3=Color3.fromRGB(0,200,255)
+    WMAccent.BorderSizePixel=0
+    Instance.new("UICorner",WMAccent).CornerRadius=UDim.new(0,8)
+
+    local WMLbl=Instance.new("TextLabel",WMFrame)
+    WMLbl.Size=UDim2.new(1,-8,1,0); WMLbl.Position=UDim2.new(0,8,0,0)
+    WMLbl.BackgroundTransparency=1; WMLbl.Text="◈  Ryuu HUB V2  ·  PREMIUM"
+    WMLbl.Font=Enum.Font.GothamBold; WMLbl.TextSize=10
+    WMLbl.TextColor3=Color3.fromRGB(0,200,255); WMLbl.TextXAlignment=Enum.TextXAlignment.Left
+    local WMGrad=Instance.new("UIGradient",WMLbl)
+    WMGrad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(0,160,255)),
+        ColorSequenceKeypoint.new(0.5,Color3.fromRGB(140,255,255)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(0,160,255))}
+
+    task.spawn(function()
+        local rot=0
+        while WatermarkSG and WatermarkSG.Parent do
+            rot=(rot+0.6)%360; pcall(function() WMGrad.Rotation=rot end); task.wait(0.016)
+        end
+    end)
+end
+
+-- ── COMBO TRACKER WIDGET ───────────────────────────────────────────
+local ComboSG=nil
+local ComboFrame=nil
+local ComboLbl2=nil
+
+local function BuildComboWidget()
+    if ComboSG then pcall(function() ComboSG:Destroy() end) end
+    ComboSG=Instance.new("ScreenGui")
+    ComboSG.Name="RyuuCombo"; ComboSG.ResetOnSpawn=false
+    ComboSG.IgnoreGuiInset=true; ComboSG.DisplayOrder=9994
+    pcall(function() ComboSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not ComboSG.Parent then pcall(function() ComboSG.Parent=Plr:WaitForChild("PlayerGui") end) end
+
+    ComboFrame=Instance.new("Frame",ComboSG)
+    ComboFrame.AnchorPoint=Vector2.new(0.5,0)
+    ComboFrame.Position=UDim2.new(0.5,0,0,80)
+    ComboFrame.Size=UDim2.new(0,160,0,58)
+    ComboFrame.BackgroundColor3=Color3.fromRGB(6,3,14)
+    ComboFrame.BackgroundTransparency=0.15; ComboFrame.BorderSizePixel=0
+    Instance.new("UICorner",ComboFrame).CornerRadius=UDim.new(0,12)
+    local CStr=Instance.new("UIStroke",ComboFrame)
+    CStr.Thickness=1.4; CStr.Color=Color3.fromRGB(0,200,255); CStr.Transparency=0.2
+
+    local CAccent=Instance.new("Frame",ComboFrame)
+    CAccent.Size=UDim2.new(1,0,0,2); CAccent.BackgroundColor3=Color3.fromRGB(0,200,255)
+    CAccent.BorderSizePixel=0; Instance.new("UICorner",CAccent).CornerRadius=UDim.new(0,12)
+
+    local CTitle=Instance.new("TextLabel",ComboFrame)
+    CTitle.Size=UDim2.new(1,0,0,14); CTitle.Position=UDim2.new(0,0,0,6)
+    CTitle.BackgroundTransparency=1; CTitle.Text="COMBO STREAK"
+    CTitle.Font=Enum.Font.GothamBold; CTitle.TextSize=8
+    CTitle.TextColor3=Color3.fromRGB(0,130,180)
+
+    ComboLbl2=Instance.new("TextLabel",ComboFrame)
+    ComboLbl2.Size=UDim2.new(1,0,0,30); ComboLbl2.Position=UDim2.new(0,0,0,18)
+    ComboLbl2.BackgroundTransparency=1; ComboLbl2.Text="0×"
+    ComboLbl2.Font=Enum.Font.GothamBlack; ComboLbl2.TextSize=26
+    ComboLbl2.TextColor3=Color3.fromRGB(0,220,255)
+
+    local CSub=Instance.new("TextLabel",ComboFrame)
+    CSub.Size=UDim2.new(1,0,0,12); CSub.Position=UDim2.new(0,0,0,46)
+    CSub.BackgroundTransparency=1; CSub.Text="— drag to reposition —"
+    CSub.Font=Enum.Font.Gotham; CSub.TextSize=7
+    CSub.TextColor3=Color3.fromRGB(40,80,100)
+
+    -- Drag logic
+    local dragging,dragStart,startPos=false,nil,nil
+    ComboFrame.InputBegan:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 then
+            dragging=true; dragStart=inp.Position; startPos=ComboFrame.Position
+        end
+    end)
+    UIS.InputChanged:Connect(function(inp)
+        if not dragging then return end
+        if inp.UserInputType==Enum.UserInputType.MouseMovement then
+            local d=inp.Position-dragStart
+            ComboFrame.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,
+                startPos.Y.Scale,startPos.Y.Offset+d.Y)
+        end
+    end)
+    UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end
+    end)
+end
+
+local function UpdateCombo(scored)
+    if not PF.ComboTracker or not PremiumUnlocked then return end
+    if not ComboFrame then return end
+    local now=os.clock()
+    if scored then
+        if now-PF.ComboLastParry<5 then PF.ComboCount=PF.ComboCount+1 else PF.ComboCount=1 end
+        PF.ComboLastParry=now
+        pcall(function()
+            ComboLbl2.Text=PF.ComboCount.."×"
+            local hue=math.clamp(PF.ComboCount/25,0,1)
+            ComboLbl2.TextColor3=Color3.fromHSV(0.56-hue*0.22,1,1)
+            TweenService:Create(ComboFrame,TweenInfo.new(0.08,Enum.EasingStyle.Back,Enum.EasingDirection.Out),
+                {Size=UDim2.new(0,180,0,68)}):Play()
+            task.delay(0.14,function()
+                pcall(function()
+                    TweenService:Create(ComboFrame,TweenInfo.new(0.2),
+                        {Size=UDim2.new(0,160,0,58)}):Play()
+                end)
+            end)
+        end)
+    end
+    task.delay(5.1,function()
+        if os.clock()-PF.ComboLastParry>=5 then
+            PF.ComboCount=0
+            pcall(function() ComboLbl2.Text="0×"; ComboLbl2.TextColor3=Color3.fromRGB(0,220,255) end)
+        end
+    end)
+end
+
+-- ── SPEED BOOST ON PARRY ───────────────────────────────────────────
+local function ApplySpeedBoost()
+    if not PF.SpeedOnParry or not PremiumUnlocked then return end
+    local char=Plr.Character; if not char then return end
+    local hum=char:FindFirstChildOfClass("Humanoid"); if not hum then return end
+    hum.WalkSpeed=PF.SpeedOnParryAmt
+    task.delay(0.8,function()
+        pcall(function() if hum and hum.Parent then hum.WalkSpeed=S.WalkSpeed end end)
+    end)
+end
+
+-- ── GHOST MODE ─────────────────────────────────────────────────────
+local function ApplyGhost(on)
+    local char=Plr.Character; if not char then return end
+    for _,p in ipairs(char:GetDescendants()) do
+        if p:IsA("BasePart") then
+            pcall(function()
+                p.LocalTransparencyModifier=on and 0.85 or 0
+                p.CanCollide=not on
+            end)
+        end
+    end
+end
+
+-- ── BALL HIGHLIGHT ─────────────────────────────────────────────────
+local BallHighlightConn=nil
+
+local function StartBallHighlight()
+    if BallHighlightConn then BallHighlightConn:Disconnect() end
+    BallHighlightConn=RunService.Heartbeat:Connect(function()
+        if not PF.BallHighlight or not PremiumUnlocked then
+            BallHighlightConn:Disconnect(); BallHighlightConn=nil; return
+        end
+        local ball=GetBall(); if not ball then return end
+        local isTgt=(ball:GetAttribute("target") or "")==Plr.Name
+        pcall(function()
+            ball.Material=Enum.Material.Neon
+            ball.Color=isTgt and Color3.fromRGB(255,50,50) or Color3.fromRGB(80,220,255)
+        end)
+    end)
+end
+
+-- ── RAINBOW TRAIL ──────────────────────────────────────────────────
+local RainbowTrailConn=nil
+local RainbowHue=0
+
+local function StartRainbowTrail()
+    if RainbowTrailConn then RainbowTrailConn:Disconnect() end
+    RainbowTrailConn=RunService.Heartbeat:Connect(function(dt)
+        if not PF.RainbowTrail or not PremiumUnlocked then
+            RainbowTrailConn:Disconnect(); RainbowTrailConn=nil; return
+        end
+        RainbowHue=(RainbowHue+dt*0.45)%1
+        local ball=GetBall(); if not ball then return end
+        pcall(function() ball.Color=Color3.fromHSV(RainbowHue,1,1); ball.Material=Enum.Material.Neon end)
+    end)
+end
+
+-- ── AUTO DODGE ─────────────────────────────────────────────────────
+local DodgeConn=nil
+
+local function StartAutoDodge()
+    if DodgeConn then DodgeConn:Disconnect() end
+    DodgeConn=RunService.Heartbeat:Connect(function()
+        if not PF.AutoDodge or not PremiumUnlocked then
+            DodgeConn:Disconnect(); DodgeConn=nil; return
+        end
+        local ball=GetBall(); if not ball then return end
+        local hrp=GetHRP(); if not hrp then return end
+        if (ball:GetAttribute("target") or "")~=Plr.Name then return end
+        local dist=(hrp.Position-ball.Position).Magnitude
+        if dist>10 then return end
+        local vel=GetVel(ball); if vel.Magnitude<8 then return end
+        local away=(hrp.Position-ball.Position).Unit
+        away=Vector3.new(away.X,0,away.Z)
+        pcall(function() hrp.CFrame=hrp.CFrame+away*0.55 end)
+    end)
+end
+
+-- ── PREMIUM FPS UNLOCKER ───────────────────────────────────────────
+local function SetPremFPS(on, cap)
+    if on then
+        pcall(function() setfpscap(cap or 0) end)
+        pcall(function() game:GetService("RunService"):Set60FpsThrottleEnabled(false) end)
+    else
+        pcall(function() setfpscap(60) end)
+    end
+end
+
+-- ── ANTI-BLOCK ─────────────────────────────────────────────────────
+local AntiBlockConn=nil
+local BLOCK_SIGS={"Forcefield","Guardian","Reaper","Titan","Flash"}
+
+local function StartAntiBlock()
+    if AntiBlockConn then AntiBlockConn:Disconnect() end
+    local lastFire=0
+    AntiBlockConn=RunService.Heartbeat:Connect(function()
+        if not PF.AntiBlock or not PremiumUnlocked then
+            AntiBlockConn:Disconnect(); AntiBlockConn=nil; return
+        end
+        local now=os.clock(); if now-lastFire<0.6 then return end
+        local hrp=GetHRP(); if not hrp then return end
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p==Plr then continue end
+            local char=p.Character; if not char then continue end
+            local pHRP=char:FindFirstChild("HumanoidRootPart"); if not pHRP then continue end
+            if (hrp.Position-pHRP.Position).Magnitude>22 then continue end
+            for _,sig in ipairs(BLOCK_SIGS) do
+                local found=false
+                pcall(function()
+                    for _,v in ipairs(char:GetDescendants()) do
+                        if tostring(v.Name):lower():find(sig:lower()) then found=true; break end
+                    end
+                end)
+                if found then lastFire=now; pcall(PremiumFire); break end
+            end
+        end
     end)
 end
 
@@ -2709,38 +2919,397 @@ end})
 -- ── TAB: PREMIUM ──────────────────────────────────────────────────
 local PT=W:CreateTab("✨ Premium",nil)
 
-PT:CreateSection("🔑 Whitelist Key")
-PT:CreateLabel("Paste the key you received from the Discord bot below.")
-PT:CreateInput({
-    Name="Your Key",PlaceholderText="ENTER KEY HERE",
-    RemoveTextAfterFocusLost=false,Flag="WLKey",
-    Callback=function(val) EnteredKey=val or "" end,
-})
+PT:CreateSection("🔑 Premium Key Scanner")
+PT:CreateLabel("Click below to open the holographic key scanner.")
+PT:CreateButton({Name="◈  Open Key Scanner",Callback=function()
+    -- ── HOLOGRAPHIC KEY SCANNER OVERLAY ──────────────────────────
+    task.spawn(function()
+        local KSG = Instance.new("ScreenGui")
+        KSG.Name="RyuuKeyScanner"; KSG.ResetOnSpawn=false
+        KSG.IgnoreGuiInset=true; KSG.DisplayOrder=99998
+        pcall(function() KSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+        if not KSG.Parent then pcall(function() KSG.Parent=Plr:WaitForChild("PlayerGui") end) end
 
-PT:CreateButton({Name="✅ Unlock Premium",Callback=function()
-    local key=EnteredKey:match("^%s*(.-)%s*$") or ""
-    if key=="" then
-        pcall(function()
-            if Rayfield.Flags.WLKey and Rayfield.Flags.WLKey.Value then
-                key=Rayfield.Flags.WLKey.Value:match("^%s*(.-)%s*$")
+        local function playSound(id, vol, pitch)
+            pcall(function()
+                local s=Instance.new("Sound",workspace); s.SoundId="rbxassetid://"..id
+                s.Volume=vol or 0.6; s.PlaybackSpeed=pitch or 1; s.RollOffMaxDistance=0
+                s:Play(); game:GetService("Debris"):AddItem(s,4)
+            end)
+        end
+
+        -- Dark overlay base
+        local Overlay = Instance.new("Frame", KSG)
+        Overlay.Size=UDim2.new(1,0,1,0); Overlay.BackgroundColor3=Color3.fromRGB(2,1,6)
+        Overlay.BackgroundTransparency=1; Overlay.BorderSizePixel=0; Overlay.ZIndex=1
+        TweenService:Create(Overlay, TweenInfo.new(0.22, Enum.EasingStyle.Quad),
+            {BackgroundTransparency=0.35}):Play()
+
+        -- Radial glow
+        local Glow = Instance.new("Frame", Overlay)
+        Glow.AnchorPoint=Vector2.new(0.5,0.5); Glow.Position=UDim2.new(0.5,0,0.5,0)
+        Glow.Size=UDim2.new(0,700,0,400); Glow.BackgroundColor3=Color3.fromRGB(60,10,150)
+        Glow.BackgroundTransparency=0.92; Glow.BorderSizePixel=0; Glow.ZIndex=1
+        Instance.new("UICorner",Glow).CornerRadius=UDim.new(1,0)
+
+        -- Scan-line grid
+        local ScanCont = Instance.new("Frame", KSG)
+        ScanCont.Size=UDim2.new(1,0,1,0); ScanCont.BackgroundTransparency=1
+        ScanCont.BorderSizePixel=0; ScanCont.ZIndex=2; ScanCont.ClipsDescendants=true
+        local kScanLines = {}
+        local kscanRunning = true
+        for i = 1, 40 do
+            local line = Instance.new("Frame", ScanCont)
+            line.Size=UDim2.new(1,0,0,1); line.Position=UDim2.new(0,0,(i-1)/40,0)
+            line.BackgroundColor3=Color3.fromRGB(80,220,255); line.BackgroundTransparency=0.75
+            line.BorderSizePixel=0; line.ZIndex=2
+            table.insert(kScanLines, line)
+        end
+        -- Vert grid
+        local KGrid = Instance.new("Frame", KSG)
+        KGrid.Size=UDim2.new(1,0,1,0); KGrid.BackgroundTransparency=1; KGrid.ZIndex=2
+        for i = 1, 14 do
+            local vl=Instance.new("Frame",KGrid); vl.Size=UDim2.new(0,1,1,0)
+            vl.Position=UDim2.new(i/14,0,0,0); vl.BackgroundColor3=Color3.fromRGB(0,160,220)
+            vl.BackgroundTransparency=0.90; vl.BorderSizePixel=0; vl.ZIndex=2
+        end
+        for i = 1, 8 do
+            local hl=Instance.new("Frame",KGrid); hl.Size=UDim2.new(1,0,0,1)
+            hl.Position=UDim2.new(0,0,i/8,0); hl.BackgroundColor3=Color3.fromRGB(0,160,220)
+            hl.BackgroundTransparency=0.90; hl.BorderSizePixel=0; hl.ZIndex=2
+        end
+
+        -- Scan line animation
+        task.spawn(function()
+            local offset = 0
+            while kscanRunning do
+                offset = (offset + 0.018) % 1
+                for i, line in ipairs(kScanLines) do
+                    local y = ((i-1)/40 + offset) % 1
+                    local brightness = math.abs(math.sin(y * math.pi * 3))
+                    pcall(function()
+                        line.BackgroundTransparency = 0.55 + brightness * 0.38
+                        line.Position = UDim2.new(0,0,y,0)
+                    end)
+                end
+                task.wait(0.02)
             end
         end)
-    end
-    if #key<8 then
-        Rayfield:Notify({Title="⚠️ No Key",Content="Enter a valid key first.",Duration=4}); return
-    end
-    local result=ValidateKey(key)
-    if result=="ok" then
-        PremiumUnlocked=true; PremiumActive=true
-        task.spawn(RemovePremiumLock)
-        task.spawn(PlayUnlockAnimation)
-        Rayfield:Notify({Title="✨ Premium Unlocked!",Content="Welcome to Ryuu V2 Premium.",Duration=5,Image=4483362458})
-        if S.AutoParry then StopEngine(); task.wait(0.05); P.AutoParry=true; StartPremiumEngine() end
-    elseif result=="locked_other" then
-        Rayfield:Notify({Title="🔒 Key In Use",Content="Bound to another device.",Duration=5,Image=4483362458})
-    else
-        Rayfield:Notify({Title="❌ Invalid Key",Content="Check your Discord key.",Duration=4,Image=4483362458})
-    end
+
+        -- Vertical sweep beam
+        playSound(9119713951, 0.4, 1.0)
+        local KVSweep = Instance.new("Frame", KSG)
+        KVSweep.Size=UDim2.new(0,3,1,0); KVSweep.Position=UDim2.new(-0.05,0,0,0)
+        KVSweep.BackgroundColor3=Color3.fromRGB(120,240,255); KVSweep.BackgroundTransparency=0.3
+        KVSweep.BorderSizePixel=0; KVSweep.ZIndex=8
+        local KVG=Instance.new("UIGradient",KVSweep)
+        KVG.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(0,0,0)),
+            ColorSequenceKeypoint.new(0.5,Color3.fromRGB(180,255,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0))}
+        KVG.Rotation=90
+        TweenService:Create(KVSweep, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Position=UDim2.new(1.05,0,0,0)}):Play()
+        task.wait(0.3)
+
+        -- ── SCANNER CARD ─────────────────────────────────────────
+        local KCard = Instance.new("Frame", KSG)
+        KCard.AnchorPoint=Vector2.new(0.5,0.5); KCard.Position=UDim2.new(0.5,0,0.6,0)
+        KCard.Size=UDim2.new(0,0,0,0); KCard.BackgroundColor3=Color3.fromRGB(4,14,22)
+        KCard.BackgroundTransparency=0; KCard.BorderSizePixel=0; KCard.ZIndex=10
+        Instance.new("UICorner",KCard).CornerRadius=UDim.new(0,16)
+        local KCStroke=Instance.new("UIStroke",KCard)
+        KCStroke.Thickness=1.8; KCStroke.Color=Color3.fromRGB(0,210,255); KCStroke.Transparency=0.1
+        local KCGrad=Instance.new("UIGradient",KCard)
+        KCGrad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(5,20,35)),
+            ColorSequenceKeypoint.new(0.5,Color3.fromRGB(3,10,18)),ColorSequenceKeypoint.new(1,Color3.fromRGB(5,20,35))}
+        KCGrad.Rotation=135
+        local KAccent=Instance.new("Frame",KCard)
+        KAccent.Size=UDim2.new(1,0,0,2); KAccent.Position=UDim2.new(0,0,0,0)
+        KAccent.BackgroundColor3=Color3.fromRGB(0,210,255); KAccent.BorderSizePixel=0; KAccent.ZIndex=11
+        Instance.new("UICorner",KAccent).CornerRadius=UDim.new(0,16)
+
+        -- Title row
+        local KIcon=Instance.new("TextLabel",KCard)
+        KIcon.Position=UDim2.new(0,14,0,10); KIcon.Size=UDim2.new(0,28,0,28)
+        KIcon.BackgroundTransparency=1; KIcon.Text="🔑"; KIcon.Font=Enum.Font.GothamBlack
+        KIcon.TextSize=20; KIcon.TextColor3=Color3.fromRGB(0,210,255); KIcon.ZIndex=12
+        local KTitle=Instance.new("TextLabel",KCard)
+        KTitle.Position=UDim2.new(0,46,0,10); KTitle.Size=UDim2.new(1,-100,0,26)
+        KTitle.BackgroundTransparency=1; KTitle.Text="PREMIUM KEY SCANNER"
+        KTitle.Font=Enum.Font.GothamBlack; KTitle.TextSize=14
+        KTitle.TextColor3=Color3.fromRGB(0,210,255); KTitle.ZIndex=12; KTitle.TextXAlignment=Enum.TextXAlignment.Left
+        local KSub=Instance.new("TextLabel",KCard)
+        KSub.Position=UDim2.new(0,46,0,30); KSub.Size=UDim2.new(1,-100,0,14)
+        KSub.BackgroundTransparency=1; KSub.Text="Enter your Ryuu HUB V2 premium key"
+        KSub.Font=Enum.Font.Gotham; KSub.TextSize=9
+        KSub.TextColor3=Color3.fromRGB(0,140,180); KSub.ZIndex=12; KSub.TextXAlignment=Enum.TextXAlignment.Left
+
+        -- Close X
+        local KClose=Instance.new("TextButton",KCard)
+        KClose.AnchorPoint=Vector2.new(1,0); KClose.Position=UDim2.new(1,-10,0,8)
+        KClose.Size=UDim2.new(0,22,0,22); KClose.BackgroundTransparency=1
+        KClose.Text="✕"; KClose.Font=Enum.Font.GothamBold; KClose.TextSize=14
+        KClose.TextColor3=Color3.fromRGB(0,140,180); KClose.ZIndex=13
+        KClose.MouseButton1Click:Connect(function()
+            kscanRunning=false
+            TweenService:Create(Overlay,TweenInfo.new(0.25),{BackgroundTransparency=1}):Play()
+            task.wait(0.28); pcall(function() KSG:Destroy() end)
+        end)
+
+        -- Divider
+        local KDiv=Instance.new("Frame",KCard)
+        KDiv.Size=UDim2.new(1,-24,0,1); KDiv.Position=UDim2.new(0,12,0,50)
+        KDiv.BackgroundColor3=Color3.fromRGB(0,140,180); KDiv.BorderSizePixel=0; KDiv.ZIndex=11
+
+        -- Input BG
+        local KInputBG=Instance.new("Frame",KCard)
+        KInputBG.Size=UDim2.new(1,-24,0,36); KInputBG.Position=UDim2.new(0,12,0,58)
+        KInputBG.BackgroundColor3=Color3.fromRGB(3,12,22); KInputBG.BorderSizePixel=0; KInputBG.ZIndex=11
+        Instance.new("UICorner",KInputBG).CornerRadius=UDim.new(0,10)
+        local KInputStroke=Instance.new("UIStroke",KInputBG)
+        KInputStroke.Thickness=1.2; KInputStroke.Color=Color3.fromRGB(0,140,200); KInputStroke.Transparency=0.2
+
+        local KInput=Instance.new("TextBox",KInputBG)
+        KInput.Size=UDim2.new(1,-14,1,0); KInput.Position=UDim2.new(0,8,0,0)
+        KInput.BackgroundTransparency=1; KInput.PlaceholderText="Enter premium key..."
+        KInput.PlaceholderColor3=Color3.fromRGB(0,80,120); KInput.Text=""
+        KInput.Font=Enum.Font.GothamBold; KInput.TextSize=13
+        KInput.TextColor3=Color3.fromRGB(150,230,255); KInput.ZIndex=12
+        KInput.ClearTextOnFocus=false; KInput.TextXAlignment=Enum.TextXAlignment.Left
+
+        -- Blinking cursor
+        local KCursor=Instance.new("Frame",KInputBG)
+        KCursor.Size=UDim2.new(0,2,0,16); KCursor.AnchorPoint=Vector2.new(0,0.5)
+        KCursor.Position=UDim2.new(0,9,0.5,0); KCursor.BackgroundColor3=Color3.fromRGB(0,200,255)
+        KCursor.BorderSizePixel=0; KCursor.ZIndex=13
+        local cursorOn=true
+        task.spawn(function()
+            while kscanRunning do
+                pcall(function() KCursor.BackgroundTransparency=cursorOn and 0 or 1; cursorOn=not cursorOn end)
+                task.wait(0.5)
+            end
+        end)
+
+        -- Scan dots row
+        local KDotsFrame=Instance.new("Frame",KCard)
+        KDotsFrame.Size=UDim2.new(1,-24,0,10); KDotsFrame.Position=UDim2.new(0,12,0,100)
+        KDotsFrame.BackgroundTransparency=1; KDotsFrame.ZIndex=11
+        local kDots={}
+        for i=1,10 do
+            local d=Instance.new("Frame",KDotsFrame)
+            d.Size=UDim2.new(0,7,0,5); d.Position=UDim2.new(0,(i-1)*12,0,2)
+            d.BackgroundColor3=Color3.fromRGB(0,80,140); d.BackgroundTransparency=0.4
+            d.BorderSizePixel=0; d.ZIndex=12
+            Instance.new("UICorner",d).CornerRadius=UDim.new(1,0)
+            table.insert(kDots,d)
+        end
+        local dotsActive=true
+        task.spawn(function()
+            local f=0
+            while dotsActive do
+                f=f+1
+                for i,d in ipairs(kDots) do
+                    local on=(f%#kDots)==(i-1)
+                    pcall(function()
+                        d.BackgroundColor3=on and Color3.fromRGB(0,200,255) or Color3.fromRGB(0,40,80)
+                        d.BackgroundTransparency=on and 0 or 0.5
+                    end)
+                end
+                task.wait(0.07)
+            end
+        end)
+
+        -- Status label
+        local KStatus=Instance.new("TextLabel",KCard)
+        KStatus.Size=UDim2.new(1,-24,0,14); KStatus.Position=UDim2.new(0,12,0,114)
+        KStatus.BackgroundTransparency=1; KStatus.Text="Waiting for key input..."
+        KStatus.Font=Enum.Font.Gotham; KStatus.TextSize=9
+        KStatus.TextColor3=Color3.fromRGB(0,120,170); KStatus.ZIndex=11; KStatus.TextXAlignment=Enum.TextXAlignment.Left
+
+        -- Submit button
+        local KBtn=Instance.new("TextButton",KCard)
+        KBtn.Size=UDim2.new(1,-24,0,30); KBtn.Position=UDim2.new(0,12,0,132)
+        KBtn.BackgroundColor3=Color3.fromRGB(0,55,90); KBtn.BorderSizePixel=0; KBtn.ZIndex=11
+        KBtn.Text="◈  SCAN & VERIFY KEY"; KBtn.Font=Enum.Font.GothamBlack; KBtn.TextSize=12
+        KBtn.TextColor3=Color3.fromRGB(0,210,255); KBtn.AutoButtonColor=false
+        Instance.new("UICorner",KBtn).CornerRadius=UDim.new(0,10)
+        local KBtnStroke=Instance.new("UIStroke",KBtn); KBtnStroke.Thickness=1.2
+        KBtnStroke.Color=Color3.fromRGB(0,180,240); KBtnStroke.Transparency=0.2
+        KBtn.MouseEnter:Connect(function()
+            TweenService:Create(KBtn,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(0,80,130)}):Play()
+        end)
+        KBtn.MouseLeave:Connect(function()
+            TweenService:Create(KBtn,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(0,55,90)}):Play()
+        end)
+
+        -- Pop card open
+        playSound(4590662766, 0.65, 1.1)
+        TweenService:Create(KCard, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Size=UDim2.new(0,370,0,172), Position=UDim2.new(0.5,0,0.5,0)}):Play()
+        task.wait(0.38)
+
+        -- ── SCAN + VERIFY LOGIC ───────────────────────────────────
+        local function doScan()
+            local raw = KInput.Text:match("^%s*(.-)%s*$") or ""
+            if #raw < 4 then
+                KStatus.Text = "⚠  Key is too short"
+                KStatus.TextColor3 = Color3.fromRGB(255,180,40); return
+            end
+
+            -- Lock input
+            KInput.TextEditable=false; KBtn.Active=false
+            KStatus.Text="◈  Scanning..."; KStatus.TextColor3=Color3.fromRGB(0,200,255)
+
+            -- Strobing border during scan
+            local scanTick=0
+            local scanConn=RunService.Heartbeat:Connect(function(dt)
+                scanTick=scanTick+dt*8
+                local r=math.floor(0  + 80 *math.abs(math.sin(scanTick)))
+                local g=math.floor(150+ 80 *math.abs(math.sin(scanTick+1)))
+                local b=math.floor(200+ 55 *math.abs(math.sin(scanTick+2)))
+                pcall(function()
+                    KCStroke.Color=Color3.fromRGB(r,g,b)
+                    KAccent.BackgroundColor3=Color3.fromRGB(r,g,b)
+                end)
+            end)
+
+            -- Hex scan readout
+            local hexChars={"0xA3","1F","7C","E9","55","AB","D2","3C","80","FF","02","C1"}
+            task.spawn(function()
+                for i=1,20 do
+                    task.wait(0.04)
+                    local c=hexChars[(i%#hexChars)+1]
+                    pcall(function() KStatus.Text="◈  Scanning...  "..c end)
+                end
+            end)
+            task.wait(0.88)
+            scanConn:Disconnect()
+
+            local result=ValidateKey(raw)
+
+            if result=="ok" then
+                -- ── SUCCESS ─────────────────────────────────────
+                dotsActive=false
+                KTitle.Text="✓  ACCESS GRANTED"
+                KTitle.TextColor3=Color3.fromRGB(50,220,110)
+                KStatus.Text="✓  Key accepted — Welcome to Premium!"
+                KStatus.TextColor3=Color3.fromRGB(50,220,110)
+                KAccent.BackgroundColor3=Color3.fromRGB(35,200,90)
+                TweenService:Create(KCStroke,TweenInfo.new(0.18),
+                    {Color=Color3.fromRGB(35,200,90)}):Play()
+                TweenService:Create(KInputBG,TweenInfo.new(0.18),
+                    {BackgroundColor3=Color3.fromRGB(5,28,12)}):Play()
+                TweenService:Create(KInputStroke,TweenInfo.new(0.18),
+                    {Color=Color3.fromRGB(35,200,90)}):Play()
+                -- Green dot wave
+                for i,d in ipairs(kDots) do
+                    task.delay((i-1)*0.055,function()
+                        pcall(function() d.BackgroundColor3=Color3.fromRGB(40,220,100); d.BackgroundTransparency=0 end)
+                    end)
+                end
+                -- White pulse → settle green
+                TweenService:Create(KCStroke,TweenInfo.new(0.12),
+                    {Color=Color3.fromRGB(255,255,255),Thickness=3.5}):Play()
+                task.wait(0.14)
+                TweenService:Create(KCStroke,TweenInfo.new(0.45),
+                    {Color=Color3.fromRGB(35,200,90),Thickness=1.8}):Play()
+
+                -- Green screen flash
+                task.wait(0.3)
+                local GFlash=Instance.new("Frame",KSG)
+                GFlash.Size=UDim2.new(1,0,1,0); GFlash.BackgroundColor3=Color3.fromRGB(30,200,80)
+                GFlash.BackgroundTransparency=0.55; GFlash.BorderSizePixel=0; GFlash.ZIndex=998
+                TweenService:Create(GFlash,TweenInfo.new(0.22),{BackgroundTransparency=0.1}):Play()
+                task.wait(0.24)
+                TweenService:Create(GFlash,TweenInfo.new(0.5,Enum.EasingStyle.Quad),
+                    {BackgroundTransparency=1}):Play()
+                playSound(6042053626, 0.7, 1.2)
+
+                -- Activate premium
+                PremiumUnlocked=true; PremiumActive=true
+                task.spawn(RemovePremiumLock)
+                Rayfield:Notify({Title="✨ Premium Unlocked!",Content="Welcome to Ryuu V2 Premium.",Duration=5,Image=4483362458})
+                if S.AutoParry then StopEngine(); task.wait(0.05); P.AutoParry=true; StartPremiumEngine() end
+
+                task.wait(1.2); kscanRunning=false
+                TweenService:Create(Overlay,TweenInfo.new(0.3),{BackgroundTransparency=1}):Play()
+                task.wait(0.32); pcall(function() KSG:Destroy() end)
+
+            else
+                -- ── FAIL ────────────────────────────────────────
+                local msg = result=="locked_other"
+                    and "✗  Key bound to another device"
+                    or  "✗  Invalid key — try again"
+                KTitle.Text="✗  ACCESS DENIED"; KTitle.TextColor3=Color3.fromRGB(255,65,65)
+                KStatus.Text=msg; KStatus.TextColor3=Color3.fromRGB(255,65,65)
+                KAccent.BackgroundColor3=Color3.fromRGB(200,40,40)
+                TweenService:Create(KCStroke,TweenInfo.new(0.15),
+                    {Color=Color3.fromRGB(200,40,40)}):Play()
+                TweenService:Create(KInputBG,TweenInfo.new(0.18),
+                    {BackgroundColor3=Color3.fromRGB(28,5,5)}):Play()
+                TweenService:Create(KInputStroke,TweenInfo.new(0.18),
+                    {Color=Color3.fromRGB(200,40,40)}):Play()
+                -- Red dot wave
+                for i,d in ipairs(kDots) do
+                    task.delay((i-1)*0.045,function()
+                        pcall(function() d.BackgroundColor3=Color3.fromRGB(220,40,40); d.BackgroundTransparency=0 end)
+                    end)
+                end
+                -- Red pulse
+                TweenService:Create(KCStroke,TweenInfo.new(0.1),
+                    {Color=Color3.fromRGB(255,80,80),Thickness=3.5}):Play()
+                task.wait(0.12)
+                TweenService:Create(KCStroke,TweenInfo.new(0.45),
+                    {Color=Color3.fromRGB(180,35,35),Thickness=1.8}):Play()
+
+                -- Red screen flash
+                local RFlash=Instance.new("Frame",KSG)
+                RFlash.Size=UDim2.new(1,0,1,0); RFlash.BackgroundColor3=Color3.fromRGB(200,30,30)
+                RFlash.BackgroundTransparency=0.6; RFlash.BorderSizePixel=0; RFlash.ZIndex=998
+                TweenService:Create(RFlash,TweenInfo.new(0.2),{BackgroundTransparency=0.15}):Play()
+                task.wait(0.22)
+                TweenService:Create(RFlash,TweenInfo.new(0.45,Enum.EasingStyle.Quad),
+                    {BackgroundTransparency=1}):Play()
+                playSound(6042053626, 0.6, 0.7)
+
+                -- Shake card
+                task.spawn(function()
+                    for i=1,6 do
+                        local ox=(i%2==0) and 5 or -5
+                        pcall(function() KCard.Position=UDim2.new(0.5,ox,0.5,0) end)
+                        task.wait(0.045)
+                    end
+                    pcall(function() KCard.Position=UDim2.new(0.5,0,0.5,0) end)
+                end)
+
+                -- Re-enable after delay
+                task.wait(1.3)
+                KInput.Text=""; KInput.TextEditable=true; KBtn.Active=true
+                KTitle.Text="🔑  PREMIUM KEY SCANNER"; KTitle.TextColor3=Color3.fromRGB(0,210,255)
+                KStatus.Text="Try again..."; KStatus.TextColor3=Color3.fromRGB(0,120,170)
+                KCStroke.Color=Color3.fromRGB(0,210,255); KCStroke.Thickness=1.8
+                KAccent.BackgroundColor3=Color3.fromRGB(0,210,255)
+                -- Re-start dots
+                dotsActive=true
+                task.spawn(function()
+                    local f=0
+                    while dotsActive do
+                        f=f+1
+                        for i,d in ipairs(kDots) do
+                            local on=(f%#kDots)==(i-1)
+                            pcall(function()
+                                d.BackgroundColor3=on and Color3.fromRGB(0,200,255) or Color3.fromRGB(0,40,80)
+                                d.BackgroundTransparency=on and 0 or 0.5
+                            end)
+                        end
+                        task.wait(0.07)
+                    end
+                end)
+            end
+        end
+
+        KBtn.MouseButton1Click:Connect(doScan)
+        KInput.FocusLost:Connect(function(enter) if enter then doScan() end end)
+    end)
 end})
 
 PT:CreateDivider()
@@ -2786,12 +3355,279 @@ PT:CreateSlider({Name="Detect Cooldown (per enemy)",Range={10,100},Increment=5,C
     Callback=function(v) if PremiumUnlocked then PDet.cd=v/100 end end})
 PT:CreateDivider()
 
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM TAB ◈ EXTENDED FEATURE SECTIONS
+-- ══════════════════════════════════════════════════════════════════
+
+-- ───────────────── ⚔ PARRY EXTRAS ────────────────────────────────
+PT:CreateDivider()
+PT:CreateSection("⚔ Parry Extras")
+
+PT:CreateToggle({Name="Parry Sound (Sword Clash)",CurrentValue=false,Flag="PFS",
+    Callback=function(v) PremGuard(v,"Parry Sound",function(val) PF.ParrySound=val end) end})
+
+PT:CreateToggle({Name="Anti-Block (auto-fire on blockers)",CurrentValue=false,Flag="PAB",
+    Callback=function(v)
+        PremGuard(v,"Anti-Block",function(val)
+            PF.AntiBlock=val
+            if val then StartAntiBlock()
+                Rayfield:Notify({Title="🛡 Anti-Block ON",Content="Auto-fires on blocker abilities.",Duration=3,Image=4483362458})
+            else if AntiBlockConn then AntiBlockConn:Disconnect() end end
+        end)
+    end})
+
+PT:CreateToggle({Name="Timing Randomizer (human delay)",CurrentValue=false,Flag="PTR",
+    Callback=function(v)
+        PremGuard(v,"Timing Random",function(val)
+            PF.TimingRandom=val
+            Rayfield:Notify({Title="🎲 Timing Randomizer "..(val and "ON" or "OFF"),
+                Content=val and "Adds ±30ms human jitter." or "Removed.",Duration=3,Image=4483362458})
+        end)
+    end})
+
+PT:CreateToggle({Name="Combo Tracker (floating widget)",CurrentValue=false,Flag="PCT",
+    Callback=function(v)
+        PremGuard(v,"Combo Tracker",function(val)
+            PF.ComboTracker=val
+            if val then
+                BuildComboWidget()
+                Rayfield:Notify({Title="🔥 Combo Tracker ON",Content="Drag the widget to reposition.",Duration=3,Image=4483362458})
+            else
+                PF.ComboCount=0
+                pcall(function() if ComboSG then ComboSG:Destroy() end end)
+            end
+        end)
+    end})
+
+PT:CreateToggle({Name="Auto Chat after Parry",CurrentValue=false,Flag="PAC",
+    Callback=function(v)
+        PremGuard(v,"Auto Chat",function(val)
+            PF.AutoChat=val
+            Rayfield:Notify({Title="💬 Auto Chat "..(val and "ON" or "OFF"),
+                Content=val and "Will chat after each parry." or "Silenced.",Duration=3,Image=4483362458})
+        end)
+    end})
+
+PT:CreateDropdown({
+    Name="Auto Chat Message Style",
+    Options={"Rotate all messages","nice try 😏","too slow ⚡","skill issue 💯","not even close 🎯","L + ratio 😴"},
+    CurrentOption={"Rotate all messages"},MultipleOptions=false,Flag="PACM",
+    Callback=function(v)
+        local pick=type(v)=="table" and v[1] or tostring(v)
+        if pick=="Rotate all messages" then
+            AutoChatIdx=1
+        else
+            for i,m in ipairs(AUTO_CHAT_MSGS) do
+                if m==pick then AutoChatIdx=i; break end
+            end
+        end
+    end})
+
+-- ───────────────── 🔮 PREDICTION & BALL TRACKING ─────────────────
+PT:CreateDivider()
+PT:CreateSection("🔮 Prediction & Ball Tracking")
+
+PT:CreateToggle({Name="Trajectory Line ESP",CurrentValue=false,Flag="PTESP",
+    Callback=function(v)
+        PremGuard(v,"Trajectory ESP",function(val)
+            PF.TrajectoryESP=val
+            if val then
+                BuildTrajectoryESP()
+                Rayfield:Notify({Title="🔮 Trajectory ESP ON",Content="Neon line shows ball path.",Duration=3,Image=4483362458})
+            else pcall(function() if TrajSG then TrajSG:Destroy() end end) end
+        end)
+    end})
+
+PT:CreateToggle({Name="Ball Speed Meter",CurrentValue=false,Flag="PBSM",
+    Callback=function(v)
+        PremGuard(v,"Speed Meter",function(val)
+            PF.BallSpeedMeter=val
+            if val then
+                BuildSpeedMeter()
+                Rayfield:Notify({Title="⚡ Speed Meter ON",Content="Bottom-center widget.",Duration=3,Image=4483362458})
+            else pcall(function() if SpeedMeterSG then SpeedMeterSG:Destroy() end end) end
+        end)
+    end})
+
+PT:CreateToggle({Name="Time-to-Impact (top of screen)",CurrentValue=false,Flag="PTTI",
+    Callback=function(v)
+        PremGuard(v,"Time-to-Impact",function(val)
+            PF.TimeToImpact=val
+            if val then
+                BuildTTI()
+                Rayfield:Notify({Title="⏱ TTI ON",Content="Shows seconds until ball hits you.",Duration=3,Image=4483362458})
+            else pcall(function() if TTISg then TTISg:Destroy() end end) end
+        end)
+    end})
+
+PT:CreateToggle({Name="Ball Target Alert (red edge flash)",CurrentValue=false,Flag="PBTA",
+    Callback=function(v)
+        PremGuard(v,"Target Alert",function(val)
+            PF.TargetAlert=val
+            if val then
+                BuildTargetAlert()
+                Rayfield:Notify({Title="🚨 Target Alert ON",Content="Red edges flash when targeted.",Duration=3,Image=4483362458})
+            else pcall(function() if AlertSG then AlertSG:Destroy() end end) end
+        end)
+    end})
+
+-- ───────────────── 👁 VISUAL & ESP ───────────────────────────────
+PT:CreateDivider()
+PT:CreateSection("👁 Visual & ESP")
+
+PT:CreateToggle({Name="Distance ESP (all players)",CurrentValue=false,Flag="PDESP",
+    Callback=function(v)
+        PremGuard(v,"Dist ESP",function(val)
+            PF.DistESP=val
+            if not val then UpdateDistESP() end
+            Rayfield:Notify({Title="📏 Distance ESP "..(val and "ON" or "OFF"),
+                Content=val and "Shows st distance above heads." or "Removed.",Duration=3,Image=4483362458})
+        end)
+    end})
+
+PT:CreateToggle({Name="Chams (see through walls)",CurrentValue=false,Flag="PCH",
+    Callback=function(v)
+        PremGuard(v,"Chams",function(val)
+            PF.Chams=val; ApplyChams(val)
+            Rayfield:Notify({Title="🌐 Chams "..(val and "ON" or "OFF"),
+                Content=val and "Neon players visible through walls." or "Restored.",Duration=3,Image=4483362458})
+        end)
+    end})
+
+PT:CreateToggle({Name="Ball Highlight (red = targeting you)",CurrentValue=false,Flag="PBH",
+    Callback=function(v)
+        PremGuard(v,"Ball Highlight",function(val)
+            PF.BallHighlight=val
+            if val then StartBallHighlight()
+                Rayfield:Notify({Title="🎯 Ball Highlight ON",Content="Red = targeting you, cyan = other.",Duration=3,Image=4483362458})
+            else if BallHighlightConn then BallHighlightConn:Disconnect() end end
+        end)
+    end})
+
+PT:CreateToggle({Name="Rainbow Ball Trail",CurrentValue=false,Flag="PRBT",
+    Callback=function(v)
+        PremGuard(v,"Rainbow Trail",function(val)
+            PF.RainbowTrail=val
+            if val then StartRainbowTrail()
+                Rayfield:Notify({Title="🌈 Rainbow Trail ON",Content="Ball cycles full spectrum.",Duration=3,Image=4483362458})
+            else if RainbowTrailConn then RainbowTrailConn:Disconnect() end end
+        end)
+    end})
+
+-- ───────────────── 🏃 MOVEMENT & COMBAT ──────────────────────────
+PT:CreateDivider()
+PT:CreateSection("🏃 Movement & Combat")
+
+PT:CreateToggle({Name="Auto Dodge (step back on target)",CurrentValue=false,Flag="PAD",
+    Callback=function(v)
+        PremGuard(v,"Auto Dodge",function(val)
+            PF.AutoDodge=val
+            if val then StartAutoDodge()
+                Rayfield:Notify({Title="💨 Auto Dodge ON",Content="Steps away when ball targets you.",Duration=3,Image=4483362458})
+            else if DodgeConn then DodgeConn:Disconnect() end end
+        end)
+    end})
+
+PT:CreateToggle({Name="Speed Boost on Parry",CurrentValue=false,Flag="PSBP",
+    Callback=function(v) PremGuard(v,"Speed Boost",function(val) PF.SpeedOnParry=val end) end})
+
+PT:CreateSlider({Name="Boost Speed Amount",Range={20,100},Increment=5,CurrentValue=40,Flag="PSBA",
+    Callback=function(v) PremGuard(v,"Speed Boost Amt",function(val) PF.SpeedOnParryAmt=val end) end})
+
+PT:CreateToggle({Name="Ghost Mode (85% transparent + noclip)",CurrentValue=false,Flag="PGM",
+    Callback=function(v)
+        PremGuard(v,"Ghost Mode",function(val)
+            PF.GhostMode=val; ApplyGhost(val)
+            Rayfield:Notify({Title="👻 Ghost Mode "..(val and "ON" or "OFF"),
+                Content=val and "85% transparent + noclip." or "Restored.",Duration=3,Image=4483362458})
+        end)
+    end})
+
+PT:CreateToggle({Name="Safe Zone Warning (vignette)",CurrentValue=false,Flag="PSZW",
+    Callback=function(v)
+        PremGuard(v,"Safe Zone Warn",function(val)
+            PF.SafeZoneWarn=val
+            if val then BuildSafeZoneWarning()
+                Rayfield:Notify({Title="⚠ Safe Zone Warn ON",Content="Orange vignette when ball targets you.",Duration=3,Image=4483362458})
+            else pcall(function() if SafeZoneSG then SafeZoneSG:Destroy() end end) end
+        end)
+    end})
+
+-- ───────────────── 📊 HUD & UI ───────────────────────────────────
+PT:CreateDivider()
+PT:CreateSection("📊 HUD & UI")
+
+PT:CreateToggle({Name="Premium FPS Unlocker",CurrentValue=false,Flag="PFPS",
+    Callback=function(v)
+        PremGuard(v,"FPS Unlock",function(val)
+            PF.PremFPS=val; SetPremFPS(val, PF.PremFPSCap)
+            Rayfield:Notify({Title="🔓 FPS Unlocker "..(val and "ON" or "OFF"),
+                Content=val and "FPS cap removed — runs as fast as possible." or "FPS restored to 60.",Duration=4,Image=4483362458})
+        end)
+    end})
+
+PT:CreateDropdown({
+    Name="FPS Cap (when unlocked)",
+    Options={"Uncapped","144","240","360"},
+    CurrentOption={"Uncapped"},MultipleOptions=false,Flag="PFPSC",
+    Callback=function(v)
+        local pick=type(v)=="table" and v[1] or tostring(v)
+        PF.PremFPSCap = pick=="Uncapped" and 0 or tonumber(pick) or 0
+        if PF.PremFPS then SetPremFPS(true,PF.PremFPSCap) end
+    end})
+
+PT:CreateToggle({Name="Kill Tracker (widget)",CurrentValue=false,Flag="PKT",
+    Callback=function(v)
+        PremGuard(v,"Kill Tracker",function(val)
+            PF.KillTracker=val
+            if val then
+                BuildKillWidget()
+                Rayfield:Notify({Title="☠ Kill Tracker ON",Content="Counts offensive parry kills.",Duration=3,Image=4483362458})
+            else pcall(function() if KillSG then KillSG:Destroy() end end) end
+        end)
+    end})
+
+PT:CreateButton({Name="☠ Reset Kill Count",Callback=function()
+    PremGuard(true,"Kill Tracker",function()
+        PF.KillCount=0
+        pcall(function() if KillLbl then KillLbl.Text="0" end end)
+        Rayfield:Notify({Title="Kill Count Reset",Content="Back to 0.",Duration=2,Image=4483362458})
+    end)
+end})
+
+PT:CreateToggle({Name="Premium Watermark Badge",CurrentValue=false,Flag="PWM",
+    Callback=function(v)
+        PremGuard(v,"Watermark",function(val)
+            PF.PremWatermark=val
+            if val then
+                BuildWatermark()
+                Rayfield:Notify({Title="◈ Watermark ON",Content="Ryuu HUB V2 badge bottom-left.",Duration=3,Image=4483362458})
+            else pcall(function() if WatermarkSG then WatermarkSG:Destroy() end end) end
+        end)
+    end})
+
+-- ───────────────── 📊 STATUS ──────────────────────────────────────
+PT:CreateDivider()
 PT:CreateSection("📊 Status")
 PT:CreateButton({Name="Check Premium Status",Callback=function()
     if PremiumUnlocked then
-        Rayfield:Notify({Title="✨ Premium ACTIVE",Content="All engines unlocked.",Duration=4,Image=4483362458})
+        local active={}
+        if PF.ParrySound    then table.insert(active,"🔊 Sound") end
+        if PF.AntiBlock     then table.insert(active,"🛡 Anti-Block") end
+        if PF.ComboTracker  then table.insert(active,"🔥 Combo") end
+        if PF.TrajectoryESP then table.insert(active,"🔮 Traj ESP") end
+        if PF.BallSpeedMeter then table.insert(active,"⚡ Speed") end
+        if PF.DistESP       then table.insert(active,"📏 DistESP") end
+        if PF.Chams         then table.insert(active,"🌐 Chams") end
+        if PF.RainbowTrail  then table.insert(active,"🌈 Trail") end
+        if PF.AutoDodge     then table.insert(active,"💨 Dodge") end
+        if PF.GhostMode     then table.insert(active,"👻 Ghost") end
+        if PF.PremFPS       then table.insert(active,"🔓 FPS") end
+        if PF.KillTracker   then table.insert(active,"☠ Kills:"..PF.KillCount) end
+        local summary=#active>0 and table.concat(active," · ") or "No extras active"
+        Rayfield:Notify({Title="✨ Premium ACTIVE",Content=summary,Duration=6,Image=4483362458})
     else
-        Rayfield:Notify({Title="🔒 Not Unlocked",Content="Enter your key above.",Duration=4,Image=4483362458})
+        Rayfield:Notify({Title="🔒 Not Unlocked",Content="Open Key Scanner to unlock.",Duration=4,Image=4483362458})
     end
 end})
 
