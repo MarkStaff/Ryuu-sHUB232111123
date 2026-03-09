@@ -958,236 +958,226 @@ local function UpdateParryIndicator(dist, fireDist, didJustFire)
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- FREE PARRY ENGINE (Upgraded)
-
-local FREE_PING_LEAD = 0.9
-local FREE_HITBOX = 6.2
-
+-- FREE PARRY ENGINE (Upgraded - Improved for Reliability)
+local FREE_PING_LEAD = 0.95  -- Slightly increased lead for better ping compensation
+local FREE_HITBOX = 6.5     -- Slightly larger base hitbox for good performance
 local PrevVel = nil
-
+local SpeedHistory = {}     -- Added basic speed history for minor accel awareness
 local function StartEngine()
-
     if Conn.Parry then
         Conn.Parry:Disconnect()
     end
-
     BuildParryIndicator()
-
     Conn.Parry = RunService.PreSimulation:Connect(function()
-
         if not S.AutoParry then return end
-
         local Ball = GetBall()
         if not Ball then return end
-
         local HRP = GetHRP()
         if not HRP then return end
-
         local BPos = Ball.Position
         local HPos = HRP.Position
-
         local Dist = (HPos - BPos).Magnitude
-
         local tgt = Ball:GetAttribute("target") or ""
         local isTgt = tgt == Plr.Name
-
         if not isTgt then
             UpdateParryIndicator(99,1,false)
             return
         end
-
         local Vel = GetVel(Ball)
         local Speed = Vel.Magnitude
-
-        local toPlayer = HPos - BPos
-        local dotVal = Vel:Dot(toPlayer)
-
-        -- allow slight sideways movement
-        local isClosing = dotVal > -(Speed * 0.25)
-
-        -- dynamic hitbox
-        local dynamicHitbox =
-            FREE_HITBOX +
-            math.clamp(Speed / 180,0,1) * 2
-
-        local pingLead =
-            (PingRaw / 1000) *
-            Speed *
-            FREE_PING_LEAD
-
-        pingLead = math.min(pingLead,3)
-
-        local fireDist = dynamicHitbox + pingLead
-
-        UpdateParryIndicator(Dist,fireDist,false)
-
-        if isClosing and Dist <= fireDist then
-            FireParry(Ball)
-            UpdateParryIndicator(Dist,fireDist,true)
-            return
+        -- Basic speed history for minor improvements
+        table.insert(SpeedHistory, Speed)
+        if #SpeedHistory > 3 then  -- Shorter history for free version
+            table.remove(SpeedHistory, 1)
         end
-
-        -- basic lookahead
-        if Speed > 80 then
-
-            local dt = 1/60
-
-            for step=1,2 do
-
-                local nextPos = BPos + Vel*(dt*step)
-
-                if (HPos-nextPos).Magnitude <= fireDist then
-
-                    FireParry(Ball)
-                    UpdateParryIndicator(Dist,fireDist,true)
-                    return
-                end
-            end
-        end
-
-        PrevVel = Vel
-
-    end)
-end
-
--- ══════════════════════════════════════════════════════════════════
--- PREMIUM PARRY ENGINE (Advanced)
-
-local PREM_PING_LEAD = 0.75
-
-local PrevVel = nil
-local SpeedHistory = {}
-
-local function StartPremiumEngine()
-
-    if PremConn.Parry then
-        PremConn.Parry:Disconnect()
-    end
-
-    BuildParryIndicator()
-
-    PremConn.Parry = RunService.PreSimulation:Connect(function()
-
-        if not P.AutoParry then return end
-
-        local Ball = GetBall()
-        if not Ball then return end
-
-        local HRP = GetHRP()
-        if not HRP then return end
-
-        local BPos = Ball.Position
-        local HPos = HRP.Position
-
-        local Dist = (HPos - BPos).Magnitude
-
-        local tgt = Ball:GetAttribute("target") or ""
-        local isTgt = tgt == Plr.Name
-
-        if not isTgt then
-            UpdateParryIndicator(99,1,false)
-            return
-        end
-
-        local Vel = GetVel(Ball)
-        local Speed = Vel.Magnitude
-
-        -- store speed history
-        table.insert(SpeedHistory,Speed)
-        if #SpeedHistory > 6 then
-            table.remove(SpeedHistory,1)
-        end
-
-        -- acceleration prediction
         local accel = 0
         if #SpeedHistory >= 3 then
             accel = SpeedHistory[#SpeedHistory] - SpeedHistory[#SpeedHistory-2]
         end
-
-        local predictedSpeed = Speed + math.max(accel,0)
-
+        local predictedSpeed = Speed + math.max(accel * 0.5, 0)  -- Toned down accel impact
         local toPlayer = HPos - BPos
         local dotVal = Vel:Dot(toPlayer)
-
-        local isClosing = dotVal > -(Speed*0.22)
-
-        -- curve detection
+        -- Allow slight sideways movement, but tightened for better fake detection
+        local isClosing = dotVal > -(Speed * 0.20)
+        -- Basic curve detection (minimal for free)
         local curveBonus = 1
-
         if PrevVel then
-
             local angle = Vel.Unit:Dot(PrevVel.Unit)
-
-            if angle < 0.94 then
-                curveBonus = 1.18
-            elseif angle < 0.97 then
-                curveBonus = 1.10
+            if angle < 0.96 then
+                curveBonus = 1.08  -- Small bonus
             end
         end
-
         PrevVel = Vel
-
-        -- dynamic hitbox
-        local baseHitbox = P.HitboxTarget or 4
-
+        -- Dynamic hitbox
         local dynamicHitbox =
-            baseHitbox +
-            math.clamp(predictedSpeed/220,0,1)*3
-
+            FREE_HITBOX +
+            math.clamp(predictedSpeed / 180, 0, 1) * 2.5  -- Slightly improved scaling
         dynamicHitbox = dynamicHitbox * curveBonus
-
-        -- ping lead
         local pingLead =
-            (PingRaw/1000)*
-            predictedSpeed*
-            PREM_PING_LEAD
-
-        pingLead = math.min(pingLead,2.5)
-
+            (PingRaw / 1000) *
+            predictedSpeed *
+            FREE_PING_LEAD
+        pingLead = math.min(pingLead, 3.2)  -- Slightly higher cap
         local fireDist = dynamicHitbox + pingLead
-
-        UpdateParryIndicator(Dist,fireDist,false)
-
-        -- panic protection
-        local panicDist = math.clamp(2 + Speed*0.004,2,3.5)
-
-        if Dist <= panicDist then
-            PremiumFire(Ball)
-            UpdateParryIndicator(Dist,panicDist,true)
-            return
-        end
-
-        -- normal fire
+        UpdateParryIndicator(Dist, fireDist, false)
         if isClosing and Dist <= fireDist then
-            PremiumFire(Ball)
-            UpdateParryIndicator(Dist,fireDist,true)
+            FireParry(Ball)
+            UpdateParryIndicator(Dist, fireDist, true)
             return
         end
-
-        -- advanced prediction
-        if Speed > 70 then
-
+        -- Basic lookahead with minor improvements
+        if Speed > 75 then  -- Lower threshold for activation
             local dt = 1/60
-
-            local maxFrames =
-                Speed > 250 and 6
-                or Speed > 180 and 5
-                or Speed > 130 and 4
-                or 3
-
-            for step=1,maxFrames do
-
-                local nextPos = BPos + Vel*(dt*step)
-
-                if (HPos-nextPos).Magnitude <= fireDist then
-
-                    PremiumFire(Ball)
-                    UpdateParryIndicator(Dist,fireDist,true)
+            for step=1,3 do  -- Increased to 3 steps for better coverage
+                local nextPos = BPos + Vel * (dt * step)
+                if (HPos - nextPos).Magnitude <= fireDist then
+                    FireParry(Ball)
+                    UpdateParryIndicator(Dist, fireDist, true)
                     return
                 end
             end
         end
-
+        -- Basic panic for very close balls (added for reliability)
+        local panicDist = math.clamp(2.5 + Speed * 0.003, 2.5, 4)
+        if Dist <= panicDist then
+            FireParry(Ball)
+            UpdateParryIndicator(Dist, panicDist, true)
+            return
+        end
+    end)
+end
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM PARRY ENGINE (Advanced - Enhanced Accuracy, Sensitivity, Precision, and Detection)
+local PREM_PING_LEAD = 0.85  -- Higher lead for more precise ping compensation
+local PrevVel = nil
+local SpeedHistory = {}
+local AngleHistory = {}     -- Added for better curve tracking
+local TargetHistory = {}    -- Added for fake target detection
+local function StartPremiumEngine()
+    if PremConn.Parry then
+        PremConn.Parry:Disconnect()
+    end
+    BuildParryIndicator()
+    PremConn.Parry = RunService.PreSimulation:Connect(function()
+        if not P.AutoParry then return end
+        local Ball = GetBall()
+        if not Ball then return end
+        local HRP = GetHRP()
+        if not HRP then return end
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local tgt = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        -- Target history for fake detection
+        table.insert(TargetHistory, tgt)
+        if #TargetHistory > 10 then
+            table.remove(TargetHistory, 1)
+        end
+        local fakeTargetSuspect = false
+        if #TargetHistory >= 3 then
+            -- Detect recent target changes as potential fakes
+            if TargetHistory[#TargetHistory] == Plr.Name and TargetHistory[#TargetHistory-1] ~= Plr.Name then
+                fakeTargetSuspect = true
+            end
+        end
+        if not isTgt and not fakeTargetSuspect then
+            UpdateParryIndicator(99,1,false)
+            return
+        end
+        local Vel = GetVel(Ball)
+        local Speed = Vel.Magnitude
+        -- Store speed history
+        table.insert(SpeedHistory, Speed)
+        if #SpeedHistory > 10 then  -- Longer history for better accel
+            table.remove(SpeedHistory, 1)
+        end
+        -- Acceleration prediction with smoothing
+        local accel = 0
+        if #SpeedHistory >= 4 then
+            local recentAccel1 = SpeedHistory[#SpeedHistory] - SpeedHistory[#SpeedHistory-1]
+            local recentAccel2 = SpeedHistory[#SpeedHistory-1] - SpeedHistory[#SpeedHistory-2]
+            accel = (recentAccel1 + recentAccel2) / 2  -- Averaged for precision
+        end
+        local predictedSpeed = Speed + math.max(accel, 0) * 1.2  -- Amplified accel for sensitivity
+        local toPlayer = HPos - BPos
+        local dotVal = Vel:Dot(toPlayer)
+        local isClosing = dotVal > -(Speed * 0.18)  -- More sensitive closing threshold
+        -- Advanced curve detection with history
+        local curveBonus = 1
+        if PrevVel then
+            local angle = Vel.Unit:Dot(PrevVel.Unit)
+            table.insert(AngleHistory, angle)
+            if #AngleHistory > 5 then
+                table.remove(AngleHistory, 1)
+            end
+            local avgAngle = 0
+            for _, a in ipairs(AngleHistory) do
+                avgAngle = avgAngle + a
+            end
+            avgAngle = avgAngle / #AngleHistory
+            if avgAngle < 0.92 then
+                curveBonus = 1.25  -- Higher bonus for strong curves
+            elseif avgAngle < 0.95 then
+                curveBonus = 1.15  -- Medium bonus
+            elseif avgAngle < 0.98 then
+                curveBonus = 1.08  -- Low bonus
+            end
+        end
+        PrevVel = Vel
+        -- Dynamic hitbox with more factors
+        local baseHitbox = P.HitboxTarget or 4
+        local dynamicHitbox =
+            baseHitbox +
+            math.clamp(predictedSpeed / 200, 0, 1) * 3.5  -- Faster scaling for precision
+        dynamicHitbox = dynamicHitbox * curveBonus
+        if fakeTargetSuspect then
+            dynamicHitbox = dynamicHitbox * 1.1  -- Slight increase for suspected fakes
+        end
+        -- Ping lead with more precision
+        local pingLead =
+            (PingRaw / 1000) *
+            predictedSpeed *
+            PREM_PING_LEAD
+        pingLead = math.min(pingLead, 3)  -- Balanced cap
+        local fireDist = dynamicHitbox + pingLead
+        UpdateParryIndicator(Dist, fireDist, false)
+        -- Enhanced panic protection with fake detection
+        local panicDist = math.clamp(2 + Speed * 0.005, 2, 4)  -- More sensitive to speed
+        if fakeTargetSuspect then
+            panicDist = panicDist * 1.2  -- Larger panic for fakes
+        end
+        if Dist <= panicDist then
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist, panicDist, true)
+            return
+        end
+        -- Normal fire with increased sensitivity
+        if isClosing and Dist <= fireDist then
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist, fireDist, true)
+            return
+        end
+        -- Advanced prediction with more frames and curve adjustment
+        if Speed > 60 then  -- Lower activation for more detection
+            local dt = 1/60
+            local maxFrames =
+                Speed > 280 and 8
+                or Speed > 200 and 7
+                or Speed > 150 and 6
+                or Speed > 100 and 5
+                or 4  -- More frames overall for precision
+            for step=1,maxFrames do
+                -- Basic curve adjustment in prediction (assume slight bend)
+                local curveAdjust = (1 - curveBonus) * step * 0.05  -- Minor position tweak
+                local nextPos = BPos + Vel * (dt * step) + Vector3.new(curveAdjust, 0, curveAdjust)  -- Example adjustment
+                if (HPos - nextPos).Magnitude <= fireDist then
+                    PremiumFire(Ball)
+                    UpdateParryIndicator(Dist, fireDist, true)
+                    return
+                end
+            end
+        end
     end)
 end
 -- ══════════════════════════════════════════════════════════════════
