@@ -57,6 +57,14 @@ local VALID_KEYS = {
     "RYUU-KEY1a0da90sdacsdaasdx",
     "RYUU-KEY2o3i4j2o3232sxasdv",
     "09153552478",
+    "x31THEGOAT",
+    "RYUU-KEYS0CF94TEDFGVasd4swdf",
+    "RYUU-KEY1csdfsf444sdccasdaaasdf",
+    "RYUU-KEY0aioscd8asdcasvvawqxsac",
+    "RYUU-KEY9x98K998y98om9N6na778Xzsaddf",
+    "RYUU-KEY8IA6SDXAOM30z68BKOsadoawdxx",
+    "x31THEGOAT",
+    "RYUU-KEYS0CF94TEDFGVasd4swdf",
 }
 local DEVICE_FILE = "ryuu_device.txt"
 local LOCK_FILE   = "ryuu_keys.txt"
