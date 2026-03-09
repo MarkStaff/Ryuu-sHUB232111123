@@ -1,30 +1,27 @@
 -- ══════════════════════════════════════════════════════════════════
 -- Ryuu's HUB V2 — UPGRADED EDITION
 -- by ZivX ◈ Upgraded: Better Engines + Lobby Parry + Holographic
---           Key Scanner + Ball Velocity Arrow + Anti-False-Fire
---           + Premium S-Tier Curve Handling + Tighter Emergency
+-- Key Scanner + Ball Velocity Arrow + Anti-False-Fire
+-- + Premium S-Tier Curve Handling + Tighter Emergency
 -- ══════════════════════════════════════════════════════════════════
-
 -- ── Services ─────────────────────────────────────────────────────
-local Players       = game:GetService("Players")
-local RunService    = game:GetService("RunService")
-local VIM           = game:GetService("VirtualInputManager")
-local UIS           = game:GetService("UserInputService")
-local TweenService  = game:GetService("TweenService")
-local CoreGui       = game:GetService("CoreGui")
-local Lighting      = game:GetService("Lighting")
-local Stats         = game:GetService("Stats")
-local RS            = game:GetService("ReplicatedStorage")
-local Plr           = Players.LocalPlayer
-local Cam           = workspace.CurrentCamera
-
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Stats = game:GetService("Stats")
+local RS = game:GetService("ReplicatedStorage")
+local Plr = Players.LocalPlayer
+local Cam = workspace.CurrentCamera
 -- ── Destroy old instances ─────────────────────────────────────────
 pcall(function()
     for _, g in ipairs(CoreGui:GetChildren()) do
         if g.Name:find("Ryuu") then pcall(function() g:Destroy() end) end
     end
 end)
-
 -- ══════════════════════════════════════════════════════════════════
 -- RAYFIELD STUB
 -- ══════════════════════════════════════════════════════════════════
@@ -32,24 +29,23 @@ local Rayfield
 local function makeStub()
     local function makeTab()
         return {
-            CreateToggle   = function(_, t) if t and t.Callback then t.Callback(t.CurrentValue or false) end end,
-            CreateSlider   = function(_, t) if t and t.Callback then t.Callback(t.CurrentValue or 0) end end,
-            CreateLabel    = function() return {Text=""} end,
-            CreateSection  = function() end,
-            CreateDivider  = function() end,
-            CreateButton   = function() end,
-            CreateKeybind  = function() end,
-            CreateInput    = function() end,
+            CreateToggle = function(_, t) if t and t.Callback then t.Callback(t.CurrentValue or false) end end,
+            CreateSlider = function(_, t) if t and t.Callback then t.Callback(t.CurrentValue or 0) end end,
+            CreateLabel = function() return {Text=""} end,
+            CreateSection = function() end,
+            CreateDivider = function() end,
+            CreateButton = function() end,
+            CreateKeybind = function() end,
+            CreateInput = function() end,
             CreateDropdown = function(_, t) if t and t.Callback then t.Callback({t.CurrentOption and t.CurrentOption[1] or ""}) end end,
         }
     end
     return {
         CreateWindow = function() return {CreateTab=function() return makeTab() end} end,
-        Notify       = function() end,
-        Flags        = {},
+        Notify = function() end,
+        Flags = {},
     }
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- KEY SYSTEM
 -- ══════════════════════════════════════════════════════════════════
@@ -68,8 +64,7 @@ local VALID_KEYS = {
     "RYUU-KEY7H5Bnq5Hzuy7ksdO9B42ASnv5RT",
 }
 local DEVICE_FILE = "ryuu_device.txt"
-local LOCK_FILE   = "ryuu_keys.txt"
-
+local LOCK_FILE = "ryuu_keys.txt"
 local function GetDeviceID()
     local ok, stored = pcall(function() return readfile(DEVICE_FILE) end)
     if ok and stored and #stored >= 16 then return stored:match("^%s*(.-)%s*$") end
@@ -81,7 +76,7 @@ local function GetDeviceID()
     pcall(function() table.insert(parts, tostring(Plr.UserId)) end)
     table.insert(parts, tostring(math.random(100000,999999)))
     table.insert(parts, tostring(os.time()))
-    local raw  = table.concat(parts,"-")
+    local raw = table.concat(parts,"-")
     local hash = 0
     for i=1,#raw do hash=(hash*31+string.byte(raw,i))%0xFFFFFFFF end
     local deviceID = string.format("DEV-%08X-%08X-%06d",
@@ -89,7 +84,6 @@ local function GetDeviceID()
     pcall(function() writefile(DEVICE_FILE, deviceID) end)
     return deviceID
 end
-
 local function LoadLocks()
     local ok, data = pcall(function() return readfile(LOCK_FILE) end)
     if not ok or not data or data=="" then return {} end
@@ -100,13 +94,11 @@ local function LoadLocks()
     end
     return locks
 end
-
 local function SaveLocks(locks)
     local lines={}
     for k,d in pairs(locks) do table.insert(lines,k.."="..d) end
     pcall(function() writefile(LOCK_FILE,table.concat(lines,"\n")) end)
 end
-
 local function ValidateKey(key)
     if not key or #key<4 then return "invalid" end
     local k = key:match("^%s*(.-)%s*$")
@@ -116,7 +108,7 @@ local function ValidateKey(key)
     end
     if not keyExists then return "invalid" end
     local myDevice = GetDeviceID()
-    local locks    = LoadLocks()
+    local locks = LoadLocks()
     if locks[k]==nil then
         locks[k]=myDevice; SaveLocks(locks); return "ok"
     elseif locks[k]==myDevice then
@@ -125,9 +117,8 @@ local function ValidateKey(key)
         return "locked_other"
     end
 end
-
 -- ══════════════════════════════════════════════════════════════════
--- INTRO  ◈  Holographic Boot Sequence
+-- INTRO ◈ Holographic Boot Sequence
 -- ══════════════════════════════════════════════════════════════════
 do
     local IntroSG = Instance.new("ScreenGui")
@@ -135,7 +126,6 @@ do
     IntroSG.IgnoreGuiInset=true; IntroSG.DisplayOrder=99999
     pcall(function() IntroSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
     if not IntroSG.Parent then pcall(function() IntroSG.Parent=Plr:WaitForChild("PlayerGui") end) end
-
     local function playSound(id, vol, pitch)
         pcall(function()
             local s = Instance.new("Sound", workspace)
@@ -144,9 +134,7 @@ do
             s:Play(); game:GetService("Debris"):AddItem(s, 4)
         end)
     end
-
     local scanRunning = true
-
     local Flash = Instance.new("Frame", IntroSG)
     Flash.Size=UDim2.new(1,0,1,0); Flash.BackgroundColor3=Color3.fromRGB(255,255,255)
     Flash.BackgroundTransparency=0; Flash.BorderSizePixel=0; Flash.ZIndex=100
@@ -154,21 +142,17 @@ do
     TweenService:Create(Flash, TweenInfo.new(0.18, Enum.EasingStyle.Quad),
         {BackgroundTransparency=1}):Play()
     task.wait(0.22)
-
     local BG = Instance.new("Frame", IntroSG)
     BG.Size=UDim2.new(1,0,1,0); BG.BackgroundColor3=Color3.fromRGB(2,1,6)
     BG.BackgroundTransparency=0; BG.BorderSizePixel=0; BG.ZIndex=1
-
     local Glow = Instance.new("Frame", BG)
     Glow.AnchorPoint=Vector2.new(0.5,0.5); Glow.Position=UDim2.new(0.5,0,0.46,0)
     Glow.Size=UDim2.new(0,600,0,300); Glow.BackgroundColor3=Color3.fromRGB(55,10,140)
     Glow.BackgroundTransparency=0.94; Glow.BorderSizePixel=0; Glow.ZIndex=1
     Instance.new("UICorner",Glow).CornerRadius=UDim.new(1,0)
-
     local ScanContainer = Instance.new("Frame", IntroSG)
     ScanContainer.Size=UDim2.new(1,0,1,0); ScanContainer.BackgroundTransparency=1
     ScanContainer.BorderSizePixel=0; ScanContainer.ZIndex=2; ScanContainer.ClipsDescendants=true
-
     local lineCount = 45
     local scanLines = {}
     for i = 1, lineCount do
@@ -179,7 +163,6 @@ do
         line.BackgroundTransparency = 0.72; line.BorderSizePixel=0; line.ZIndex=2
         table.insert(scanLines, line)
     end
-
     task.spawn(function()
         local offset = 0
         while scanRunning do
@@ -196,7 +179,6 @@ do
             task.wait(0.018)
         end
     end)
-
     local GridContainer = Instance.new("Frame", IntroSG)
     GridContainer.Size=UDim2.new(1,0,1,0); GridContainer.BackgroundTransparency=1
     GridContainer.BorderSizePixel=0; GridContainer.ZIndex=3
@@ -212,7 +194,6 @@ do
         hl.BackgroundColor3=Color3.fromRGB(0,160,220); hl.BackgroundTransparency=0.88
         hl.BorderSizePixel=0; hl.ZIndex=3
     end
-
     local VSweep = Instance.new("Frame", IntroSG)
     VSweep.Size=UDim2.new(0,3,1,0); VSweep.Position=UDim2.new(-0.05,0,0,0)
     VSweep.BackgroundColor3=Color3.fromRGB(120,240,255); VSweep.BackgroundTransparency=0.3
@@ -233,14 +214,12 @@ do
         ColorSequenceKeypoint.new(0.5,Color3.fromRGB(60,180,255)),
         ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0)),
     }
-
     playSound(9119713951, 0.5, 1.0)
     TweenService:Create(VSweep, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
         {Position=UDim2.new(1.05,0,0,0)}):Play()
     TweenService:Create(VBloom, TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
         {Position=UDim2.new(1.0,0,0,0)}):Play()
     task.wait(0.3)
-
     local Card = Instance.new("Frame", IntroSG)
     Card.AnchorPoint=Vector2.new(0.5,0.5); Card.Position=UDim2.new(0.5,0,0.5,0)
     Card.Size=UDim2.new(0,0,0,0); Card.BackgroundColor3=Color3.fromRGB(4,14,22)
@@ -254,12 +233,10 @@ do
         ColorSequenceKeypoint.new(0.5,Color3.fromRGB(3,10,18)),
         ColorSequenceKeypoint.new(1,Color3.fromRGB(5,20,35)),
     }; CardGrad.Rotation=135
-
     local Accent = Instance.new("Frame", Card)
     Accent.Size=UDim2.new(1,0,0,2); Accent.Position=UDim2.new(0,0,0,0)
     Accent.BackgroundColor3=Color3.fromRGB(0,210,255); Accent.BorderSizePixel=0; Accent.ZIndex=11
     Instance.new("UICorner",Accent).CornerRadius=UDim.new(0,16)
-
     local Badge = Instance.new("TextLabel", Card)
     Badge.AnchorPoint=Vector2.new(1,0); Badge.Position=UDim2.new(1,-10,0,8)
     Badge.Size=UDim2.new(0,72,0,18); Badge.BackgroundColor3=Color3.fromRGB(0,50,80)
@@ -267,17 +244,15 @@ do
     Badge.TextSize=9; Badge.TextColor3=Color3.fromRGB(0,220,255); Badge.TextTransparency=1; Badge.ZIndex=12
     Instance.new("UICorner",Badge).CornerRadius=UDim.new(0,5)
     local BadgeStroke=Instance.new("UIStroke",Badge); BadgeStroke.Thickness=1; BadgeStroke.Color=Color3.fromRGB(0,180,255)
-
     local IconLbl = Instance.new("TextLabel", Card)
     IconLbl.AnchorPoint=Vector2.new(0,0.5); IconLbl.Position=UDim2.new(0,18,0,62)
     IconLbl.Size=UDim2.new(0,44,0,44); IconLbl.BackgroundTransparency=1; IconLbl.Text="◈"
     IconLbl.Font=Enum.Font.GothamBlack; IconLbl.TextSize=36
     IconLbl.TextColor3=Color3.fromRGB(0,210,255); IconLbl.TextTransparency=1; IconLbl.ZIndex=12
-
     local Headline = Instance.new("TextLabel", Card)
     Headline.AnchorPoint=Vector2.new(0,0.5); Headline.Position=UDim2.new(0,70,0,52)
     Headline.Size=UDim2.new(1,-80,0,30); Headline.BackgroundTransparency=1
-    Headline.Text="RYUU  HUB"; Headline.Font=Enum.Font.GothamBlack; Headline.TextSize=28
+    Headline.Text="RYUU HUB"; Headline.Font=Enum.Font.GothamBlack; Headline.TextSize=28
     Headline.TextTransparency=1; Headline.TextXAlignment=Enum.TextXAlignment.Left; Headline.ZIndex=12
     local HLGrad = Instance.new("UIGradient", Headline)
     HLGrad.Color=ColorSequence.new{
@@ -285,18 +260,15 @@ do
         ColorSequenceKeypoint.new(0.5,Color3.fromRGB(255,255,255)),
         ColorSequenceKeypoint.new(1,Color3.fromRGB(0,200,255)),
     }
-
     local SubLbl = Instance.new("TextLabel", Card)
     SubLbl.AnchorPoint=Vector2.new(0,0.5); SubLbl.Position=UDim2.new(0,70,0,82)
     SubLbl.Size=UDim2.new(1,-80,0,16); SubLbl.BackgroundTransparency=1
-    SubLbl.Text="V 2   ·   by ZivX   ·   Loading..."; SubLbl.Font=Enum.Font.Gotham; SubLbl.TextSize=10
+    SubLbl.Text="V 2 · by ZivX · Loading..."; SubLbl.Font=Enum.Font.Gotham; SubLbl.TextSize=10
     SubLbl.TextColor3=Color3.fromRGB(0,160,200); SubLbl.TextTransparency=1
     SubLbl.TextXAlignment=Enum.TextXAlignment.Left; SubLbl.ZIndex=12
-
     local CDivider = Instance.new("Frame", Card)
     CDivider.Size=UDim2.new(0,0,0,1); CDivider.Position=UDim2.new(0,18,0,104)
     CDivider.BackgroundColor3=Color3.fromRGB(0,160,210); CDivider.BorderSizePixel=0; CDivider.ZIndex=11
-
     local CBarBG = Instance.new("Frame", Card)
     CBarBG.Size=UDim2.new(1,-36,0,4); CBarBG.Position=UDim2.new(0,18,0,116)
     CBarBG.BackgroundColor3=Color3.fromRGB(0,20,40); CBarBG.BorderSizePixel=0; CBarBG.ZIndex=11
@@ -315,15 +287,12 @@ do
     CBarShimmer.BackgroundColor3=Color3.fromRGB(255,255,255); CBarShimmer.BackgroundTransparency=0.7
     CBarShimmer.BorderSizePixel=0; CBarShimmer.ZIndex=13
     Instance.new("UICorner",CBarShimmer).CornerRadius=UDim.new(1,0)
-
     local StatusLbl = Instance.new("TextLabel", IntroSG)
     StatusLbl.AnchorPoint=Vector2.new(0.5,0.5); StatusLbl.Position=UDim2.new(0.5,0,0.72,0)
     StatusLbl.Size=UDim2.new(0,340,0,14); StatusLbl.BackgroundTransparency=1
     StatusLbl.Text="Initializing..."; StatusLbl.Font=Enum.Font.Gotham; StatusLbl.TextSize=10
     StatusLbl.TextColor3=Color3.fromRGB(0,160,200); StatusLbl.ZIndex=8
-
     local loadDone = false
-
     task.spawn(function()
         playSound(4590662766, 0.65, 1.1)
         TweenService:Create(Card,
@@ -341,7 +310,6 @@ do
         TweenService:Create(CDivider, TweenInfo.new(0.3, Enum.EasingStyle.Quad),
             {Size=UDim2.new(1,-36,0,1)}):Play()
         task.wait(0.1)
-
         local STEPS = {
             "Initializing engine...",
             "Loading Rayfield...",
@@ -349,7 +317,6 @@ do
             "Connecting to services...",
             "Starting systems...",
         }
-
         task.spawn(function()
             while not loadDone do
                 pcall(function()
@@ -361,7 +328,6 @@ do
                 task.wait(1.0)
             end
         end)
-
         local stepCount = #STEPS
         for i, stepText in ipairs(STEPS) do
             if loadDone then break end
@@ -372,11 +338,9 @@ do
                 {Size=UDim2.new(pct * 0.85,0,1,0)}):Play()
             task.wait(0.38)
         end
-
         local w = 0
         while not loadDone and w < 8 do task.wait(0.1); w=w+0.1 end
-
-        SubLbl.Text = "V 2   ·   by ZivX   ·   Ready!"
+        SubLbl.Text = "V 2 · by ZivX · Ready!"
         StatusLbl.Text = "Ready"
         StatusLbl.TextColor3 = Color3.fromRGB(50,220,110)
         TweenService:Create(CBar, TweenInfo.new(0.18),
@@ -389,7 +353,6 @@ do
             {Color=Color3.fromRGB(35,220,100)}):Play()
         TweenService:Create(Accent, TweenInfo.new(0.2),
             {BackgroundColor3=Color3.fromRGB(35,220,100)}):Play()
-
         task.wait(0.25)
         playSound(6042053626, 0.5, 0.85)
         local VSweep2 = Instance.new("Frame", IntroSG)
@@ -399,34 +362,30 @@ do
         TweenService:Create(VSweep2, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
             {Position=UDim2.new(-0.05,0,0,0)}):Play()
         task.wait(0.4)
-
         TweenService:Create(CardStroke, TweenInfo.new(0.1),
             {Color=Color3.fromRGB(255,255,255), Thickness=3.5}):Play()
         task.wait(0.12)
         TweenService:Create(CardStroke, TweenInfo.new(0.4),
             {Color=Color3.fromRGB(35,220,100), Thickness=1.8}):Play()
         task.wait(0.5)
-
         scanRunning = false
         for _, line in ipairs(scanLines) do
             TweenService:Create(line, TweenInfo.new(0.3), {BackgroundTransparency=1}):Play()
         end
         TweenService:Create(GridContainer, TweenInfo.new(0.4), {BackgroundTransparency=1}):Play()
         task.wait(0.5)
-
         local ft = TweenInfo.new(0.38)
-        TweenService:Create(BG,       ft, {BackgroundTransparency=1}):Play()
-        TweenService:Create(Card,     ft, {BackgroundTransparency=1}):Play()
+        TweenService:Create(BG, ft, {BackgroundTransparency=1}):Play()
+        TweenService:Create(Card, ft, {BackgroundTransparency=1}):Play()
         TweenService:Create(CardStroke, ft, {Transparency=1}):Play()
         TweenService:Create(Headline, ft, {TextTransparency=1}):Play()
-        TweenService:Create(SubLbl,   ft, {TextTransparency=1}):Play()
-        TweenService:Create(IconLbl,  ft, {TextTransparency=1}):Play()
-        TweenService:Create(Badge,    ft, {TextTransparency=1}):Play()
+        TweenService:Create(SubLbl, ft, {TextTransparency=1}):Play()
+        TweenService:Create(IconLbl, ft, {TextTransparency=1}):Play()
+        TweenService:Create(Badge, ft, {TextTransparency=1}):Play()
         TweenService:Create(StatusLbl, ft, {TextTransparency=1}):Play()
         task.wait(0.42)
         pcall(function() IntroSG:Destroy() end)
     end)
-
     local RF_URLS = {
         "https://sirius.menu/rayfield",
         "https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua",
@@ -441,126 +400,113 @@ do
         warn("[Ryuu V2] Rayfield load failed — using stub")
         Rayfield = makeStub()
     end
-
     loadDone = true
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- ALWAYS-ON HUD
 -- ══════════════════════════════════════════════════════════════════
 do
     local HudSG = Instance.new("ScreenGui")
-    HudSG.Name           = "RyuuHUD"
-    HudSG.ResetOnSpawn   = false
+    HudSG.Name = "RyuuHUD"
+    HudSG.ResetOnSpawn = false
     HudSG.IgnoreGuiInset = true
-    HudSG.DisplayOrder   = 9998
+    HudSG.DisplayOrder = 9998
     pcall(function() HudSG.Parent = (typeof(gethui)=="function" and gethui()) or CoreGui end)
     if not HudSG.Parent then pcall(function() HudSG.Parent = Plr:WaitForChild("PlayerGui") end) end
-
     local HudFrame = Instance.new("Frame", HudSG)
-    HudFrame.AnchorPoint       = Vector2.new(1,0)
-    HudFrame.Position          = UDim2.new(1,-14,0,14)
-    HudFrame.Size              = UDim2.new(0,200,0,110)
-    HudFrame.BackgroundColor3  = Color3.fromRGB(6,3,14)
+    HudFrame.AnchorPoint = Vector2.new(1,0)
+    HudFrame.Position = UDim2.new(1,-14,0,14)
+    HudFrame.Size = UDim2.new(0,200,0,110)
+    HudFrame.BackgroundColor3 = Color3.fromRGB(6,3,14)
     HudFrame.BackgroundTransparency = 0.18
-    HudFrame.BorderSizePixel   = 0
+    HudFrame.BorderSizePixel = 0
     Instance.new("UICorner", HudFrame).CornerRadius = UDim.new(0,10)
     local HudStroke = Instance.new("UIStroke", HudFrame)
-    HudStroke.Thickness  = 1.2
-    HudStroke.Color      = Color3.fromRGB(80,35,170)
+    HudStroke.Thickness = 1.2
+    HudStroke.Color = Color3.fromRGB(80,35,170)
     HudStroke.Transparency = 0.35
-
     local HudGrad = Instance.new("UIGradient", HudFrame)
     HudGrad.Color = ColorSequence.new{
         ColorSequenceKeypoint.new(0, Color3.fromRGB(18,8,40)),
         ColorSequenceKeypoint.new(1, Color3.fromRGB(6,3,14)),
     }
     HudGrad.Rotation = 90
-
     local HudTitle = Instance.new("TextLabel", HudFrame)
-    HudTitle.Size              = UDim2.new(1,-10,0,14)
-    HudTitle.Position          = UDim2.new(0,8,0,5)
+    HudTitle.Size = UDim2.new(1,-10,0,14)
+    HudTitle.Position = UDim2.new(0,8,0,5)
     HudTitle.BackgroundTransparency = 1
-    HudTitle.Text              = "◈  RYUU V2"
-    HudTitle.Font              = Enum.Font.GothamBlack
-    HudTitle.TextSize          = 10
-    HudTitle.TextColor3        = Color3.fromRGB(140,60,255)
-    HudTitle.TextXAlignment    = Enum.TextXAlignment.Left
-
+    HudTitle.Text = "◈ RYUU V2"
+    HudTitle.Font = Enum.Font.GothamBlack
+    HudTitle.TextSize = 10
+    HudTitle.TextColor3 = Color3.fromRGB(140,60,255)
+    HudTitle.TextXAlignment = Enum.TextXAlignment.Left
     local divider = Instance.new("Frame", HudFrame)
-    divider.Size               = UDim2.new(1,-16,0,1)
-    divider.Position           = UDim2.new(0,8,0,21)
-    divider.BackgroundColor3   = Color3.fromRGB(60,25,120)
-    divider.BorderSizePixel    = 0
-
+    divider.Size = UDim2.new(1,-16,0,1)
+    divider.Position = UDim2.new(0,8,0,21)
+    divider.BackgroundColor3 = Color3.fromRGB(60,25,120)
+    divider.BorderSizePixel = 0
     local HudPing = Instance.new("TextLabel", HudFrame)
-    HudPing.Size               = UDim2.new(1,-12,0,22)
-    HudPing.Position           = UDim2.new(0,8,0,26)
+    HudPing.Size = UDim2.new(1,-12,0,22)
+    HudPing.Position = UDim2.new(0,8,0,26)
     HudPing.BackgroundTransparency = 1
-    HudPing.Text               = "📶  Ping  —  --ms"
-    HudPing.Font               = Enum.Font.GothamBold
-    HudPing.TextSize           = 12
-    HudPing.TextColor3         = Color3.fromRGB(200,200,200)
-    HudPing.TextXAlignment     = Enum.TextXAlignment.Left
-
+    HudPing.Text = "📶 Ping — --ms"
+    HudPing.Font = Enum.Font.GothamBold
+    HudPing.TextSize = 12
+    HudPing.TextColor3 = Color3.fromRGB(200,200,200)
+    HudPing.TextXAlignment = Enum.TextXAlignment.Left
     local HudFPS = Instance.new("TextLabel", HudFrame)
-    HudFPS.Size                = UDim2.new(1,-12,0,20)
-    HudFPS.Position            = UDim2.new(0,8,0,46)
+    HudFPS.Size = UDim2.new(1,-12,0,20)
+    HudFPS.Position = UDim2.new(0,8,0,46)
     HudFPS.BackgroundTransparency = 1
-    HudFPS.Text                = "🖥  FPS  —  --"
-    HudFPS.Font                = Enum.Font.GothamBold
-    HudFPS.TextSize            = 11
-    HudFPS.TextColor3          = Color3.fromRGB(200,200,200)
-    HudFPS.TextXAlignment      = Enum.TextXAlignment.Left
-
+    HudFPS.Text = "🖥 FPS — --"
+    HudFPS.Font = Enum.Font.GothamBold
+    HudFPS.TextSize = 11
+    HudFPS.TextColor3 = Color3.fromRGB(200,200,200)
+    HudFPS.TextXAlignment = Enum.TextXAlignment.Left
     local HudParry = Instance.new("TextLabel", HudFrame)
-    HudParry.Size              = UDim2.new(1,-12,0,20)
-    HudParry.Position          = UDim2.new(0,8,0,66)
+    HudParry.Size = UDim2.new(1,-12,0,20)
+    HudParry.Position = UDim2.new(0,8,0,66)
     HudParry.BackgroundTransparency = 1
-    HudParry.Text              = "⚔  Hit Rate  —  --%"
-    HudParry.Font              = Enum.Font.GothamBold
-    HudParry.TextSize          = 11
-    HudParry.TextColor3        = Color3.fromRGB(200,200,200)
-    HudParry.TextXAlignment    = Enum.TextXAlignment.Left
-
-    -- NEW: Mode indicator (GAME / LOBBY / OFF)
+    HudParry.Text = "⚔ Hit Rate — --%"
+    HudParry.Font = Enum.Font.GothamBold
+    HudParry.TextSize = 11
+    HudParry.TextColor3 = Color3.fromRGB(200,200,200)
+    HudParry.TextXAlignment = Enum.TextXAlignment.Left
     local HudMode = Instance.new("TextLabel", HudFrame)
-    HudMode.Size               = UDim2.new(1,-12,0,16)
-    HudMode.Position           = UDim2.new(0,8,0,88)
+    HudMode.Size = UDim2.new(1,-12,0,16)
+    HudMode.Position = UDim2.new(0,8,0,88)
     HudMode.BackgroundTransparency = 1
-    HudMode.Text               = "⚡  Mode  —  IDLE"
-    HudMode.Font               = Enum.Font.GothamBold
-    HudMode.TextSize           = 10
-    HudMode.TextColor3         = Color3.fromRGB(160,160,160)
-    HudMode.TextXAlignment     = Enum.TextXAlignment.Left
-
+    HudMode.Text = "⚡ Mode — IDLE"
+    HudMode.Font = Enum.Font.GothamBold
+    HudMode.TextSize = 10
+    HudMode.TextColor3 = Color3.fromRGB(160,160,160)
+    HudMode.TextXAlignment = Enum.TextXAlignment.Left
     _G.RyuuHudMode = HudMode
     _G.RyuuHudParry = HudParry
     _G.RyuuHudPing = HudPing
     _G.RyuuHudFPS = HudFPS
-
     local fpsCount, fpsTimer, fpsNow = 0, 0, 0
     RunService.Heartbeat:Connect(function(dt)
         fpsCount = fpsCount + 1
         fpsTimer = fpsTimer + dt
         if fpsTimer >= 0.5 then
-            fpsNow   = math.floor(fpsCount / fpsTimer)
+            fpsNow = math.floor(fpsCount / fpsTimer)
             fpsCount = 0
             fpsTimer = 0
             local col = fpsNow >= 55 and Color3.fromRGB(34,197,110)
                      or fpsNow >= 30 and Color3.fromRGB(255,200,50)
                      or Color3.fromRGB(255,80,80)
             pcall(function()
-                HudFPS.Text      = ("🖥  FPS  —  %d"):format(fpsNow)
+                HudFPS.Text = ("🖥 FPS — %d"):format(fpsNow)
                 HudFPS.TextColor3= col
             end)
         end
         pcall(function()
             local displayMs = math.floor(PingRaw > 0 and PingRaw or PingMs)
-            local col = displayMs < 60  and Color3.fromRGB(34,197,110)
+            local col = displayMs < 60 and Color3.fromRGB(34,197,110)
                      or displayMs < 120 and Color3.fromRGB(255,200,50)
                      or Color3.fromRGB(255,80,80)
-            HudPing.Text      = ("📶  %dms"):format(displayMs)
+            HudPing.Text = ("📶 %dms"):format(displayMs)
             HudPing.TextColor3= col
         end)
         pcall(function()
@@ -568,56 +514,47 @@ do
             local pcol = rate >= 80 and Color3.fromRGB(34,197,110)
                       or rate >= 50 and Color3.fromRGB(255,200,50)
                       or Color3.fromRGB(255,80,80)
-            HudParry.Text       = ("⚔  Hit Rate  —  %d%%"):format(rate)
+            HudParry.Text = ("⚔ Hit Rate — %d%%"):format(rate)
             HudParry.TextColor3 = pcol
         end)
     end)
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- LOBBY MODE HUD BADGE
 -- ══════════════════════════════════════════════════════════════════
 local LobbyBadgeSG = nil
-
 local function BuildLobbyBadge(visible)
     if LobbyBadgeSG then pcall(function() LobbyBadgeSG:Destroy() end); LobbyBadgeSG=nil end
     if not visible then return end
-
     LobbyBadgeSG = Instance.new("ScreenGui")
     LobbyBadgeSG.Name="RyuuLobbyBadge"; LobbyBadgeSG.ResetOnSpawn=false
     LobbyBadgeSG.IgnoreGuiInset=true; LobbyBadgeSG.DisplayOrder=9997
     pcall(function() LobbyBadgeSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
     if not LobbyBadgeSG.Parent then pcall(function() LobbyBadgeSG.Parent=Plr:WaitForChild("PlayerGui") end) end
-
     local BadgeFrame = Instance.new("Frame", LobbyBadgeSG)
     BadgeFrame.AnchorPoint = Vector2.new(0.5,0)
-    BadgeFrame.Position    = UDim2.new(0.5,0,0,16)
-    BadgeFrame.Size        = UDim2.new(0,220,0,38)
+    BadgeFrame.Position = UDim2.new(0.5,0,0,16)
+    BadgeFrame.Size = UDim2.new(0,220,0,38)
     BadgeFrame.BackgroundColor3 = Color3.fromRGB(4,18,8)
     BadgeFrame.BackgroundTransparency = 0.1
     BadgeFrame.BorderSizePixel = 0
     Instance.new("UICorner",BadgeFrame).CornerRadius = UDim.new(0,12)
     local BStroke = Instance.new("UIStroke",BadgeFrame)
     BStroke.Thickness=1.6; BStroke.Color=Color3.fromRGB(35,220,100); BStroke.Transparency=0.1
-
     local BAccent = Instance.new("Frame",BadgeFrame)
     BAccent.Size=UDim2.new(1,0,0,2); BAccent.BackgroundColor3=Color3.fromRGB(35,220,100)
     BAccent.BorderSizePixel=0
     Instance.new("UICorner",BAccent).CornerRadius=UDim.new(0,12)
-
     local Dot = Instance.new("Frame",BadgeFrame)
     Dot.Size=UDim2.new(0,8,0,8); Dot.Position=UDim2.new(0,14,0.5,-4)
     Dot.BackgroundColor3=Color3.fromRGB(35,220,100); Dot.BorderSizePixel=0
     Instance.new("UICorner",Dot).CornerRadius=UDim.new(1,0)
-
     local BLbl = Instance.new("TextLabel",BadgeFrame)
     BLbl.Size=UDim2.new(1,-36,1,0); BLbl.Position=UDim2.new(0,28,0,0)
     BLbl.BackgroundTransparency=1
-    BLbl.Text="🏟  LOBBY PARRY  —  ACTIVE"
+    BLbl.Text="🏟 LOBBY PARRY — ACTIVE"
     BLbl.Font=Enum.Font.GothamBlack; BLbl.TextSize=11
     BLbl.TextColor3=Color3.fromRGB(50,230,110); BLbl.TextXAlignment=Enum.TextXAlignment.Left
-
-    -- Pulse dot animation
     task.spawn(function()
         local big = false
         while LobbyBadgeSG and LobbyBadgeSG.Parent do
@@ -630,57 +567,51 @@ local function BuildLobbyBadge(visible)
             task.wait(0.5)
         end
     end)
-
-    -- Entrance tween
     BadgeFrame.Position = UDim2.new(0.5,0,-0.1,0)
     TweenService:Create(BadgeFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
         {Position=UDim2.new(0.5,0,0,16)}):Play()
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- STATE
 -- ══════════════════════════════════════════════════════════════════
 local S = {
-    AutoParry       = false,
-    LobbyParry      = false,
-    AutoFace        = false,
-    BallESP         = false,
-    AbilityESP      = false,
-    Triggerbot      = false,
-    Fullbright      = false,
-    Noclip          = false,
-    InfJump         = false,
-    ParryCount      = 0,
-    WalkSpeed       = 16,
-    JumpPower       = 50,
-    LastParry       = 0,
-    ParryCooldown   = 0.30,
-    DidParry        = false,
-    EmergencyParry  = true,
-    EmergencyDist   = 6,
-    ParryAccuracy   = 100,
-    AntiCurve       = true,
-    ParryReset      = 0.16,
+    AutoParry = false,
+    LobbyParry = false,
+    AutoFace = false,
+    BallESP = false,
+    AbilityESP = false,
+    Triggerbot = false,
+    Fullbright = false,
+    Noclip = false,
+    InfJump = false,
+    ParryCount = 0,
+    WalkSpeed = 16,
+    JumpPower = 50,
+    LastParry = 0,
+    ParryCooldown = 0.30,
+    DidParry = false,
+    EmergencyParry = true,
+    EmergencyDist = 6,
+    ParryAccuracy = 100,
+    AntiCurve = true,
+    ParryReset = 0.16,
 }
-
 local P = {
-    AutoParry       = false,
-    LobbyParry      = false,
-    GodEmergency    = false,
-    CurveCrusher    = true,
-    AutoFace        = false,
-    HitboxTarget    = 4.0,
+    AutoParry = false,
+    LobbyParry = false,
+    GodEmergency = false,
+    CurveCrusher = true,
+    AutoFace = false,
+    HitboxTarget = 4.0,
     SpeedBoostDetect= true,
     QuadCurvePredict= true,
-    STierCurve      = true,
+    STierCurve = true,
 }
-
 local PDet = { conn=nil, cd=0.4, cds={} }
 local PremiumUnlocked = false
-local PremiumActive   = false
-local EnteredKey      = ""
-local Conn            = {}
-
+local PremiumActive = false
+local EnteredKey = ""
+local Conn = {}
 -- ══════════════════════════════════════════════════════════════════
 -- BALL / PLAYER HELPERS
 -- ══════════════════════════════════════════════════════════════════
@@ -699,12 +630,10 @@ local function GetBall()
     end
     return nil
 end
-
 local function GetHRP()
     local c=Plr.Character
     return c and c:FindFirstChild("HumanoidRootPart")
 end
-
 local function GetVel(ball)
     local best = Vector3.zero
     local ok1,v1 = pcall(function() return ball.AssemblyLinearVelocity end)
@@ -719,17 +648,15 @@ local function GetVel(ball)
     end)
     return best
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- PING SAMPLER
 -- ══════════════════════════════════════════════════════════════════
-local PingMs      = 1
-local PingRaw     = 0
-local PingBonus   = 0
-local PingScale   = 1.0
+local PingMs = 1
+local PingRaw = 0
+local PingBonus = 0
+local PingScale = 1.0
 local PingSamples = {}
-local PingJitter  = 0
-
+local PingJitter = 0
 task.spawn(function()
     while true do
         local ok, raw = pcall(function()
@@ -757,34 +684,15 @@ task.spawn(function()
         task.wait(0.5)
     end
 end)
-
-local PingLabel = nil
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if PingLabel then
-            pcall(function()
-                local realMs = math.floor(PingRaw > 0 and PingRaw or PingMs)
-                local col2 = realMs<60 and Color3.fromRGB(34,197,110)
-                          or realMs<120 and Color3.fromRGB(255,200,50)
-                          or Color3.fromRGB(255,80,80)
-                PingLabel.Text      = ("Real: %dms  |  Comp: +%.3fs"):format(realMs, PingBonus)
-                PingLabel.TextColor3= col2
-            end)
-        end
-    end
-end)
-
 -- ══════════════════════════════════════════════════════════════════
 -- PARRY STATS
 -- ══════════════════════════════════════════════════════════════════
 local ParryStats = {
-    total          = 0,
-    hits           = 0,
+    total = 0,
+    hits = 0,
     lastBallTarget = "",
-    lastFireTime   = 0,
+    lastFireTime = 0,
 }
-
 local function TrackParryHit(ballTarget)
     if ballTarget ~= Plr.Name and ParryStats.lastBallTarget == Plr.Name then
         if os.clock() - ParryStats.lastFireTime < 0.4 then
@@ -793,18 +701,15 @@ local function TrackParryHit(ballTarget)
     end
     ParryStats.lastBallTarget = ballTarget or ""
 end
-
 local function ParrySuccessRate()
     if ParryStats.total == 0 then return 100 end
     return math.floor((ParryStats.hits / ParryStats.total) * 100)
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- BALL VELOCITY VECTOR ARROW ESP
 -- ══════════════════════════════════════════════════════════════════
 local VelArrowSG = nil
 local VelArrowActive = false
-
 local function BuildVelArrow()
     if VelArrowSG then pcall(function() VelArrowSG:Destroy() end) end
     VelArrowSG = Instance.new("ScreenGui")
@@ -812,8 +717,6 @@ local function BuildVelArrow()
     VelArrowSG.IgnoreGuiInset=true; VelArrowSG.DisplayOrder=9985
     pcall(function() VelArrowSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
     if not VelArrowSG.Parent then pcall(function() VelArrowSG.Parent=Plr:WaitForChild("PlayerGui") end) end
-
-    -- Arrow shaft
     local Shaft = Instance.new("Frame", VelArrowSG)
     Shaft.Name="Shaft"; Shaft.BackgroundColor3=Color3.fromRGB(255,220,0)
     Shaft.BorderSizePixel=0; Shaft.ZIndex=8; Shaft.Visible=false
@@ -822,20 +725,17 @@ local function BuildVelArrow()
     ShaftGlow.Name="ShaftGlow"; ShaftGlow.BackgroundColor3=Color3.fromRGB(255,220,0)
     ShaftGlow.BackgroundTransparency=0.7; ShaftGlow.BorderSizePixel=0; ShaftGlow.ZIndex=7; ShaftGlow.Visible=false
     Instance.new("UICorner",ShaftGlow).CornerRadius=UDim.new(1,0)
-    -- Arrowhead
     local Head = Instance.new("Frame", VelArrowSG)
     Head.Name="Head"; Head.AnchorPoint=Vector2.new(0.5,0.5)
     Head.Size=UDim2.new(0,12,0,12); Head.BackgroundColor3=Color3.fromRGB(255,220,0)
     Head.BorderSizePixel=0; Head.ZIndex=9; Head.Visible=false
     Instance.new("UICorner",Head).CornerRadius=UDim.new(0,2)
-    -- Speed label on arrow
     local SpeedTag = Instance.new("TextLabel", VelArrowSG)
     SpeedTag.Name="SpeedTag"; SpeedTag.BackgroundTransparency=1
     SpeedTag.Size=UDim2.new(0,80,0,16); SpeedTag.Text="-- st/s"
     SpeedTag.Font=Enum.Font.GothamBold; SpeedTag.TextSize=10
     SpeedTag.TextColor3=Color3.fromRGB(255,230,80); SpeedTag.ZIndex=10; SpeedTag.Visible=false
     SpeedTag.TextStrokeTransparency=0.4
-
     VelArrowActive = true
     RunService.Heartbeat:Connect(function()
         if not VelArrowActive then
@@ -846,11 +746,8 @@ local function BuildVelArrow()
         local vel = GetVel(ball)
         local spd = vel.Magnitude
         if spd < 4 then Shaft.Visible=false; ShaftGlow.Visible=false; Head.Visible=false; SpeedTag.Visible=false; return end
-
         local sp1, on1 = Cam:WorldToViewportPoint(ball.Position)
         if not on1 then Shaft.Visible=false; ShaftGlow.Visible=false; Head.Visible=false; SpeedTag.Visible=false; return end
-
-        -- Scale arrow length by speed (min 30px, max 130px)
         local len = math.clamp(spd * 0.45, 30, 130)
         local ahead3D = ball.Position + vel.Unit * (len / 15)
         local sp2, _ = Cam:WorldToViewportPoint(ahead3D)
@@ -859,11 +756,9 @@ local function BuildVelArrow()
         local screenLen = math.sqrt(dx*dx + dy*dy)
         if screenLen < 4 then return end
         local rot = math.deg(math.atan2(dy, dx))
-
         local isTgt = (ball:GetAttribute("target") or "") == Plr.Name
         local col = isTgt and Color3.fromRGB(255,60,60) or Color3.fromRGB(255,220,0)
         local glowCol = isTgt and Color3.fromRGB(255,120,120) or Color3.fromRGB(255,240,120)
-
         pcall(function()
             Shaft.Visible=true; Shaft.BackgroundColor3=col
             Shaft.Size=UDim2.new(0,screenLen,0,3)
@@ -883,63 +778,52 @@ local function BuildVelArrow()
         end)
     end)
 end
-
 -- ══════════════════════════════════════════════════════════════════
 -- PARRY FIRE HELPERS
 -- ══════════════════════════════════════════════════════════════════
-local FreeLastParriedBall  = nil
-local PremLastParriedBall  = nil
-local FREE_ANTI_SPAM_CD    = 0.08
-
+local FreeLastParriedBall = nil
+local PremLastParriedBall = nil
+local FREE_ANTI_SPAM_CD = 0.08
 local function FireParry(ball)
     if S.DidParry then return end
     if os.clock() - S.LastParry < S.ParryCooldown then return end
     if os.clock() - S.LastParry < FREE_ANTI_SPAM_CD then return end
     if ball and ball == FreeLastParriedBall then return end
-
-    -- Accuracy jitter (human-feel at lower accuracy settings)
     if S.ParryAccuracy < 100 then
         local chance = S.ParryAccuracy / 100
         if math.random() > chance then return end
     end
-
-    VIM:SendMouseButtonEvent(0,0,0,true,  game, 0)
-    S.LastParry             = os.clock()
-    S.DidParry              = true
-    S.ParryCount            = S.ParryCount + 1
-    ParryStats.total        = ParryStats.total + 1
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    S.LastParry = os.clock()
+    S.DidParry = true
+    S.ParryCount = S.ParryCount + 1
+    ParryStats.total = ParryStats.total + 1
     ParryStats.lastFireTime = os.clock()
-    FreeLastParriedBall     = ball
-
+    FreeLastParriedBall = ball
     task.spawn(function()
         task.wait(0.015)
         VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
     end)
     task.delay(S.ParryReset or 0.16, function()
-        S.DidParry          = false
+        S.DidParry = false
         FreeLastParriedBall = nil
     end)
 end
-
--- Premium adaptive cooldown
-local PremCooldown      = 0.15
-local PremCooldownBase  = 0.15
-local PremCooldownMax   = 0.22
-local PremLastParry     = 0
-local PremDidParry      = false
-
+local PremCooldown = 0.15
+local PremCooldownBase = 0.15
+local PremCooldownMax = 0.22
+local PremLastParry = 0
+local PremDidParry = false
 local PremConn = {}
 local PremSpeedWarnThreshold = 160
-local PremLastSpeedWarn      = 0
-
+local PremLastSpeedWarn = 0
 local function AdaptPremCooldown(speed)
-    if     speed > 200 then PremCooldown = PremCooldownBase
+    if speed > 200 then PremCooldown = PremCooldownBase
     elseif speed > 140 then PremCooldown = PremCooldownBase + 0.02
-    elseif speed >  80 then PremCooldown = PremCooldownBase + 0.04
-    else                    PremCooldown = PremCooldownMax
+    elseif speed > 80 then PremCooldown = PremCooldownBase + 0.04
+    else PremCooldown = PremCooldownMax
     end
 end
-
 local function CheckBallSpeedWarning(speed)
     if not PremiumUnlocked then return end
     local now = os.clock()
@@ -947,31 +831,577 @@ local function CheckBallSpeedWarning(speed)
         PremLastSpeedWarn = now
     end
 end
-
 local function PremiumFire(ball)
     local now = os.clock()
     if PremDidParry then return end
     if now - PremLastParry < PremCooldown then return end
     if ball and ball == PremLastParriedBall then return end
-
-    VIM:SendMouseButtonEvent(0,0,0,true,  game, 0)
-    PremLastParry           = now
-    PremDidParry            = true
-    S.ParryCount            = S.ParryCount + 1
-    ParryStats.total        = ParryStats.total + 1
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    PremLastParry = now
+    PremDidParry = true
+    S.ParryCount = S.ParryCount + 1
+    ParryStats.total = ParryStats.total + 1
     ParryStats.lastFireTime = now
-    PremLastParriedBall     = ball
-
+    PremLastParriedBall = ball
     task.spawn(function()
         task.wait(0.015)
         VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
     end)
     task.delay(PremCooldown * 0.70, function()
-        PremDidParry        = false
+        PremDidParry = false
         PremLastParriedBall = nil
     end)
 end
-
+-- ══════════════════════════════════════════════════════════════════
+-- VISUAL PARRY TIMING INDICATOR
+-- ══════════════════════════════════════════════════════════════════
+local ParryIndicatorGui = nil
+local ParryIndicatorBar = nil
+local ParryIndicatorLbl = nil
+local function BuildParryIndicator()
+    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end) end
+    local sg = Instance.new("ScreenGui")
+    sg.Name="RyuuParryInd"; sg.ResetOnSpawn=false; sg.IgnoreGuiInset=true; sg.DisplayOrder=9996
+    pcall(function() sg.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
+    if not sg.Parent then pcall(function() sg.Parent=Plr:WaitForChild("PlayerGui") end) end
+    ParryIndicatorGui = sg
+    local Container = Instance.new("Frame", sg)
+    Container.AnchorPoint = Vector2.new(0.5,1)
+    Container.Position = UDim2.new(0.5,0,1,-18)
+    Container.Size = UDim2.new(0,220,0,36)
+    Container.BackgroundColor3 = Color3.fromRGB(5,3,12)
+    Container.BackgroundTransparency = 0.2
+    Container.BorderSizePixel = 0
+    Instance.new("UICorner",Container).CornerRadius = UDim.new(0,10)
+    local CStroke = Instance.new("UIStroke",Container)
+    CStroke.Thickness=1.2; CStroke.Color=Color3.fromRGB(60,25,120); CStroke.Transparency=0.3
+    local Lbl = Instance.new("TextLabel",Container)
+    Lbl.Size=UDim2.new(1,-8,0,14); Lbl.Position=UDim2.new(0,6,0,3)
+    Lbl.BackgroundTransparency=1; Lbl.Text="PARRY TIMING"
+    Lbl.Font=Enum.Font.GothamBold; Lbl.TextSize=9
+    Lbl.TextColor3=Color3.fromRGB(100,60,200); Lbl.TextXAlignment=Enum.TextXAlignment.Left
+    ParryIndicatorLbl = Lbl
+    local BarBG = Instance.new("Frame",Container)
+    BarBG.Size=UDim2.new(1,-12,0,8); BarBG.Position=UDim2.new(0,6,0,20)
+    BarBG.BackgroundColor3=Color3.fromRGB(15,8,35); BarBG.BorderSizePixel=0
+    Instance.new("UICorner",BarBG).CornerRadius=UDim.new(1,0)
+    local Fill = Instance.new("Frame",BarBG)
+    Fill.Size=UDim2.new(0,0,1,0); Fill.BackgroundColor3=Color3.fromRGB(130,50,255)
+    Fill.BorderSizePixel=0; Fill.ZIndex=2
+    Instance.new("UICorner",Fill).CornerRadius=UDim.new(1,0)
+    local FillGrad=Instance.new("UIGradient",Fill)
+    FillGrad.Color=ColorSequence.new{
+        ColorSequenceKeypoint.new(0,Color3.fromRGB(80,20,200)),
+        ColorSequenceKeypoint.new(1,Color3.fromRGB(200,100,255)),
+    }
+    ParryIndicatorBar = Fill
+    local Flash = Instance.new("Frame",Container)
+    Flash.Name="Flash"; Flash.Size=UDim2.new(1,0,1,0); Flash.Position=UDim2.new(0,0,0,0)
+    Flash.BackgroundColor3=Color3.fromRGB(50,255,120); Flash.BackgroundTransparency=1
+    Flash.BorderSizePixel=0; Flash.ZIndex=5
+    Instance.new("UICorner",Flash).CornerRadius=UDim.new(0,10)
+end
+local function UpdateParryIndicator(dist, fireDist, didJustFire)
+    if not ParryIndicatorBar then return end
+    pcall(function()
+        local ratio = math.clamp(1-(dist-fireDist)/math.max(fireDist,1), 0, 1)
+        local col = ratio > 0.85 and Color3.fromRGB(50,255,120)
+                 or ratio > 0.55 and Color3.fromRGB(255,200,50)
+                 or Color3.fromRGB(130,50,255)
+        TweenService:Create(ParryIndicatorBar,
+            TweenInfo.new(0.06, Enum.EasingStyle.Linear),
+            {Size=UDim2.new(ratio,0,1,0), BackgroundColor3=col}):Play()
+        if didJustFire then
+            local flash = ParryIndicatorGui and ParryIndicatorGui:FindFirstChild("Frame") and
+                ParryIndicatorGui.Frame:FindFirstChild("Flash")
+            if flash then
+                flash.BackgroundTransparency = 0.55
+                TweenService:Create(flash, TweenInfo.new(0.18), {BackgroundTransparency=1}):Play()
+            end
+            if ParryIndicatorLbl then
+                ParryIndicatorLbl.Text = "✓ PARRY FIRED — " .. ParrySuccessRate() .. "% hit rate"
+                ParryIndicatorLbl.TextColor3 = Color3.fromRGB(50,220,110)
+                task.delay(0.6, function()
+                    pcall(function()
+                        ParryIndicatorLbl.Text = "PARRY TIMING"
+                        ParryIndicatorLbl.TextColor3 = Color3.fromRGB(100,60,200)
+                    end)
+                end)
+            end
+        end
+    end)
+end
+-- ══════════════════════════════════════════════════════════════════
+-- FREE PARRY ENGINE ◈ tuned slightly earlier
+-- ══════════════════════════════════════════════════════════════════
+local FREE_PING_LEAD_PER_100MS = 1.12          -- was 0.9   ← more aggressive
+local FreeSpeedHist = {}
+local FreeVelHistory = {}
+local PrevBallPos, PrevBallTime = nil, 0
+local function GetSmoothedVel(ball, rawVel)
+    table.insert(FreeVelHistory, rawVel)
+    if #FreeVelHistory > 3 then table.remove(FreeVelHistory, 1) end
+    local sx, sy, sz = 0, 0, 0
+    for _, v in ipairs(FreeVelHistory) do
+        sx = sx + v.X; sy = sy + v.Y; sz = sz + v.Z
+    end
+    local n = #FreeVelHistory
+    return Vector3.new(sx/n, sy/n, sz/n)
+end
+local function StartEngine()
+    if Conn.Parry then Conn.Parry:Disconnect() end
+    PrevBallPos = nil; PrevBallTime = 0
+    FreeSpeedHist = {}; FreeVelHistory = {}
+    BuildParryIndicator()
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "⚡ Mode — GAME PARRY"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(50,220,110)
+        end)
+    end
+    Conn.Parry = RunService.PreSimulation:Connect(function()
+        if not S.AutoParry then return end
+        local Ball = GetBall()
+        if not Ball then PrevBallPos=nil; return end
+        local HRP = GetHRP(); if not HRP then return end
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local now = os.clock()
+        local tgt = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        TrackParryHit(tgt)
+        if isTgt and S.AutoFace then
+            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
+        end
+        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
+            S.DidParry=false; FreeLastParriedBall=nil; return
+        end
+        if not isTgt then
+            PrevBallPos=nil; FreeVelHistory={}
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        if S.DidParry then return end
+        local RawVel = GetVel(Ball)
+        local Vel = GetSmoothedVel(Ball, RawVel)
+        local Speed = Vel.Magnitude
+        local toPlayer = (HPos - BPos)
+        local dotVal = Vel:Dot(toPlayer.Unit)
+        local isClosing = dotVal > -(Speed * 0.08)
+        local approachSpeed = dotVal
+        if approachSpeed < 3.0 and Dist > 8 then
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        if dotVal < -(Speed * 0.3) and Dist > 12 then
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        table.insert(FreeSpeedHist, Speed)
+        if #FreeSpeedHist > 6 then table.remove(FreeSpeedHist, 1) end
+        local spikeMul = 1.0
+        if #FreeSpeedHist >= 4 then
+            local prev3 = FreeSpeedHist[#FreeSpeedHist - 3]
+            if prev3 and prev3 > 1 then
+                local ratio = Speed / prev3
+                if ratio > 2.0 then spikeMul = 1.30
+                elseif ratio > 1.5 then spikeMul = 1.18
+                elseif ratio > 1.2 then spikeMul = 1.08
+                end
+            end
+        end
+        local FREE_SPD_REF = 260
+        local FREE_HB_MIN = 3.75          -- was 4.2  ← lowered = fires earlier
+        local FREE_HB_MAX = 7.9           -- was 8.4  ← slightly lowered ceiling
+        local t = math.clamp(Speed / FREE_SPD_REF, 0, 1)
+        local curve = t < 0.5 and (2 * t * t) or (1 - (-2*t+2)^2 / 2)
+        local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * spikeMul
+        local pingScale = math.clamp(Speed / 120, 0.4, 1.0)
+        local pingLead = (PingRaw / 1000) * Speed * FREE_PING_LEAD_PER_100MS / 0.1
+        pingLead = math.min(pingLead * pingScale, 3.2)   -- was 3.0
+        local fireDist = dynamicHitbox + pingLead
+        UpdateParryIndicator(Dist, fireDist, false)
+        if isClosing and Dist <= fireDist then
+            FireParry(Ball)
+            UpdateParryIndicator(Dist, fireDist, true)
+            PrevBallPos=BPos; PrevBallTime=now
+            return
+        end
+        if Speed > 60 and isClosing then
+            local dt = 1/60
+            local maxFrames = Speed > 220 and 5     -- was 4
+                           or Speed > 160 and 4     -- was 3
+                           or Speed > 100 and 3     -- was 2
+                           or 2
+            for step = 1, maxFrames do
+                local nextPos = BPos + Vel * (dt * step)
+                local nextDist = (HPos - nextPos).Magnitude
+                if nextDist <= fireDist then
+                    FireParry(Ball)
+                    UpdateParryIndicator(Dist, fireDist, true)
+                    return
+                end
+            end
+        end
+        PrevBallPos=BPos; PrevBallTime=now
+    end)
+end
+local function StopEngine()
+    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
+    S.DidParry = false
+    FreeLastParriedBall = nil
+    PrevBallPos = nil
+    FreeSpeedHist = {}
+    FreeVelHistory = {}
+    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "⚡ Mode — IDLE"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(160,160,160)
+        end)
+    end
+end
+-- ══════════════════════════════════════════════════════════════════
+-- FREE LOBBY PARRY ENGINE  (same tuning as free game parry)
+-- ══════════════════════════════════════════════════════════════════
+local LobbyConn = {}
+local LobbyFreeLastParriedBall = nil
+local LobbyFreeSpeedHist = {}
+local LobbyFreeVelHistory = {}
+local LobbyFreeDidParry = false
+local LobbyFreeLastParry = 0
+local function LobbyFireParry(ball)
+    local now = os.clock()
+    if LobbyFreeDidParry then return end
+    if now - LobbyFreeLastParry < S.ParryCooldown then return end
+    if now - LobbyFreeLastParry < FREE_ANTI_SPAM_CD then return end
+    if ball and ball == LobbyFreeLastParriedBall then return end
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    LobbyFreeLastParry = now
+    LobbyFreeDidParry = true
+    S.ParryCount = S.ParryCount + 1
+    ParryStats.total = ParryStats.total + 1
+    ParryStats.lastFireTime = now
+    LobbyFreeLastParriedBall = ball
+    task.spawn(function()
+        task.wait(0.015)
+        VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+    end)
+    task.delay(S.ParryReset or 0.16, function()
+        LobbyFreeDidParry = false
+        LobbyFreeLastParriedBall = nil
+    end)
+end
+local function StartLobbyEngine()
+    if LobbyConn.Parry then LobbyConn.Parry:Disconnect() end
+    LobbyFreeSpeedHist = {}; LobbyFreeVelHistory = {}
+    BuildLobbyBadge(true)
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "🏟 Mode — LOBBY PARRY"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(50,220,110)
+        end)
+    end
+    LobbyConn.Parry = RunService.PreSimulation:Connect(function()
+        if not S.LobbyParry then return end
+        local Ball = GetBall()
+        if not Ball then LobbyFreeVelHistory={}; return end
+        local HRP = GetHRP(); if not HRP then return end
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local tgt = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        TrackParryHit(tgt)
+        if not isTgt then
+            LobbyFreeVelHistory = {}
+            return
+        end
+        if LobbyFreeDidParry then return end
+        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
+            LobbyFreeDidParry=false; LobbyFreeLastParriedBall=nil; return
+        end
+        local RawVel = GetVel(Ball)
+        table.insert(LobbyFreeVelHistory, RawVel)
+        if #LobbyFreeVelHistory > 3 then table.remove(LobbyFreeVelHistory, 1) end
+        local sx, sy, sz = 0, 0, 0
+        for _, v in ipairs(LobbyFreeVelHistory) do sx=sx+v.X; sy=sy+v.Y; sz=sz+v.Z end
+        local vn = #LobbyFreeVelHistory
+        local Vel = Vector3.new(sx/vn, sy/vn, sz/vn)
+        local Speed = Vel.Magnitude
+        local toPlayer = (HPos - BPos)
+        local dotVal = Vel:Dot(toPlayer.Unit)
+        local isClosing = dotVal > -(Speed * 0.08)
+        local approachSpeed = dotVal
+        if approachSpeed < 3.0 and Dist > 8 then return end
+        if dotVal < -(Speed * 0.3) and Dist > 12 then return end
+        table.insert(LobbyFreeSpeedHist, Speed)
+        if #LobbyFreeSpeedHist > 6 then table.remove(LobbyFreeSpeedHist, 1) end
+        local spikeMul = 1.0
+        if #LobbyFreeSpeedHist >= 4 then
+            local prev3 = LobbyFreeSpeedHist[#LobbyFreeSpeedHist - 3]
+            if prev3 and prev3 > 1 then
+                local ratio = Speed / prev3
+                if ratio > 2.0 then spikeMul = 1.30
+                elseif ratio > 1.5 then spikeMul = 1.18
+                elseif ratio > 1.2 then spikeMul = 1.08
+                end
+            end
+        end
+        local FREE_SPD_REF = 260
+        local FREE_HB_MIN = 3.75           -- same as free game
+        local FREE_HB_MAX = 7.9            -- same as free game
+        local t = math.clamp(Speed / FREE_SPD_REF, 0, 1)
+        local curve = t < 0.5 and (2 * t * t) or (1 - (-2*t+2)^2 / 2)
+        local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * spikeMul
+        local pingScale = math.clamp(Speed / 120, 0.4, 1.0)
+        local pingLead = (PingRaw / 1000) * Speed * FREE_PING_LEAD_PER_100MS / 0.1
+        pingLead = math.min(pingLead * pingScale, 3.2)
+        local fireDist = dynamicHitbox + pingLead
+        if isClosing and Dist <= fireDist then
+            LobbyFireParry(Ball)
+            return
+        end
+        if Speed > 60 and isClosing then
+            local dt = 1/60
+            local maxFrames = Speed > 220 and 5     -- was 4
+                           or Speed > 160 and 4
+                           or Speed > 100 and 3
+                           or 2
+            for step = 1, maxFrames do
+                local nextPos = BPos + Vel * (dt * step)
+                local nextDist = (HPos - nextPos).Magnitude
+                if nextDist <= fireDist then
+                    LobbyFireParry(Ball)
+                    return
+                end
+            end
+        end
+    end)
+end
+local function StopLobbyEngine()
+    if LobbyConn.Parry then LobbyConn.Parry:Disconnect(); LobbyConn.Parry=nil end
+    LobbyFreeDidParry = false
+    LobbyFreeLastParriedBall = nil
+    LobbyFreeSpeedHist = {}
+    LobbyFreeVelHistory = {}
+    BuildLobbyBadge(false)
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "⚡ Mode — IDLE"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(160,160,160)
+        end)
+    end
+end
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM PARRY ENGINE ◈ god-like / very early / precise
+-- ══════════════════════════════════════════════════════════════════
+local PREM_PING_LEAD_PER_100MS = 1.25          -- was 0.75   ← much stronger lead
+local PremSpeedHist = {}
+local PremVelHistory = {}
+local PremCurveDetected = false
+local PremCurveLastCheck = 0
+local S_TIER_NAMES = {"pull","infinity","time hole","slash of duality","dragon spirit"}
+local function DetectSTierCurve()
+    if not P.STierCurve then return false end
+    local now = os.clock()
+    if now - PremCurveLastCheck < 0.3 then return PremCurveDetected end
+    PremCurveLastCheck = now
+    for _,p in ipairs(Players:GetPlayers()) do
+        if p == Plr then continue end
+        local char = p.Character; if not char then continue end
+        for _,attrName in ipairs({"Ability","ability","AbilityName","EquippedAbility","Skill"}) do
+            local ok, v = pcall(function() return p:GetAttribute(attrName) end)
+            if ok and type(v)=="string" then
+                local vl = v:lower()
+                for _, sName in ipairs(S_TIER_NAMES) do
+                    if vl:find(sName) then
+                        PremCurveDetected = true
+                        return true
+                    end
+                end
+            end
+        end
+        for _, d in ipairs(char:GetDescendants()) do
+            if d:IsA("BasePart") or d:IsA("ParticleEmitter") then
+                local nl = d.Name:lower()
+                for _, sName in ipairs(S_TIER_NAMES) do
+                    if nl:find(sName:gsub(" ",""):sub(1,5)) then
+                        PremCurveDetected = true
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    PremCurveDetected = false
+    return false
+end
+local function GetWeightedVel(history)
+    if #history == 0 then return Vector3.zero end
+    local weights = {0.1, 0.2, 0.3, 0.4}
+    local sx, sy, sz, wSum = 0, 0, 0, 0
+    for i, v in ipairs(history) do
+        local w = weights[math.max(1, 4 - (#history - i))] or 0.25
+        sx = sx + v.X * w; sy = sy + v.Y * w; sz = sz + v.Z * w
+        wSum = wSum + w
+    end
+    return Vector3.new(sx/wSum, sy/wSum, sz/wSum)
+end
+local function StartPremiumEngine()
+    if PremConn.Parry then PremConn.Parry:Disconnect() end
+    PremSpeedHist = {}; PremVelHistory = {}
+    BuildParryIndicator()
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "✨ Mode — PREMIUM PARRY"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(140,60,255)
+        end)
+    end
+    PremConn.Parry = RunService.PreSimulation:Connect(function()
+        if not P.AutoParry then return end
+        local Ball = GetBall()
+        if not Ball then return end
+        local HRP = GetHRP(); if not HRP then return end
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+        local Dist = (HPos - BPos).Magnitude
+        local now = os.clock()
+        local tgt = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        TrackParryHit(tgt)
+        if isTgt and P.AutoFace then
+            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
+        end
+        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
+            PremDidParry=false; PremLastParriedBall=nil; return
+        end
+        -- Tighter god emergency
+        if P.GodEmergency and isTgt and not PremDidParry and Dist <= 1.75 then   -- was 1.8
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist, Dist, true)
+            return
+        end
+        if not isTgt then
+            PremVelHistory = {}
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        if PremDidParry then return end
+        local RawVel = GetVel(Ball)
+        table.insert(PremVelHistory, RawVel)
+        if #PremVelHistory > 4 then table.remove(PremVelHistory, 1) end
+        local Vel = GetWeightedVel(PremVelHistory)
+        local Speed = Vel.Magnitude
+        AdaptPremCooldown(Speed)
+        CheckBallSpeedWarning(Speed)
+        local toPlayer = HPos - BPos
+        local dotVal = Vel:Dot(toPlayer.Unit)
+        local isClosing = dotVal > -(Speed * 0.12)
+        if dotVal < 3.0 and Dist > 8 then
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        if dotVal < -(Speed * 0.3) and Dist > 12 then
+            UpdateParryIndicator(99, 1, false)
+            return
+        end
+        table.insert(PremSpeedHist, Speed)
+        if #PremSpeedHist > 8 then table.remove(PremSpeedHist, 1) end
+        local premSpikeMul = 1.0
+        if #PremSpeedHist >= 5 then
+            local prev4 = PremSpeedHist[#PremSpeedHist - 4]
+            if prev4 and prev4 > 1 then
+                local ratio = Speed / prev4
+                if ratio > 2.2 then premSpikeMul = 1.28
+                elseif ratio > 1.6 then premSpikeMul = 1.16
+                elseif ratio > 1.25 then premSpikeMul = 1.07
+                end
+            end
+        end
+        local accel = 0
+        if #PremSpeedHist >= 5 then
+            local n = math.min(#PremSpeedHist, 5)
+            local base= #PremSpeedHist - n + 1
+            local sumW, sumWx, sumWy, sumWxx, sumWxy = 0,0,0,0,0
+            for i = 1, n do
+                local w = i / n
+                local x = i
+                local y = PremSpeedHist[base + i - 1]
+                sumW = sumW + w
+                sumWx = sumWx + w * x
+                sumWy = sumWy + w * y
+                sumWxx = sumWxx + w * x * x
+                sumWxy = sumWxy + w * x * y
+            end
+            local denom = sumW * sumWxx - sumWx * sumWx
+            if math.abs(denom) > 0.001 then
+                accel = (sumW * sumWxy - sumWx * sumWy) / denom
+                accel = accel * 60
+            end
+        end
+        local projSpeed = Speed + math.max(0, accel) * (1/60)
+        local sTierActive = DetectSTierCurve()
+        local sTierMul = sTierActive and 1.22 or 1.0          -- was 1.15   ← stronger
+        local extraFrames = sTierActive and 5 or 2             -- more aggressive lookahead
+        local PREM_SPD_REF = 240
+        local PREM_HB_MIN = 3.4                                -- was slider / 4.0   ← lower = earlier
+        local PREM_HB_MAX = P.HitboxTarget + 4.2
+        local t = math.clamp(projSpeed / PREM_SPD_REF, 0, 1)
+        local curve = 1 - (1 - t)^3
+        local dynamicHitbox = PREM_HB_MIN + (PREM_HB_MAX - PREM_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * premSpikeMul * sTierMul
+        local pingScale = math.clamp(projSpeed / 100, 0.35, 1.0)
+        local pingLead = (PingRaw / 1000) * projSpeed * PREM_PING_LEAD_PER_100MS / 0.1
+        pingLead = math.min(pingLead * pingScale, 3.4)         -- was 2.4
+        local fireDist = dynamicHitbox + pingLead
+        UpdateParryIndicator(Dist, fireDist, false)
+        if isClosing and Dist <= fireDist then
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist, fireDist, true)
+            return
+        end
+        if Speed > 60 and isClosing then
+            local dt = 1/60
+            local maxFrames = (Speed > 240 and 6 or Speed > 180 and 5 or Speed > 120 and 4 or 3) + extraFrames
+            for step = 1, maxFrames do
+                local nextPos
+                if sTierActive then
+                    local curveFactor = 0.08 * step
+                    local curvedDir = (Vel.Unit + toPlayer.Unit * curveFactor).Unit
+                    nextPos = BPos + curvedDir * Speed * (dt * step)
+                else
+                    nextPos = BPos + Vel * (dt * step)
+                end
+                local nextDist = (HPos - nextPos).Magnitude
+                if nextDist <= fireDist then
+                    PremiumFire(Ball)
+                    UpdateParryIndicator(Dist, fireDist, true)
+                    return
+                end
+            end
+        end
+    end)
+end
+local function StopPremiumEngine()
+    if PremConn.Parry then PremConn.Parry:Disconnect(); PremConn.Parry=nil end
+    PremDidParry = false
+    PremLastParriedBall = nil
+    PremSpeedHist = {}
+    PremVelHistory = {}
+    PremCurveDetected = false
+    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text = "⚡ Mode — IDLE"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(160,160,160)
+        end)
+    end
+end
+-- ══════════════════════════════════════════════════════════════════
 -- ══════════════════════════════════════════════════════════════════
 -- VISUAL PARRY TIMING INDICATOR
 -- ══════════════════════════════════════════════════════════════════
