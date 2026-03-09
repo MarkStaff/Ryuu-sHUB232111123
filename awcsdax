@@ -2829,401 +2829,406 @@ T6:CreateButton({Name="⚔ Apply Now",Callback=function()
 end})
 
 -- ── TAB: PREMIUM ──────────────────────────────────────────────────
-local PT=W:CreateTab("✨ Premium",nil)
-
+local PT = W:CreateTab("✨ Premium", nil)
 PT:CreateSection("🔑 Premium Key Scanner")
 PT:CreateLabel("Click below to open the holographic key scanner.")
-PT:CreateButton({Name="◈  Open Key Scanner",Callback=function()
-    -- ── HOLOGRAPHIC KEY SCANNER OVERLAY ──────────────────────────
-    task.spawn(function()
-        local KSG = Instance.new("ScreenGui")
-        KSG.Name="RyuuKeyScanner"; KSG.ResetOnSpawn=false
-        KSG.IgnoreGuiInset=true; KSG.DisplayOrder=99998
-        pcall(function() KSG.Parent=(typeof(gethui)=="function" and gethui()) or CoreGui end)
-        if not KSG.Parent then pcall(function() KSG.Parent=Plr:WaitForChild("PlayerGui") end) end
-
-        local function playSound(id, vol, pitch)
-            pcall(function()
-                local s=Instance.new("Sound",workspace); s.SoundId="rbxassetid://"..id
-                s.Volume=vol or 0.6; s.PlaybackSpeed=pitch or 1; s.RollOffMaxDistance=0
-                s:Play(); game:GetService("Debris"):AddItem(s,4)
-            end)
-        end
-
-        -- Dark overlay base
-        local Overlay = Instance.new("Frame", KSG)
-        Overlay.Size=UDim2.new(1,0,1,0); Overlay.BackgroundColor3=Color3.fromRGB(2,1,6)
-        Overlay.BackgroundTransparency=1; Overlay.BorderSizePixel=0; Overlay.ZIndex=1
-        TweenService:Create(Overlay, TweenInfo.new(0.22, Enum.EasingStyle.Quad),
-            {BackgroundTransparency=0.35}):Play()
-
-        -- Radial glow
-        local Glow = Instance.new("Frame", Overlay)
-        Glow.AnchorPoint=Vector2.new(0.5,0.5); Glow.Position=UDim2.new(0.5,0,0.5,0)
-        Glow.Size=UDim2.new(0,700,0,400); Glow.BackgroundColor3=Color3.fromRGB(60,10,150)
-        Glow.BackgroundTransparency=0.92; Glow.BorderSizePixel=0; Glow.ZIndex=1
-        Instance.new("UICorner",Glow).CornerRadius=UDim.new(1,0)
-
-        -- Scan-line grid
-        local ScanCont = Instance.new("Frame", KSG)
-        ScanCont.Size=UDim2.new(1,0,1,0); ScanCont.BackgroundTransparency=1
-        ScanCont.BorderSizePixel=0; ScanCont.ZIndex=2; ScanCont.ClipsDescendants=true
-        local kScanLines = {}
-        local kscanRunning = true
-        for i = 1, 40 do
-            local line = Instance.new("Frame", ScanCont)
-            line.Size=UDim2.new(1,0,0,1); line.Position=UDim2.new(0,0,(i-1)/40,0)
-            line.BackgroundColor3=Color3.fromRGB(80,220,255); line.BackgroundTransparency=0.75
-            line.BorderSizePixel=0; line.ZIndex=2
-            table.insert(kScanLines, line)
-        end
-        -- Vert grid
-        local KGrid = Instance.new("Frame", KSG)
-        KGrid.Size=UDim2.new(1,0,1,0); KGrid.BackgroundTransparency=1; KGrid.ZIndex=2
-        for i = 1, 14 do
-            local vl=Instance.new("Frame",KGrid); vl.Size=UDim2.new(0,1,1,0)
-            vl.Position=UDim2.new(i/14,0,0,0); vl.BackgroundColor3=Color3.fromRGB(0,160,220)
-            vl.BackgroundTransparency=0.90; vl.BorderSizePixel=0; vl.ZIndex=2
-        end
-        for i = 1, 8 do
-            local hl=Instance.new("Frame",KGrid); hl.Size=UDim2.new(1,0,0,1)
-            hl.Position=UDim2.new(0,0,i/8,0); hl.BackgroundColor3=Color3.fromRGB(0,160,220)
-            hl.BackgroundTransparency=0.90; hl.BorderSizePixel=0; hl.ZIndex=2
-        end
-
-        -- Scan line animation
+PT:CreateButton({
+    Name = "◈ Open Key Scanner",
+    Callback = function()
+        -- ── HOLOGRAPHIC PREMIUM KEY SCANNER ──────────────────────────
         task.spawn(function()
-            local offset = 0
-            while kscanRunning do
-                offset = (offset + 0.018) % 1
-                for i, line in ipairs(kScanLines) do
-                    local y = ((i-1)/40 + offset) % 1
-                    local brightness = math.abs(math.sin(y * math.pi * 3))
-                    pcall(function()
-                        line.BackgroundTransparency = 0.55 + brightness * 0.38
-                        line.Position = UDim2.new(0,0,y,0)
-                    end)
-                end
-                task.wait(0.02)
-            end
-        end)
+            local KSG = Instance.new("ScreenGui")
+            KSG.Name = "RyuuKeyScanner"
+            KSG.ResetOnSpawn = false
+            KSG.IgnoreGuiInset = true
+            KSG.DisplayOrder = 99999
+            pcall(function() KSG.Parent = (typeof(gethui) == "function" and gethui()) or game:GetService("CoreGui") end)
+            if not KSG.Parent then pcall(function() KSG.Parent = Plr:WaitForChild("PlayerGui") end) end
 
-        -- Vertical sweep beam
-        playSound(9119713951, 0.4, 1.0)
-        local KVSweep = Instance.new("Frame", KSG)
-        KVSweep.Size=UDim2.new(0,3,1,0); KVSweep.Position=UDim2.new(-0.05,0,0,0)
-        KVSweep.BackgroundColor3=Color3.fromRGB(120,240,255); KVSweep.BackgroundTransparency=0.3
-        KVSweep.BorderSizePixel=0; KVSweep.ZIndex=8
-        local KVG=Instance.new("UIGradient",KVSweep)
-        KVG.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(0,0,0)),
-            ColorSequenceKeypoint.new(0.5,Color3.fromRGB(180,255,255)),ColorSequenceKeypoint.new(1,Color3.fromRGB(0,0,0))}
-        KVG.Rotation=90
-        TweenService:Create(KVSweep, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {Position=UDim2.new(1.05,0,0,0)}):Play()
-        task.wait(0.3)
+            local TS = game:GetService("TweenService")
+            local RS = game:GetService("RunService")
+            local Debris = game:GetService("Debris")
 
-        -- ── SCANNER CARD ─────────────────────────────────────────
-        local KCard = Instance.new("Frame", KSG)
-        KCard.AnchorPoint=Vector2.new(0.5,0.5); KCard.Position=UDim2.new(0.5,0,0.6,0)
-        KCard.Size=UDim2.new(0,0,0,0); KCard.BackgroundColor3=Color3.fromRGB(4,14,22)
-        KCard.BackgroundTransparency=0; KCard.BorderSizePixel=0; KCard.ZIndex=10
-        Instance.new("UICorner",KCard).CornerRadius=UDim.new(0,16)
-        local KCStroke=Instance.new("UIStroke",KCard)
-        KCStroke.Thickness=1.8; KCStroke.Color=Color3.fromRGB(0,210,255); KCStroke.Transparency=0.1
-        local KCGrad=Instance.new("UIGradient",KCard)
-        KCGrad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB(5,20,35)),
-            ColorSequenceKeypoint.new(0.5,Color3.fromRGB(3,10,18)),ColorSequenceKeypoint.new(1,Color3.fromRGB(5,20,35))}
-        KCGrad.Rotation=135
-        local KAccent=Instance.new("Frame",KCard)
-        KAccent.Size=UDim2.new(1,0,0,2); KAccent.Position=UDim2.new(0,0,0,0)
-        KAccent.BackgroundColor3=Color3.fromRGB(0,210,255); KAccent.BorderSizePixel=0; KAccent.ZIndex=11
-        Instance.new("UICorner",KAccent).CornerRadius=UDim.new(0,16)
-
-        -- Title row
-        local KIcon=Instance.new("TextLabel",KCard)
-        KIcon.Position=UDim2.new(0,14,0,10); KIcon.Size=UDim2.new(0,28,0,28)
-        KIcon.BackgroundTransparency=1; KIcon.Text="🔑"; KIcon.Font=Enum.Font.GothamBlack
-        KIcon.TextSize=20; KIcon.TextColor3=Color3.fromRGB(0,210,255); KIcon.ZIndex=12
-        local KTitle=Instance.new("TextLabel",KCard)
-        KTitle.Position=UDim2.new(0,46,0,10); KTitle.Size=UDim2.new(1,-100,0,26)
-        KTitle.BackgroundTransparency=1; KTitle.Text="PREMIUM KEY SCANNER"
-        KTitle.Font=Enum.Font.GothamBlack; KTitle.TextSize=14
-        KTitle.TextColor3=Color3.fromRGB(0,210,255); KTitle.ZIndex=12; KTitle.TextXAlignment=Enum.TextXAlignment.Left
-        local KSub=Instance.new("TextLabel",KCard)
-        KSub.Position=UDim2.new(0,46,0,30); KSub.Size=UDim2.new(1,-100,0,14)
-        KSub.BackgroundTransparency=1; KSub.Text="Enter your Ryuu HUB V2 premium key"
-        KSub.Font=Enum.Font.Gotham; KSub.TextSize=9
-        KSub.TextColor3=Color3.fromRGB(0,140,180); KSub.ZIndex=12; KSub.TextXAlignment=Enum.TextXAlignment.Left
-
-        -- Close X
-        local KClose=Instance.new("TextButton",KCard)
-        KClose.AnchorPoint=Vector2.new(1,0); KClose.Position=UDim2.new(1,-10,0,8)
-        KClose.Size=UDim2.new(0,22,0,22); KClose.BackgroundTransparency=1
-        KClose.Text="✕"; KClose.Font=Enum.Font.GothamBold; KClose.TextSize=14
-        KClose.TextColor3=Color3.fromRGB(0,140,180); KClose.ZIndex=13
-        KClose.MouseButton1Click:Connect(function()
-            kscanRunning=false
-            TweenService:Create(Overlay,TweenInfo.new(0.25),{BackgroundTransparency=1}):Play()
-            task.wait(0.28); pcall(function() KSG:Destroy() end)
-        end)
-
-        -- Divider
-        local KDiv=Instance.new("Frame",KCard)
-        KDiv.Size=UDim2.new(1,-24,0,1); KDiv.Position=UDim2.new(0,12,0,50)
-        KDiv.BackgroundColor3=Color3.fromRGB(0,140,180); KDiv.BorderSizePixel=0; KDiv.ZIndex=11
-
-        -- Input BG
-        local KInputBG=Instance.new("Frame",KCard)
-        KInputBG.Size=UDim2.new(1,-24,0,36); KInputBG.Position=UDim2.new(0,12,0,58)
-        KInputBG.BackgroundColor3=Color3.fromRGB(3,12,22); KInputBG.BorderSizePixel=0; KInputBG.ZIndex=11
-        Instance.new("UICorner",KInputBG).CornerRadius=UDim.new(0,10)
-        local KInputStroke=Instance.new("UIStroke",KInputBG)
-        KInputStroke.Thickness=1.2; KInputStroke.Color=Color3.fromRGB(0,140,200); KInputStroke.Transparency=0.2
-
-        local KInput=Instance.new("TextBox",KInputBG)
-        KInput.Size=UDim2.new(1,-14,1,0); KInput.Position=UDim2.new(0,8,0,0)
-        KInput.BackgroundTransparency=1; KInput.PlaceholderText="Enter premium key..."
-        KInput.PlaceholderColor3=Color3.fromRGB(0,80,120); KInput.Text=""
-        KInput.Font=Enum.Font.GothamBold; KInput.TextSize=13
-        KInput.TextColor3=Color3.fromRGB(150,230,255); KInput.ZIndex=12
-        KInput.ClearTextOnFocus=false; KInput.TextXAlignment=Enum.TextXAlignment.Left
-
-        -- Blinking cursor
-        local KCursor=Instance.new("Frame",KInputBG)
-        KCursor.Size=UDim2.new(0,2,0,16); KCursor.AnchorPoint=Vector2.new(0,0.5)
-        KCursor.Position=UDim2.new(0,9,0.5,0); KCursor.BackgroundColor3=Color3.fromRGB(0,200,255)
-        KCursor.BorderSizePixel=0; KCursor.ZIndex=13
-        local cursorOn=true
-        task.spawn(function()
-            while kscanRunning do
-                pcall(function() KCursor.BackgroundTransparency=cursorOn and 0 or 1; cursorOn=not cursorOn end)
-                task.wait(0.5)
-            end
-        end)
-
-        -- Scan dots row
-        local KDotsFrame=Instance.new("Frame",KCard)
-        KDotsFrame.Size=UDim2.new(1,-24,0,10); KDotsFrame.Position=UDim2.new(0,12,0,100)
-        KDotsFrame.BackgroundTransparency=1; KDotsFrame.ZIndex=11
-        local kDots={}
-        for i=1,10 do
-            local d=Instance.new("Frame",KDotsFrame)
-            d.Size=UDim2.new(0,7,0,5); d.Position=UDim2.new(0,(i-1)*12,0,2)
-            d.BackgroundColor3=Color3.fromRGB(0,80,140); d.BackgroundTransparency=0.4
-            d.BorderSizePixel=0; d.ZIndex=12
-            Instance.new("UICorner",d).CornerRadius=UDim.new(1,0)
-            table.insert(kDots,d)
-        end
-        local dotsActive=true
-        task.spawn(function()
-            local f=0
-            while dotsActive do
-                f=f+1
-                for i,d in ipairs(kDots) do
-                    local on=(f%#kDots)==(i-1)
-                    pcall(function()
-                        d.BackgroundColor3=on and Color3.fromRGB(0,200,255) or Color3.fromRGB(0,40,80)
-                        d.BackgroundTransparency=on and 0 or 0.5
-                    end)
-                end
-                task.wait(0.07)
-            end
-        end)
-
-        -- Status label
-        local KStatus=Instance.new("TextLabel",KCard)
-        KStatus.Size=UDim2.new(1,-24,0,14); KStatus.Position=UDim2.new(0,12,0,114)
-        KStatus.BackgroundTransparency=1; KStatus.Text="Waiting for key input..."
-        KStatus.Font=Enum.Font.Gotham; KStatus.TextSize=9
-        KStatus.TextColor3=Color3.fromRGB(0,120,170); KStatus.ZIndex=11; KStatus.TextXAlignment=Enum.TextXAlignment.Left
-
-        -- Submit button
-        local KBtn=Instance.new("TextButton",KCard)
-        KBtn.Size=UDim2.new(1,-24,0,30); KBtn.Position=UDim2.new(0,12,0,132)
-        KBtn.BackgroundColor3=Color3.fromRGB(0,55,90); KBtn.BorderSizePixel=0; KBtn.ZIndex=11
-        KBtn.Text="◈  SCAN & VERIFY KEY"; KBtn.Font=Enum.Font.GothamBlack; KBtn.TextSize=12
-        KBtn.TextColor3=Color3.fromRGB(0,210,255); KBtn.AutoButtonColor=false
-        Instance.new("UICorner",KBtn).CornerRadius=UDim.new(0,10)
-        local KBtnStroke=Instance.new("UIStroke",KBtn); KBtnStroke.Thickness=1.2
-        KBtnStroke.Color=Color3.fromRGB(0,180,240); KBtnStroke.Transparency=0.2
-        KBtn.MouseEnter:Connect(function()
-            TweenService:Create(KBtn,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(0,80,130)}):Play()
-        end)
-        KBtn.MouseLeave:Connect(function()
-            TweenService:Create(KBtn,TweenInfo.new(0.12),{BackgroundColor3=Color3.fromRGB(0,55,90)}):Play()
-        end)
-
-        -- Pop card open
-        playSound(4590662766, 0.65, 1.1)
-        TweenService:Create(KCard, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-            {Size=UDim2.new(0,370,0,172), Position=UDim2.new(0.5,0,0.5,0)}):Play()
-        task.wait(0.38)
-
-        -- ── SCAN + VERIFY LOGIC ───────────────────────────────────
-        local function doScan()
-            local raw = KInput.Text:match("^%s*(.-)%s*$") or ""
-            if #raw < 4 then
-                KStatus.Text = "⚠  Key is too short"
-                KStatus.TextColor3 = Color3.fromRGB(255,180,40); return
-            end
-
-            -- Lock input
-            KInput.TextEditable=false; KBtn.Active=false
-            KStatus.Text="◈  Scanning..."; KStatus.TextColor3=Color3.fromRGB(0,200,255)
-
-            -- Strobing border during scan
-            local scanTick=0
-            local scanConn=RunService.Heartbeat:Connect(function(dt)
-                scanTick=scanTick+dt*8
-                local r=math.floor(0  + 80 *math.abs(math.sin(scanTick)))
-                local g=math.floor(150+ 80 *math.abs(math.sin(scanTick+1)))
-                local b=math.floor(200+ 55 *math.abs(math.sin(scanTick+2)))
+            local function playSound(id, vol, pitch, parent)
                 pcall(function()
-                    KCStroke.Color=Color3.fromRGB(r,g,b)
-                    KAccent.BackgroundColor3=Color3.fromRGB(r,g,b)
-                end)
-            end)
-
-            -- Hex scan readout
-            local hexChars={"0xA3","1F","7C","E9","55","AB","D2","3C","80","FF","02","C1"}
-            task.spawn(function()
-                for i=1,20 do
-                    task.wait(0.04)
-                    local c=hexChars[(i%#hexChars)+1]
-                    pcall(function() KStatus.Text="◈  Scanning...  "..c end)
-                end
-            end)
-            task.wait(0.88)
-            scanConn:Disconnect()
-
-            local result=ValidateKey(raw)
-
-            if result=="ok" then
-                -- ── SUCCESS ─────────────────────────────────────
-                dotsActive=false
-                KTitle.Text="✓  ACCESS GRANTED"
-                KTitle.TextColor3=Color3.fromRGB(50,220,110)
-                KStatus.Text="✓  Key accepted — Welcome to Premium!"
-                KStatus.TextColor3=Color3.fromRGB(50,220,110)
-                KAccent.BackgroundColor3=Color3.fromRGB(35,200,90)
-                TweenService:Create(KCStroke,TweenInfo.new(0.18),
-                    {Color=Color3.fromRGB(35,200,90)}):Play()
-                TweenService:Create(KInputBG,TweenInfo.new(0.18),
-                    {BackgroundColor3=Color3.fromRGB(5,28,12)}):Play()
-                TweenService:Create(KInputStroke,TweenInfo.new(0.18),
-                    {Color=Color3.fromRGB(35,200,90)}):Play()
-                -- Green dot wave
-                for i,d in ipairs(kDots) do
-                    task.delay((i-1)*0.055,function()
-                        pcall(function() d.BackgroundColor3=Color3.fromRGB(40,220,100); d.BackgroundTransparency=0 end)
-                    end)
-                end
-                -- White pulse → settle green
-                TweenService:Create(KCStroke,TweenInfo.new(0.12),
-                    {Color=Color3.fromRGB(255,255,255),Thickness=3.5}):Play()
-                task.wait(0.14)
-                TweenService:Create(KCStroke,TweenInfo.new(0.45),
-                    {Color=Color3.fromRGB(35,200,90),Thickness=1.8}):Play()
-
-                -- Green screen flash
-                task.wait(0.3)
-                local GFlash=Instance.new("Frame",KSG)
-                GFlash.Size=UDim2.new(1,0,1,0); GFlash.BackgroundColor3=Color3.fromRGB(30,200,80)
-                GFlash.BackgroundTransparency=0.55; GFlash.BorderSizePixel=0; GFlash.ZIndex=998
-                TweenService:Create(GFlash,TweenInfo.new(0.22),{BackgroundTransparency=0.1}):Play()
-                task.wait(0.24)
-                TweenService:Create(GFlash,TweenInfo.new(0.5,Enum.EasingStyle.Quad),
-                    {BackgroundTransparency=1}):Play()
-                playSound(6042053626, 0.7, 1.2)
-
-                -- Activate premium
-                PremiumUnlocked=true; PremiumActive=true
-                task.spawn(RemovePremiumLock)
-                Rayfield:Notify({Title="✨ Premium Unlocked!",Content="Welcome to Ryuu V2 Premium.",Duration=5,Image=4483362458})
-                if S.AutoParry then StopEngine(); task.wait(0.05); P.AutoParry=true; StartPremiumEngine() end
-
-                task.wait(1.2); kscanRunning=false
-                TweenService:Create(Overlay,TweenInfo.new(0.3),{BackgroundTransparency=1}):Play()
-                task.wait(0.32); pcall(function() KSG:Destroy() end)
-
-            else
-                -- ── FAIL ────────────────────────────────────────
-                local msg = result=="locked_other"
-                    and "✗  Key bound to another device"
-                    or  "✗  Invalid key — try again"
-                KTitle.Text="✗  ACCESS DENIED"; KTitle.TextColor3=Color3.fromRGB(255,65,65)
-                KStatus.Text=msg; KStatus.TextColor3=Color3.fromRGB(255,65,65)
-                KAccent.BackgroundColor3=Color3.fromRGB(200,40,40)
-                TweenService:Create(KCStroke,TweenInfo.new(0.15),
-                    {Color=Color3.fromRGB(200,40,40)}):Play()
-                TweenService:Create(KInputBG,TweenInfo.new(0.18),
-                    {BackgroundColor3=Color3.fromRGB(28,5,5)}):Play()
-                TweenService:Create(KInputStroke,TweenInfo.new(0.18),
-                    {Color=Color3.fromRGB(200,40,40)}):Play()
-                -- Red dot wave
-                for i,d in ipairs(kDots) do
-                    task.delay((i-1)*0.045,function()
-                        pcall(function() d.BackgroundColor3=Color3.fromRGB(220,40,40); d.BackgroundTransparency=0 end)
-                    end)
-                end
-                -- Red pulse
-                TweenService:Create(KCStroke,TweenInfo.new(0.1),
-                    {Color=Color3.fromRGB(255,80,80),Thickness=3.5}):Play()
-                task.wait(0.12)
-                TweenService:Create(KCStroke,TweenInfo.new(0.45),
-                    {Color=Color3.fromRGB(180,35,35),Thickness=1.8}):Play()
-
-                -- Red screen flash
-                local RFlash=Instance.new("Frame",KSG)
-                RFlash.Size=UDim2.new(1,0,1,0); RFlash.BackgroundColor3=Color3.fromRGB(200,30,30)
-                RFlash.BackgroundTransparency=0.6; RFlash.BorderSizePixel=0; RFlash.ZIndex=998
-                TweenService:Create(RFlash,TweenInfo.new(0.2),{BackgroundTransparency=0.15}):Play()
-                task.wait(0.22)
-                TweenService:Create(RFlash,TweenInfo.new(0.45,Enum.EasingStyle.Quad),
-                    {BackgroundTransparency=1}):Play()
-                playSound(6042053626, 0.6, 0.7)
-
-                -- Shake card
-                task.spawn(function()
-                    for i=1,6 do
-                        local ox=(i%2==0) and 5 or -5
-                        pcall(function() KCard.Position=UDim2.new(0.5,ox,0.5,0) end)
-                        task.wait(0.045)
-                    end
-                    pcall(function() KCard.Position=UDim2.new(0.5,0,0.5,0) end)
-                end)
-
-                -- Re-enable after delay
-                task.wait(1.3)
-                KInput.Text=""; KInput.TextEditable=true; KBtn.Active=true
-                KTitle.Text="🔑  PREMIUM KEY SCANNER"; KTitle.TextColor3=Color3.fromRGB(0,210,255)
-                KStatus.Text="Try again..."; KStatus.TextColor3=Color3.fromRGB(0,120,170)
-                KCStroke.Color=Color3.fromRGB(0,210,255); KCStroke.Thickness=1.8
-                KAccent.BackgroundColor3=Color3.fromRGB(0,210,255)
-                -- Re-start dots
-                dotsActive=true
-                task.spawn(function()
-                    local f=0
-                    while dotsActive do
-                        f=f+1
-                        for i,d in ipairs(kDots) do
-                            local on=(f%#kDots)==(i-1)
-                            pcall(function()
-                                d.BackgroundColor3=on and Color3.fromRGB(0,200,255) or Color3.fromRGB(0,40,80)
-                                d.BackgroundTransparency=on and 0 or 0.5
-                            end)
-                        end
-                        task.wait(0.07)
-                    end
+                    local s = Instance.new("Sound")
+                    s.SoundId = "rbxassetid://" .. tostring(id)
+                    s.Volume = vol or 0.6
+                    s.PlaybackSpeed = pitch or 1
+                    s.RollOffMaxDistance = 500
+                    s.Parent = parent or workspace
+                    s:Play()
+                    Debris:AddItem(s, 6)
                 end)
             end
-        end
 
-        KBtn.MouseButton1Click:Connect(doScan)
-        KInput.FocusLost:Connect(function(enter) if enter then doScan() end end)
-    end)
-end})
+            -- Background overlay with subtle vignette
+            local Overlay = Instance.new("Frame", KSG)
+            Overlay.Size = UDim2.new(1,0,1,0)
+            Overlay.BackgroundColor3 = Color3.fromRGB(3,0,8)
+            Overlay.BackgroundTransparency = 1
+            Overlay.ZIndex = 1
+            TS:Create(Overlay, TweenInfo.new(0.4, Enum.EasingStyle.Sine), {BackgroundTransparency = 0.4}):Play()
 
+            local Vignette = Instance.new("ImageLabel", Overlay)
+            Vignette.Size = UDim2.new(1,80,1,80)
+            Vignette.Position = UDim2.new(0,-40,0,-40)
+            Vignette.BackgroundTransparency = 1
+            Vignette.Image = "rbxassetid://6014261993" -- subtle vignette / radial gradient
+            Vignette.ImageTransparency = 0.65
+            Vignette.ImageColor3 = Color3.fromRGB(90,40,180)
+            Vignette.ZIndex = 1
+
+            -- Central holographic orb / scanner core
+            local CoreOrb = Instance.new("Frame", KSG)
+            CoreOrb.AnchorPoint = Vector2.new(0.5,0.5)
+            CoreOrb.Position = UDim2.new(0.5,0,0.5,0)
+            CoreOrb.Size = UDim2.new(0,180,0,180)
+            CoreOrb.BackgroundColor3 = Color3.fromRGB(40,180,255)
+            CoreOrb.BackgroundTransparency = 0.75
+            CoreOrb.ZIndex = 5
+            local orbCorner = Instance.new("UICorner", CoreOrb)
+            orbCorner.CornerRadius = UDim.new(1,0)
+            local orbStroke = Instance.new("UIStroke", CoreOrb)
+            orbStroke.Thickness = 2.5
+            orbStroke.Color = Color3.fromRGB(120,240,255)
+            orbStroke.Transparency = 0.3
+            local orbGradient = Instance.new("UIGradient", CoreOrb)
+            orbGradient.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(180,255,255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(40,100,255))
+            }
+            orbGradient.Rotation = 45
+
+            -- Rotating rings around orb
+            local rings = {}
+            for i = 1, 3 do
+                local ring = Instance.new("Frame", CoreOrb)
+                ring.AnchorPoint = Vector2.new(0.5,0.5)
+                ring.Position = UDim2.new(0.5,0,0.5,0)
+                ring.Size = UDim2.new(1, i*45, 1, i*45)
+                ring.BackgroundTransparency = 1
+                ring.ZIndex = 6 + i
+                local stroke = Instance.new("UIStroke", ring)
+                stroke.Thickness = 1.5 - i*0.3
+                stroke.Color = Color3.fromRGB(100 + i*50, 220 - i*30, 255)
+                stroke.Transparency = 0.4 + i*0.1
+                local corner = Instance.new("UICorner", ring)
+                corner.CornerRadius = UDim.new(1,0)
+                table.insert(rings, ring)
+            end
+
+            -- Gentle pulse on core
+            task.spawn(function()
+                while CoreOrb.Parent do
+                    TS:Create(CoreOrb, TweenInfo.new(1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                        Size = UDim2.new(0,192,0,192), BackgroundTransparency = 0.68
+                    }):Play()
+                    task.wait(1.8)
+                    TS:Create(CoreOrb, TweenInfo.new(1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                        Size = UDim2.new(0,168,0,168), BackgroundTransparency = 0.82
+                    }):Play()
+                    task.wait(1.8)
+                end
+            end)
+
+            -- Rotating rings animation
+            task.spawn(function()
+                local rot = 0
+                while CoreOrb.Parent do
+                    rot = rot + 0.8
+                    for i, ring in ipairs(rings) do
+                        local dir = (i % 2 == 0) and 1 or -1
+                        ring.Rotation = rot * dir * (0.7 + i*0.4)
+                    end
+                    task.wait(0.016)
+                end
+            end)
+
+            -- Scanner card (appears after short delay)
+            task.wait(0.6)
+            playSound(9119713951, 0.35, 0.95) -- scan startup sound
+
+            local Card = Instance.new("Frame", KSG)
+            Card.AnchorPoint = Vector2.new(0.5,0.5)
+            Card.Position = UDim2.new(0.5,0,0.5,60)
+            Card.Size = UDim2.new(0,420,0,210)
+            Card.BackgroundColor3 = Color3.fromRGB(5,8,18)
+            Card.BackgroundTransparency = 0.15
+            Card.ZIndex = 10
+            local cardCorner = Instance.new("UICorner", Card)
+            cardCorner.CornerRadius = UDim.new(0,18)
+            local cardStroke = Instance.new("UIStroke", Card)
+            cardStroke.Thickness = 2.2
+            cardStroke.Color = Color3.fromRGB(80,220,255)
+            cardStroke.Transparency = 0.25
+            local cardGradient = Instance.new("UIGradient", Card)
+            cardGradient.Color = ColorSequence.new{
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(10,25,45)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(4,12,25)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(10,25,45))
+            }
+            cardGradient.Rotation = -45
+
+            -- Header
+            local Header = Instance.new("TextLabel", Card)
+            Header.Size = UDim2.new(1,-80,0,40)
+            Header.Position = UDim2.new(0,40,0,12)
+            Header.BackgroundTransparency = 1
+            Header.Text = "RYUU HUB V2 • PREMIUM ACCESS"
+            Header.Font = Enum.Font.GothamBlack
+            Header.TextSize = 16
+            Header.TextColor3 = Color3.fromRGB(120,240,255)
+            Header.TextXAlignment = Enum.TextXAlignment.Left
+            Header.ZIndex = 12
+
+            local SubHeader = Instance.new("TextLabel", Card)
+            SubHeader.Size = UDim2.new(1,-80,0,18)
+            SubHeader.Position = UDim2.new(0,40,0,38)
+            SubHeader.BackgroundTransparency = 1
+            SubHeader.Text = "Enter your premium authorization key"
+            SubHeader.Font = Enum.Font.Gotham
+            SubHeader.TextSize = 11
+            SubHeader.TextColor3 = Color3.fromRGB(90,180,220)
+            SubHeader.TextXAlignment = Enum.TextXAlignment.Left
+            SubHeader.ZIndex = 12
+
+            -- Input field
+            local InputFrame = Instance.new("Frame", Card)
+            InputFrame.Size = UDim2.new(1,-80,0,48)
+            InputFrame.Position = UDim2.new(0,40,0,70)
+            InputFrame.BackgroundColor3 = Color3.fromRGB(8,18,32)
+            InputFrame.ZIndex = 11
+            local inputCorner = Instance.new("UICorner", InputFrame)
+            inputCorner.CornerRadius = UDim.new(0,10)
+            local inputStroke = Instance.new("UIStroke", InputFrame)
+            inputStroke.Thickness = 1.4
+            inputStroke.Color = Color3.fromRGB(60,200,255)
+            inputStroke.Transparency = 0.3
+
+            local InputBox = Instance.new("TextBox", InputFrame)
+            InputBox.Size = UDim2.new(1,-16,1,0)
+            InputBox.Position = UDim2.new(0,8,0,0)
+            InputBox.BackgroundTransparency = 1
+            InputBox.PlaceholderText = "••••••••-••••-••••-••••-••••••••••••"
+            InputBox.PlaceholderColor3 = Color3.fromRGB(60,120,180)
+            InputBox.Text = ""
+            InputBox.TextColor3 = Color3.fromRGB(180,240,255)
+            InputBox.Font = Enum.Font.GothamBold
+            InputBox.TextSize = 15
+            InputBox.ClearTextOnFocus = false
+            InputBox.TextXAlignment = Enum.TextXAlignment.Left
+            InputBox.ZIndex = 12
+
+            -- Status label
+            local Status = Instance.new("TextLabel", Card)
+            Status.Size = UDim2.new(1,-80,0,20)
+            Status.Position = UDim2.new(0,40,0,130)
+            Status.BackgroundTransparency = 1
+            Status.Text = "Awaiting key sequence..."
+            Status.Font = Enum.Font.Gotham
+            Status.TextSize = 11
+            Status.TextColor3 = Color3.fromRGB(100,180,220)
+            Status.TextXAlignment = Enum.TextXAlignment.Left
+            Status.ZIndex = 12
+
+            -- Verify Button
+            local VerifyBtn = Instance.new("TextButton", Card)
+            VerifyBtn.Size = UDim2.new(1,-80,0,42)
+            VerifyBtn.Position = UDim2.new(0,40,0,158)
+            VerifyBtn.BackgroundColor3 = Color3.fromRGB(0,90,160)
+            VerifyBtn.Text = "VERIFY & AUTHENTICATE"
+            VerifyBtn.Font = Enum.Font.GothamBlack
+            VerifyBtn.TextSize = 14
+            VerifyBtn.TextColor3 = Color3.fromRGB(220,255,255)
+            VerifyBtn.ZIndex = 12
+            local btnCorner = Instance.new("UICorner", VerifyBtn)
+            btnCorner.CornerRadius = UDim.new(0,10)
+            local btnStroke = Instance.new("UIStroke", VerifyBtn)
+            btnStroke.Thickness = 1.6
+            btnStroke.Color = Color3.fromRGB(120,240,255)
+
+            VerifyBtn.MouseEnter:Connect(function()
+                TS:Create(VerifyBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0,120,200)}):Play()
+            end)
+            VerifyBtn.MouseLeave:Connect(function()
+                TS:Create(VerifyBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(0,90,160)}):Play()
+            end)
+
+            -- Close button
+            local CloseBtn = Instance.new("TextButton", Card)
+            CloseBtn.Size = UDim2.new(0,32,0,32)
+            CloseBtn.Position = UDim2.new(1,-42,0,8)
+            CloseBtn.BackgroundTransparency = 1
+            CloseBtn.Text = "×"
+            CloseBtn.Font = Enum.Font.GothamBold
+            CloseBtn.TextSize = 22
+            CloseBtn.TextColor3 = Color3.fromRGB(180,180,200)
+            CloseBtn.ZIndex = 13
+
+            local function closeScanner()
+                playSound(4590662766, 0.4, 0.9)
+                TS:Create(Overlay, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+                TS:Create(Card, TweenInfo.new(0.32, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                    Size = UDim2.new(0,0,0,0), Position = UDim2.new(0.5,0,1.2,0)
+                }):Play()
+                TS:Create(CoreOrb, TweenInfo.new(0.4), {Size = UDim2.new(0,0,0,0)}):Play()
+                task.wait(0.45)
+                KSG:Destroy()
+            end
+
+            CloseBtn.MouseButton1Click:Connect(closeScanner)
+
+            -- Entrance animation
+            Card.Size = UDim2.new(0,0,0,0)
+            TS:Create(Card, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0,420,0,210)
+            }):Play()
+
+            -- ── VERIFICATION LOGIC ───────────────────────────────────────
+            local function doVerify()
+                local key = InputBox.Text:match("^%s*(.-)%s*$") or ""
+                if #key < 6 then
+                    Status.Text = "Key sequence too short"
+                    Status.TextColor3 = Color3.fromRGB(255,160,60)
+                    playSound(6042053626, 0.5, 0.8)
+                    return
+                end
+
+                InputBox.TextEditable = false
+                VerifyBtn.Active = false
+                Status.Text = "AUTHENTICATING..."
+                Status.TextColor3 = Color3.fromRGB(120,240,255)
+
+                -- Scanning effect
+                playSound(9114261993, 0.5, 1.05) -- scanning hum
+
+                local scanActive = true
+                task.spawn(function()
+                    local t = 0
+                    while scanActive and Card.Parent do
+                        t = t + 0.04
+                        local hue = math.sin(t * 3) * 0.5 + 0.5
+                        local col = Color3.fromHSV(hue * 0.15 + 0.55, 0.9, 0.95)
+                        cardStroke.Color = col
+                        orbStroke.Color = col
+                        task.wait(0.04)
+                    end
+                end)
+
+                task.wait(1.4 + math.random()*0.4)
+                scanActive = false
+
+                local result = ValidateKey(key)
+
+                if result == "ok" then
+                    -- ── SUCCESS SEQUENCE ────────────────────────────────
+                    playSound(1847668471, 0.7, 1.0)     -- success base
+                    task.delay(0.1, function() playSound(1847668590, 0.6, 1.3) end) -- high chime
+                    task.delay(0.25, function() playSound(1847668590, 0.5, 1.6) end) -- sparkle
+
+                    Status.Text = "AUTHENTICATION SUCCESSFUL"
+                    Status.TextColor3 = Color3.fromRGB(80,255,140)
+
+                    TS:Create(cardStroke, TweenInfo.new(0.4), {Color = Color3.fromRGB(60,255,140)}):Play()
+                    TS:Create(orbStroke, TweenInfo.new(0.4), {Color = Color3.fromRGB(100,255,160)}):Play()
+                    TS:Create(InputFrame, TweenInfo.new(0.4), {BackgroundColor3 = Color3.fromRGB(10,40,20)}):Play()
+
+                    -- Particle burst on success
+                    for i = 1, 18 do
+                        task.delay(i*0.04, function()
+                            local p = Instance.new("Frame", KSG)
+                            p.AnchorPoint = Vector2.new(0.5,0.5)
+                            p.Position = CoreOrb.Position
+                            p.Size = UDim2.new(0,6,0,6)
+                            p.BackgroundColor3 = Color3.fromRGB(120,255,180)
+                            p.BackgroundTransparency = 0.2
+                            p.ZIndex = 20
+                            Instance.new("UICorner", p).CornerRadius = UDim.new(1,0)
+                            TS:Create(p, TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                                Position = UDim2.new(0.5, math.random(-180,180), 0.5, math.random(-180,180)),
+                                Size = UDim2.new(0,0,0,0),
+                                BackgroundTransparency = 1
+                            }):Play()
+                            Debris:AddItem(p, 1.2)
+                        end)
+                    end
+
+                    -- Flash + confirmation
+                    local successFlash = Instance.new("Frame", KSG)
+                    successFlash.Size = UDim2.new(1,0,1,0)
+                    successFlash.BackgroundColor3 = Color3.fromRGB(80,255,140)
+                    successFlash.BackgroundTransparency = 0.7
+                    successFlash.ZIndex = 999
+                    TS:Create(successFlash, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+                    Debris:AddItem(successFlash, 0.8)
+
+                    PremiumUnlocked = true
+                    PremiumActive = true
+                    task.spawn(RemovePremiumLock)
+                    Rayfield:Notify({
+                        Title = "✨ Premium Activated",
+                        Content = "Full access granted. Enjoy Ryuu V2 Premium.",
+                        Duration = 6,
+                        Image = 4483362458
+                    })
+
+                    if S.AutoParry then
+                        StopEngine()
+                        task.wait(0.08)
+                        P.AutoParry = true
+                        StartPremiumEngine()
+                    end
+
+                    task.wait(1.8)
+                    closeScanner()
+                else
+                    -- ── FAILURE SEQUENCE ────────────────────────────────
+                    playSound(6042053626, 0.65, 0.75)
+                    Status.Text = result == "locked_other" and "DEVICE MISMATCH — ACCESS DENIED" or "INVALID KEY SEQUENCE"
+                    Status.TextColor3 = Color3.fromRGB(255,80,80)
+
+                    TS:Create(cardStroke, TweenInfo.new(0.25), {Color = Color3.fromRGB(220,60,60)}):Play()
+                    TS:Create(orbStroke, TweenInfo.new(0.25), {Color = Color3.fromRGB(255,100,100)}):Play()
+
+                    -- Red shake + flash
+                    local failFlash = Instance.new("Frame", KSG)
+                    failFlash.Size = UDim2.new(1,0,1,0)
+                    failFlash.BackgroundColor3 = Color3.fromRGB(220,40,40)
+                    failFlash.BackgroundTransparency = 0.65
+                    failFlash.ZIndex = 999
+                    TS:Create(failFlash, TweenInfo.new(0.25), {BackgroundTransparency = 1}):Play()
+                    Debris:AddItem(failFlash, 0.7)
+
+                    -- Shake animation
+                    for i = 1, 8 do
+                        task.delay((i-1)*0.04, function()
+                            local offset = (i % 2 == 0) and 8 or -8
+                            Card.Position = UDim2.new(0.5, offset, 0.5, 60 + offset*0.5)
+                        end)
+                    end
+                    task.delay(0.36, function()
+                        Card.Position = UDim2.new(0.5,0,0.5,60)
+                    end)
+
+                    task.wait(1.6)
+                    InputBox.Text = ""
+                    InputBox.TextEditable = true
+                    VerifyBtn.Active = true
+                    Status.Text = "Enter premium key..."
+                    Status.TextColor3 = Color3.fromRGB(100,180,220)
+                    cardStroke.Color = Color3.fromRGB(80,220,255)
+                end
+            end
+
+            VerifyBtn.MouseButton1Click:Connect(doVerify)
+            InputBox.FocusLost:Connect(function(enterPressed)
+                if enterPressed then doVerify() end
+            end)
+
+        end)
+    end
+})
 PT:CreateDivider()
 PT:CreateSection("⚡ Premium Parry Engine")
 PT:CreateLabel("Quintic prediction · 5-point acceleration · 0.15s cooldown · God Emergency")
