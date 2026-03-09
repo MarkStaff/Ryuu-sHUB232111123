@@ -960,23 +960,8 @@ end
 -- ══════════════════════════════════════════════════════════════════
 -- FREE PARRY ENGINE  ◈  Blade Ball · Pure distance + dot-product
 -- ══════════════════════════════════════════════════════════════════
--- DESIGN: No history, no regression, no curve math.
---   Fire condition:
---     1. Ball is targeting us
---     2. Ball is actually moving TOWARD us  (dot product < 0)
---     3. Distance ≤ fireDist  (hitbox + ping lead)
---     4. On odd/behind angles: use a tight fallback dist so we never
---        fire on balls flying past us sideways
---
--- Blade Ball parry hitbox ≈ 6 studs radius.
--- We fire at exactly that edge + one ping-length of lead.
--- ══════════════════════════════════════════════════════════════════
 
--- How many studs of extra lead to add per 100ms of ping
--- Keeps the window consistent across connections
-local FREE_PING_LEAD_PER_100MS = 0.9  -- studs
-
--- Base hitbox radius for Blade Ball (confirmed ~6 studs)
+local FREE_PING_LEAD_PER_100MS = 0.9
 local FREE_HITBOX = 6.2
 
 local PrevBallPos, PrevBallTime = nil, 0
@@ -984,298 +969,409 @@ local PrevBallPos, PrevBallTime = nil, 0
 local function StartEngine()
     if Conn.Parry       then Conn.Parry:Disconnect()       end
     if Conn.FreeAbilDet then Conn.FreeAbilDet:Disconnect() end
-    PrevBallPos   = nil; PrevBallTime = 0
+    PrevBallPos   = nil
+    PrevBallTime  = 0
     FreeSpeedHist = {}
     BuildParryIndicator()
 
     Conn.Parry = RunService.PreSimulation:Connect(function()
         if not S.AutoParry then return end
+
         local Ball = GetBall()
-        if not Ball then PrevBallPos=nil; return end
-        local HRP = GetHRP(); if not HRP then return end
-
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local now   = os.clock()
-        local tgt   = Ball:GetAttribute("target") or ""
-        local isTgt = tgt == Plr.Name
-
-        TrackParryHit(tgt)
-
-        -- Auto-face: rotate toward ball when it targets us
-        if isTgt and S.AutoFace then
-            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
-        end
-
-        -- Auto-reset on death / respawn
-        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            S.DidParry=false; FreeLastParriedBall=nil; return
-        end
-
-        if not isTgt then
+        if not Ball then
             PrevBallPos=nil
-            UpdateParryIndicator(99, 1, false)
-            return
-        end
-        if S.DidParry then return end
-
-        local Vel   = GetVel(Ball)
-        local Speed = Vel.Magnitude
-
-        -- ── DOT PRODUCT: is ball closing on us? ─────────────────
-        local toPlayer  = (HPos - BPos)
-        local dotVal    = Vel:Dot(toPlayer)
-        local isClosing = dotVal > -(Speed * 0.15)
-
-        -- ── ADAPTIVE HITBOX  ──────────────────────────────────────
-        -- Core idea: hitbox is NOT fixed. It grows as the ball gets faster
-        -- and shrinks when the ball is slow. This means:
-        --   slow ball  (≤30 st/s)  → minimum hitbox (~4.8 studs)  no early fires
-        --   medium ball (30-120)   → smooth ramp up
-        --   fast ball  (120-220)   → hitbox near max (~7.8 studs)
-        --   very fast  (220+)      → capped at 8.8 studs + spike bonus
-        --
-        -- We also track the last 6 speed readings to detect sudden spikes
-        -- (e.g. Pull ability, speed boost) and inflate the hitbox instantly.
-
-        -- Speed history ring buffer (6 samples, one per frame)
-        FreeSpeedHist = FreeSpeedHist or {}
-        table.insert(FreeSpeedHist, Speed)
-        if #FreeSpeedHist > 6 then table.remove(FreeSpeedHist, 1) end
-
-        -- Detect spike: compare current speed to 3-sample-ago speed
-        local spikeMul = 1.0
-        if #FreeSpeedHist >= 4 then
-            local prev3 = FreeSpeedHist[#FreeSpeedHist - 3]
-            if prev3 and prev3 > 1 then
-                local ratio = Speed / prev3
-                if     ratio > 2.0 then spikeMul = 1.30  -- huge spike (Pull/boost)
-                elseif ratio > 1.5 then spikeMul = 1.18
-                elseif ratio > 1.2 then spikeMul = 1.08
-                end
-            end
-        end
-
-        -- Smooth exponential curve: grows quickly in mid-range, plateaus at top
-        -- t = normalised speed 0→1 over [0, 260 studs/s]
-        local FREE_SPD_REF = 260
-        local FREE_HB_MIN  = 4.8   -- studs at speed 0
-        local FREE_HB_MAX  = 8.8   -- studs at speed >= FREE_SPD_REF
-        local t = math.clamp(Speed / FREE_SPD_REF, 0, 1)
-        -- ease-in-out quad: slow ramp → fast middle → plateau
-        local curve = t < 0.5 and (2 * t * t) or (1 - (-2*t+2)^2 / 2)
-        local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
-        dynamicHitbox = dynamicHitbox * spikeMul  -- inflate on speed spikes
-
-        -- Ping lead: distance ball travels during one ping window
-        -- Scale the coefficient down slightly for slow balls (less slop needed)
-        local pingScale = math.clamp(Speed / 120, 0.4, 1.0)
-        local pingLead  = (PingRaw / 1000) * Speed * FREE_PING_LEAD_PER_100MS / 0.1
-        pingLead = math.min(pingLead * pingScale, 3.0)
-
-        local fireDist = dynamicHitbox + pingLead
-
-        UpdateParryIndicator(Dist, fireDist, false)
-
-        -- ── FIRE CHECK ────────────────────────────────────────────
-        if isClosing and Dist <= fireDist then
-            FireParry(Ball)
-            UpdateParryIndicator(Dist, fireDist, true)
-            PrevBallPos=BPos; PrevBallTime=now
             return
         end
 
-        -- ── SPEED-SCALED LOOKAHEAD ────────────────────────────────
-        -- Frames to look ahead scales with speed so fast balls never skip us
-        if Speed > 60 and isClosing then
-            local dt        = 1/60
-            local maxFrames = Speed > 220 and 4 or Speed > 160 and 3 or Speed > 100 and 2 or 1
-            for step = 1, maxFrames do
-                local nextPos  = BPos + Vel * (dt * step)
-                local nextDist = (HPos - nextPos).Magnitude
-                if nextDist <= fireDist then
-                    FireParry(Ball)
-                    UpdateParryIndicator(Dist, fireDist, true)
-                    return
-                end
-            end
-        end
-
-        PrevBallPos=BPos; PrevBallTime=now
-    end)
-end
-
-local function StopEngine()
-    if Conn.Parry       then Conn.Parry:Disconnect();       Conn.Parry=nil       end
-    if Conn.FreeAbilDet then Conn.FreeAbilDet:Disconnect(); Conn.FreeAbilDet=nil end
-    S.DidParry          = false
-    FreeLastParriedBall = nil
-    PrevBallPos         = nil
-    FreeSpeedHist       = {}  -- reset speed history so stale data doesn't bleed in
-    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
-end
-
-
--- ══════════════════════════════════════════════════════════════════
--- PREMIUM PARRY ENGINE  ◈  Blade Ball · Pure distance + dot-product · Tighter
--- ══════════════════════════════════════════════════════════════════
--- Same clean approach as free engine.
--- Differences vs free:
---   • Hitbox radius controlled by HitboxTarget slider (default 5.8)
---   • Ping lead coefficient slightly smaller (tighter window)
---   • 2-frame lookahead instead of 1 (covers speed boost edge cases)
---   • God emergency fires at 2.5 studs regardless of dot product
---   • Adaptive cooldown: shrinks at high ball speed
--- ══════════════════════════════════════════════════════════════════
-
-local PREM_PING_LEAD_PER_100MS = 0.75  -- slightly tighter than free
--- PremConn, AdaptPremCooldown, CheckBallSpeedWarning declared above (shared scope)
-
-local function StartPremiumEngine()
-    if PremConn.Parry then PremConn.Parry:Disconnect() end
-    PremSpeedHist = {}
-    BuildParryIndicator()
-
-    PremConn.Parry = RunService.PreSimulation:Connect(function()
-        if not P.AutoParry then return end
-        local Ball = GetBall()
-        if not Ball then return end
-        local HRP  = GetHRP(); if not HRP then return end
+        local HRP = GetHRP()
+        if not HRP then return end
 
         local BPos  = Ball.Position
         local HPos  = HRP.Position
         local Dist  = (HPos - BPos).Magnitude
         local now   = os.clock()
+
         local tgt   = Ball:GetAttribute("target") or ""
         local isTgt = tgt == Plr.Name
 
         TrackParryHit(tgt)
 
         -- Auto-face
-        if isTgt and P.AutoFace then
+        if isTgt and S.AutoFace then
             HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
         end
 
-        -- Auto-reset on death / respawn
         if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            PremDidParry=false; PremLastParriedBall=nil; return
-        end
-
-        -- God emergency: fire instantly at extreme close range
-        if P.GodEmergency and isTgt and not PremDidParry and Dist <= 2.5 then
-            PremiumFire(Ball)
-            UpdateParryIndicator(Dist, Dist, true)
+            S.DidParry=false
+            FreeLastParriedBall=nil
             return
         end
 
         if not isTgt then
-            UpdateParryIndicator(99, 1, false)
+            PrevBallPos=nil
+            UpdateParryIndicator(99,1,false)
             return
         end
-        if PremDidParry then return end
+
+        if S.DidParry then return end
 
         local Vel   = GetVel(Ball)
         local Speed = Vel.Magnitude
 
-        AdaptPremCooldown(Speed)
-        CheckBallSpeedWarning(Speed)
+        -- Prevent slow ball false triggers
+        if Speed < 5 then return end
 
-        -- ── DOT PRODUCT: closing check ────────────────────────────
-        local toPlayer  = HPos - BPos
+        -- DOT PRODUCT CHECK (fixed)
+        local toPlayer  = (HPos - BPos)
         local dotVal    = Vel:Dot(toPlayer)
-        local isClosing = dotVal > -(Speed * 0.12)  -- tighter tolerance than free
+        local isClosing = dotVal > 0
 
-        -- ── ADAPTIVE HITBOX  ──────────────────────────────────────
-        -- Premium version — tighter base, finer spike detection, acceleration
-        -- awareness using the last 8 speed samples (more history than free).
-        --
-        --   P.HitboxTarget = slider-set minimum (slow ball floor)
-        --   PREM_EXPAND    = max studs added at full speed (tighter than free)
-        --   acceleration   = detected from history → pre-inflates hitbox so
-        --                    a ball that is ACTIVELY SPEEDING UP gets a slightly
-        --                    bigger window before it arrives, not after.
+        -- SPEED HISTORY
+        FreeSpeedHist = FreeSpeedHist or {}
+        table.insert(FreeSpeedHist, Speed)
+        if #FreeSpeedHist > 6 then
+            table.remove(FreeSpeedHist,1)
+        end
 
-        PremSpeedHist = PremSpeedHist or {}
-        table.insert(PremSpeedHist, Speed)
-        if #PremSpeedHist > 8 then table.remove(PremSpeedHist, 1) end
+        -- SPIKE DETECTION
+        local spikeMul = 1.0
+        if #FreeSpeedHist >= 4 then
+            local prev3 = FreeSpeedHist[#FreeSpeedHist - 3]
+            if prev3 and prev3 > 1 then
+                local ratio = Speed / prev3
 
-        -- Spike detection: ratio vs 4 samples ago
-        local premSpikeMul = 1.0
-        if #PremSpeedHist >= 5 then
-            local prev4 = PremSpeedHist[#PremSpeedHist - 4]
-            if prev4 and prev4 > 1 then
-                local ratio = Speed / prev4
-                if     ratio > 2.2 then premSpikeMul = 1.28
-                elseif ratio > 1.6 then premSpikeMul = 1.16
-                elseif ratio > 1.25 then premSpikeMul = 1.07
+                if ratio > 2.0 then
+                    spikeMul = 1.30
+                elseif ratio > 1.5 then
+                    spikeMul = 1.18
+                elseif ratio > 1.2 then
+                    spikeMul = 1.08
                 end
             end
         end
 
-        -- Acceleration estimate (st/s²): positive = speeding up
-        local accel = 0
-        if #PremSpeedHist >= 3 then
-            local n   = #PremSpeedHist
-            local dv  = PremSpeedHist[n] - PremSpeedHist[n-2]
-            accel = dv / (2 / 60)  -- two frames apart at 60fps
+        -- ADAPTIVE HITBOX
+        local FREE_SPD_REF = 260
+        local FREE_HB_MIN  = 4.8
+        local FREE_HB_MAX  = 8.8
+
+        local t = math.clamp(Speed / FREE_SPD_REF,0,1)
+
+        local curve
+        if t < 0.5 then
+            curve = 2 * t * t
+        else
+            curve = 1 - ((-2 * t + 2)^2) / 2
         end
-        -- Forward-compensate: if ball is accelerating, treat speed as slightly higher
-        local projSpeed = Speed + math.max(0, accel) * (1/60)
 
-        -- Smooth ease-out curve on projected speed (premium uses projected, not raw)
-        local PREM_SPD_REF = 240
-        local PREM_HB_MIN  = P.HitboxTarget            -- slider floor (default 4.0)
-        local PREM_HB_MAX  = P.HitboxTarget + 3.0      -- ceiling = floor + 3 studs
-        local t = math.clamp(projSpeed / PREM_SPD_REF, 0, 1)
-        -- ease-out cubic: fast ramp at low speed, plateau at high speed
-        local curve = 1 - (1 - t)^3
-        local dynamicHitbox = PREM_HB_MIN + (PREM_HB_MAX - PREM_HB_MIN) * curve
-        dynamicHitbox = dynamicHitbox * premSpikeMul
+        local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
+        dynamicHitbox = dynamicHitbox * spikeMul
 
-        -- Ping lead — tighter cap than free, scaled by speed
-        local pingScale = math.clamp(projSpeed / 100, 0.35, 1.0)
-        local pingLead  = (PingRaw / 1000) * projSpeed * PREM_PING_LEAD_PER_100MS / 0.1
-        pingLead = math.min(pingLead * pingScale, 2.4)
+        -- PING LEAD
+        local pingScale = math.clamp(Speed / 120,0.4,1.0)
+
+        local pingLead =
+            (PingRaw / 1000)
+            * Speed
+            * FREE_PING_LEAD_PER_100MS
+            / 0.1
+
+        pingLead = math.min(pingLead * pingScale,3.0)
 
         local fireDist = dynamicHitbox + pingLead
 
-        UpdateParryIndicator(Dist, fireDist, false)
+        UpdateParryIndicator(Dist,fireDist,false)
 
-        -- ── FIRE CHECK ────────────────────────────────────────────
-        if isClosing and Dist <= fireDist then
-            PremiumFire(Ball)
-            UpdateParryIndicator(Dist, fireDist, true)
+        -- FIRE CHECK (double target safety)
+        if isTgt and isClosing and Dist <= fireDist then
+            FireParry(Ball)
+            UpdateParryIndicator(Dist,fireDist,true)
+
+            PrevBallPos=BPos
+            PrevBallTime=now
             return
         end
 
-        -- ── SPEED-SCALED LOOKAHEAD ────────────────────────────────
-        -- Premium gets one more lookahead frame than free at all speed tiers
+        -- SPEED LOOKAHEAD
         if Speed > 60 and isClosing then
-            local dt        = 1/60
-            local maxFrames = Speed > 220 and 5 or Speed > 160 and 4 or Speed > 100 and 3 or 2
+
+            local dt = 1/60
+
+            local maxFrames =
+                Speed > 220 and 4
+                or Speed > 160 and 3
+                or Speed > 100 and 2
+                or 1
+
             for step = 1, maxFrames do
+
                 local nextPos  = BPos + Vel * (dt * step)
                 local nextDist = (HPos - nextPos).Magnitude
+
                 if nextDist <= fireDist then
-                    PremiumFire(Ball)
-                    UpdateParryIndicator(Dist, fireDist, true)
+                    FireParry(Ball)
+                    UpdateParryIndicator(Dist,fireDist,true)
                     return
                 end
             end
         end
+
+        PrevBallPos=BPos
+        PrevBallTime=now
     end)
 end
 
-local function StopPremiumEngine()
-    if PremConn.Parry then PremConn.Parry:Disconnect(); PremConn.Parry=nil end
-    PremDidParry        = false
-    PremLastParriedBall = nil
-    PremSpeedHist       = {}  -- reset speed history so stale data doesn't bleed in
-    if ParryIndicatorGui then pcall(function() ParryIndicatorGui:Destroy() end); ParryIndicatorGui=nil end
+
+local function StopEngine()
+
+    if Conn.Parry then
+        Conn.Parry:Disconnect()
+        Conn.Parry=nil
+    end
+
+    if Conn.FreeAbilDet then
+        Conn.FreeAbilDet:Disconnect()
+        Conn.FreeAbilDet=nil
+    end
+
+    S.DidParry=false
+    FreeLastParriedBall=nil
+    PrevBallPos=nil
+    FreeSpeedHist={}
+
+    if ParryIndicatorGui then
+        pcall(function()
+            ParryIndicatorGui:Destroy()
+        end)
+        ParryIndicatorGui=nil
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM PARRY ENGINE  ◈  Blade Ball · Advanced Prediction
+-- ═══════════════════════════════════════════════════════════
+
+local PREM_PING_LEAD_PER_100MS = 0.75
+local PREM_MIN_SPEED = 6
+
+local PremPrevVel = nil
+
+local function StartPremiumEngine()
+
+    if PremConn.Parry then PremConn.Parry:Disconnect() end
+
+    PremSpeedHist = {}
+    PremPrevVel   = nil
+
+    BuildParryIndicator()
+
+    PremConn.Parry = RunService.PreSimulation:Connect(function()
+
+        if not P.AutoParry then return end
+
+        local Ball = GetBall()
+        if not Ball then return end
+
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local BPos = Ball.Position
+        local HPos = HRP.Position
+
+        local Dist = (HPos - BPos).Magnitude
+
+        local tgt = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+
+        TrackParryHit(tgt)
+
+        if isTgt and P.AutoFace then
+            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
+        end
+
+        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
+            PremDidParry=false
+            PremLastParriedBall=nil
+            return
+        end
+
+        local Vel = GetVel(Ball)
+        local Speed = Vel.Magnitude
+
+        if Speed < PREM_MIN_SPEED then return end
+
+        AdaptPremCooldown(Speed)
+        CheckBallSpeedWarning(Speed)
+
+        -- GOD EMERGENCY (dynamic)
+        local panicDist = math.clamp(2.2 + Speed * 0.004, 2.2, 3.4)
+
+        if P.GodEmergency and isTgt and not PremDidParry and Dist <= panicDist then
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist, panicDist, true)
+            return
+        end
+
+        if not isTgt then
+            UpdateParryIndicator(99,1,false)
+            return
+        end
+
+        if PremDidParry then return end
+
+        -- DOT PRODUCT (true closing check)
+        local toPlayer = HPos - BPos
+        local dotVal = Vel:Dot(toPlayer)
+        local isClosing = dotVal > 0
+
+        -- SPEED HISTORY
+        PremSpeedHist = PremSpeedHist or {}
+        table.insert(PremSpeedHist,Speed)
+
+        if #PremSpeedHist > 8 then
+            table.remove(PremSpeedHist,1)
+        end
+
+        -- SPEED SPIKE DETECTION
+        local spikeMul = 1.0
+
+        if #PremSpeedHist >= 5 then
+            local prev4 = PremSpeedHist[#PremSpeedHist-4]
+
+            if prev4 and prev4 > 1 then
+                local ratio = Speed / prev4
+
+                if ratio > 2.3 then
+                    spikeMul = 1.30
+                elseif ratio > 1.7 then
+                    spikeMul = 1.18
+                elseif ratio > 1.3 then
+                    spikeMul = 1.10
+                end
+            end
+        end
+
+        -- ACCELERATION PREDICTION
+        local accel = 0
+
+        if #PremSpeedHist >= 3 then
+            local n = #PremSpeedHist
+            local dv = PremSpeedHist[n] - PremSpeedHist[n-2]
+
+            accel = dv / (2/60)
+        end
+
+        local projSpeed = Speed + math.max(0,accel) * (1/60)
+
+        -- CURVE DETECTION
+        local curveBonus = 1.0
+
+        if PremPrevVel then
+            local angle = Vel.Unit:Dot(PremPrevVel.Unit)
+
+            if angle < 0.94 then
+                curveBonus = 1.18
+            elseif angle < 0.97 then
+                curveBonus = 1.10
+            end
+        end
+
+        PremPrevVel = Vel
+
+        -- DYNAMIC HITBOX
+        local PREM_SPD_REF = 240
+
+        local PREM_HB_MIN = P.HitboxTarget
+        local PREM_HB_MAX = P.HitboxTarget + 3.2
+
+        local t = math.clamp(projSpeed / PREM_SPD_REF,0,1)
+
+        local curve = 1 - (1 - t)^3
+
+        local dynamicHitbox =
+            PREM_HB_MIN +
+            (PREM_HB_MAX - PREM_HB_MIN) * curve
+
+        dynamicHitbox =
+            dynamicHitbox *
+            spikeMul *
+            curveBonus
+
+        -- PING LEAD
+        local pingScale = math.clamp(projSpeed / 100,0.35,1.0)
+
+        local pingLead =
+            (PingRaw / 1000)
+            * projSpeed
+            * PREM_PING_LEAD_PER_100MS
+            / 0.1
+
+        pingLead = math.min(pingLead * pingScale,2.4)
+
+        local fireDist = dynamicHitbox + pingLead
+
+        UpdateParryIndicator(Dist,fireDist,false)
+
+        -- FIRE CHECK
+        if isClosing and Dist <= fireDist then
+
+            PremiumFire(Ball)
+            UpdateParryIndicator(Dist,fireDist,true)
+
+            return
+        end
+
+        -- ADVANCED LOOKAHEAD
+        if Speed > 60 and isClosing then
+
+            local dt = 1/60
+
+            local maxFrames =
+                Speed > 260 and 6
+                or Speed > 200 and 5
+                or Speed > 150 and 4
+                or Speed > 110 and 3
+                or 2
+
+            for step = 1,maxFrames do
+
+                local nextPos = BPos + Vel * (dt * step)
+                local nextDist = (HPos - nextPos).Magnitude
+
+                if nextDist <= fireDist then
+
+                    PremiumFire(Ball)
+                    UpdateParryIndicator(Dist,fireDist,true)
+
+                    return
+                end
+            end
+        end
+
+    end)
 end
 
 
+local function StopPremiumEngine()
+
+    if PremConn.Parry then
+        PremConn.Parry:Disconnect()
+        PremConn.Parry=nil
+    end
+
+    PremDidParry=false
+    PremLastParriedBall=nil
+    PremSpeedHist={}
+    PremPrevVel=nil
+
+    if ParryIndicatorGui then
+        pcall(function()
+            ParryIndicatorGui:Destroy()
+        end)
+
+        ParryIndicatorGui=nil
+    end
+end
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY ESP  ◈  Upgraded: cleaner cards, warn flash, tier badge
 -- ══════════════════════════════════════════════════════════════════
