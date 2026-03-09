@@ -1073,7 +1073,7 @@ end
 -- Still not as good as premium (premium has 4.5 studs, 5-frames, full boost detect, god emergency).
 local freePosHist = {} -- For 3-frame AntiCurve {dist, time}
 local freeSpeedHist = {} -- For basic boost detect
-local MAX_FREE_HIST = 3
+local MAX_FREE_HIST = 6
 local function pushFreeHist(dist, t)
     table.insert(freePosHist, {d=dist, t=t})
     if #freePosHist > MAX_FREE_HIST then table.remove(freePosHist, 1) end
@@ -1326,7 +1326,7 @@ local function StartLobbyEngine()
 
         -- Speed history
         table.insert(LobbyFreeSpeedHist, Speed)
-        if #LobbyFreeSpeedHist > 6 then table.remove(LobbyFreeSpeedHist, 1) end
+        if #LobbyFreeSpeedHist > 8 then table.remove(LobbyFreeSpeedHist, 1) end
 
         local spikeMul = 1.0
         if #LobbyFreeSpeedHist >= 4 then
@@ -1341,8 +1341,8 @@ local function StartLobbyEngine()
         end
 
         local FREE_SPD_REF = 260
-        local FREE_HB_MIN  = 4.2
-        local FREE_HB_MAX  = 8.4
+        local FREE_HB_MIN  = 8.0
+        local FREE_HB_MAX  = 13.0
         local t = math.clamp(Speed / FREE_SPD_REF, 0, 1)
         local curve = t < 0.5 and (2 * t * t) or (1 - (-2*t+2)^2 / 2)
         local dynamicHitbox = FREE_HB_MIN + (FREE_HB_MAX - FREE_HB_MIN) * curve
@@ -1406,7 +1406,7 @@ local P = {
     GodEmergency = false, -- Now 2.5 studs
     CurveCrusher = false, -- 5-frame smoothed anticurve
     AutoFace = false, -- always face ball
-    HitboxTarget = 4.0, -- Even tighter
+    HitboxTarget = 13.0, -- Even tighter
     SpeedBoostDetect = true, -- auto-adjust for accelerating balls
     QuadCurvePredict = true, -- New: quadratic curve estimation
 }
@@ -1430,7 +1430,7 @@ local function predictQuadPos(curPos, curVel, dt)
 end
 -- Multi-frame closing speed history (5 frames, smoothed)
 local posHist = {} -- {dist, time}
-local MAX_HIST = 5
+local MAX_HIST = 8
 local function pushHist(dist, t)
     table.insert(posHist, {d=dist, t=t})
     if #posHist > MAX_HIST then table.remove(posHist, 1) end
