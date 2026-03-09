@@ -2345,7 +2345,17 @@ local function HookSwordApply(char)
         if v:IsA("Tool") then task.wait(0.1); ApplySwordPreset(CurrentSwordPreset) end
     end)
 end
-Plr.CharacterAdded:Connect(function(char) task.wait(0.5); HookSwordApply(char) end)
+Plr.CharacterAdded:Connect(function(char)
+    task.wait(0.5)
+    HookSwordApply(char)
+    task.wait(1.0)
+    if DesyncActive then
+        StopDesync()
+        DesyncActive = true
+        task.wait(0.1)
+        StartDesync()
+    end
+end)
 if Plr.Character then HookSwordApply(Plr.Character) end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -2535,18 +2545,6 @@ local function StopDesync()
         end)
     end
 end
-
--- Re-hook on respawn
-Plr.CharacterAdded:Connect(function()
-    task.wait(1.5)
-    if DesyncActive then
-        StopDesync()
-        DesyncActive = true
-        task.wait(0.1)
-        StartDesync()
-    end
-end)
-
 
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM FEATURES  ◈  State + All Functions
@@ -3175,11 +3173,23 @@ TDesync:CreateToggle({
         DesyncActive = v
         if v then
             StartDesync()
-            Rayfield:Notify({
+ Rayfield:Notify({
                 Title    = "👻 Desync ACTIVE",
                 Content  = "Ghost offset + reset cycle + net jitter running. Move normally — others can't track you.",
-                Duration = 5
-
+                Duration = 5,
+                Image    = 4483362458
+            })
+        else
+            StopDesync()
+            Rayfield:Notify({
+                Title    = "👻 Desync OFF",
+                Content  = "Clean restore applied. Back to normal replication.",
+                Duration = 3,
+                Image    = 4483362458
+            })
+        end
+    end
+})
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM TAB  ◈  FULL HOLOGRAPHIC KEY SCANNER (UPGRADED)
 -- ══════════════════════════════════════════════════════════════════
