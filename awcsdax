@@ -1061,518 +1061,379 @@ local function UpdateParryIndicator(dist, fireDist, didJustFire)
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- IMPROVED FREE PARRY ENGINE ◈ Enhanced Precision
 -- ══════════════════════════════════════════════════════════════════
-local function StartEngine()
-    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry=nil end
-    if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
-    if Conn.BallAdded then Conn.BallAdded:Disconnect(); Conn.BallAdded=nil end
-    if Conn.DirWatch then Conn.DirWatch:Disconnect(); Conn.DirWatch=nil end
-    S.DidParry = false
-    PrevBallPos = nil
-    freePosHist = {}
-    freeSpeedHist = {}
+-- FREE AUTO PARRY ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local Conn = {}
 
-    local function HookBall(ball)
-        if not ball then return end
-        if Conn.Target then Conn.Target:Disconnect(); Conn.Target=nil end
-        Conn.Target = ball:GetAttributeChangedSignal("target"):Connect(function()
-            S.DidParry = false
-        end)
-    end
-    HookBall(GetBall())
-
-    local function hookFolder(folder)
-        if not folder then return end
-        Conn.BallAdded = folder.ChildAdded:Connect(function()
-            task.wait(0.05)
-            local b = GetBall()
-            if b then S.DidParry=false; PrevBallPos=nil; HookBall(b) end
-        end)
-    end
-    local bf = workspace:FindFirstChild("Balls")
-    if bf then hookFolder(bf)
-    else task.spawn(function()
-        local f = workspace:WaitForChild("Balls", 30)
-        if f and not Conn.BallAdded then hookFolder(f) end
-    end) end
-
-    local lastDir = Vector3.zero
-    Conn.DirWatch = RunService.Heartbeat:Connect(function()
-        if not S.AutoParry then return end
-        local b = GetBall(); if not b then return end
-        local v = GetVel(b)
-        if v.Magnitude > 2 and lastDir.Magnitude > 0 then
-            if v.Unit:Dot(lastDir.Unit) < -0.4 then
-                S.DidParry = false
-            end
-        end
-        if v.Magnitude > 0.5 then lastDir = v end
+local function FireParry()
+    if S.DidParry then return end
+    if os.clock() - S.LastParry < S.ParryCooldown then return end
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    task.wait(0.015)
+    VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+    S.LastParry             = os.clock()
+    S.DidParry              = true
+    S.ParryCount            = S.ParryCount + 1
+    ParryStats.total        = ParryStats.total + 1
+    ParryStats.lastFireTime = os.clock()
+    task.delay(S.ParryCooldown, function()
+        S.DidParry = false
     end)
+end
 
-    Conn.Parry = RunService.PreSimulation:Connect(function()
+local function StartEngine()
+    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry = nil end
+    S.DidParry = false
+
+    Conn.Parry = RunService.Heartbeat:Connect(function()
         if not S.AutoParry then return end
         local Ball = GetBall()
-        if not Ball then PrevBallPos=nil; freePosHist={}; freeSpeedHist={}; return end
+        if not Ball then return end
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local isTgt = Ball:GetAttribute("target") == Plr.Name
+        if not isTgt then S.DidParry = false; return end
+
+        local BPos  = Ball.Position
+        local HPos  = HRP.Position
+        local Dist  = (HPos - BPos).Magnitude
+        local Vel   = GetVel(Ball)
+        local Speed = Vel.Magnitude
+
+        if S.AutoFace then
+            HRP.CFrame = CFrame.lookAt(
+                HPos,
+                Vector3.new(BPos.X, HPos.Y, BPos.Z)
+            )
+        end
+
+        -- Ping compensation: how many studs ball travels during ping
+        local pingStuds = (PingMs / 1000) * Speed
+        -- Fire distance: S.HitboxTarget studs + ping lead
+        -- S.HitboxTarget defaults to 5.0, user-adjustable via slider
+        local fireDist = S.HitboxTarget + pingStuds
+
+        -- Next frame prediction: where will ball be in 1/60s
+        local nextBPos = BPos + Vel * (1/60)
+        local nextDist = (HPos - nextBPos).Magnitude
+
+        if Dist <= fireDist or nextDist <= fireDist then
+            FireParry()
+        end
+    end)
+end
+
+local function StopEngine()
+    if Conn.Parry then Conn.Parry:Disconnect(); Conn.Parry = nil end
+    S.DidParry = false
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- FREE LOBBY PARRY ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local LobbyConn      = {}
+local LobbyDidParry  = false
+local LobbyLastParry = 0
+
+local function LobbyFireParry()
+    local now = os.clock()
+    if LobbyDidParry then return end
+    if now - LobbyLastParry < S.ParryCooldown then return end
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    task.wait(0.015)
+    VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+    LobbyLastParry          = now
+    LobbyDidParry           = true
+    S.ParryCount            = S.ParryCount + 1
+    ParryStats.total        = ParryStats.total + 1
+    ParryStats.lastFireTime = now
+    task.delay(S.ParryCooldown, function()
+        LobbyDidParry = false
+    end)
+end
+
+local function StartLobbyEngine()
+    if LobbyConn.Parry then LobbyConn.Parry:Disconnect(); LobbyConn.Parry = nil end
+    LobbyDidParry = false
+    BuildLobbyBadge(true)
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text       = "🏟  Mode  —  LOBBY PARRY"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(50,220,110)
+        end)
+    end
+
+    LobbyConn.Parry = RunService.Heartbeat:Connect(function()
+        if not S.LobbyParry then return end
+        local Ball = GetBall()
+        if not Ball then return end
+        local HRP = GetHRP()
+        if not HRP then return end
+
+        local tgt   = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        TrackParryHit(tgt)
+        if not isTgt then LobbyDidParry = false; return end
+
+        local BPos  = Ball.Position
+        local HPos  = HRP.Position
+        local Dist  = (HPos - BPos).Magnitude
+        local Vel   = GetVel(Ball)
+        local Speed = Vel.Magnitude
+
+        local pingStuds = (PingMs / 1000) * Speed
+        -- Lobby hitbox slightly larger than game (lobby balls can be faster)
+        local fireDist  = (S.HitboxTarget + 1.5) + pingStuds
+
+        local nextBPos = BPos + Vel * (1/60)
+        local nextDist = (HPos - nextBPos).Magnitude
+
+        if Dist <= fireDist or nextDist <= fireDist then
+            LobbyFireParry()
+        end
+    end)
+end
+
+local function StopLobbyEngine()
+    if LobbyConn.Parry then LobbyConn.Parry:Disconnect(); LobbyConn.Parry = nil end
+    LobbyDidParry = false
+    BuildLobbyBadge(false)
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text       = "⚡  Mode  —  IDLE"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(160,160,160)
+        end)
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM AUTO PARRY ENGINE
+-- Accuracy slider 1-150:
+-- 1-50   = humanlike (random delay added)
+-- 51-99  = good timing
+-- 100    = perfect machine timing
+-- 101-150= god mode (fires multiple frames ahead, near-instant)
+-- ══════════════════════════════════════════════════════════════════
+local PremiumConn    = {}
+local PremDidParry   = false
+local PremLastParry  = 0
+local PremCooldown   = 0.15
+local PremAccuracy   = 100  -- default, connected to slider
+
+local function PremiumFire()
+    local now = os.clock()
+    if PremDidParry then return end
+    if now - PremLastParry < PremCooldown then return end
+
+    -- Human delay at low accuracy (1-50)
+    if PremAccuracy < 51 then
+        local maxDelay = 0.12 * (1 - PremAccuracy / 51)
+        task.wait(math.random() * maxDelay)
+    end
+
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    task.wait(0.015)
+    VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+    PremLastParry           = now
+    PremDidParry            = true
+    S.ParryCount            = S.ParryCount + 1
+    ParryStats.total        = ParryStats.total + 1
+    ParryStats.lastFireTime = now
+    task.delay(PremCooldown, function()
+        PremDidParry = false
+    end)
+end
+
+local function StartPremiumEngine()
+    for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
+    PremiumConn  = {}
+    PremDidParry = false
+
+    PremiumConn.Parry = RunService.Heartbeat:Connect(function()
+        if not P.AutoParry then return end
+        local Ball = GetBall()
+        if not Ball then return end
         local HRP = GetHRP()
         if not HRP then return end
 
         local BPos  = Ball.Position
         local HPos  = HRP.Position
         local Dist  = (HPos - BPos).Magnitude
-        local now   = os.clock()
+        local Vel   = GetVel(Ball)
+        local Speed = Vel.Magnitude
 
-        -- Emergency: fires for any nearby ball coming at us
-        if S.EmergencyParry and not S.DidParry then
-            if Dist <= (S.EmergencyDist or 6) then
-                for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= Plr and p.Character then
-                        local ehr = p.Character:FindFirstChild("HumanoidRootPart")
-                        if ehr and (ehr.Position - HPos).Magnitude <= (S.EmergencyDist + 10) then
-                            FireParry(); break
-                        end
-                    end
-                end
+        -- God Emergency
+        if P.GodEmergency and not PremDidParry then
+            if Dist <= 3.5 then
+                PremiumFire(); return
             end
         end
 
         local isTgt = Ball:GetAttribute("target") == Plr.Name
-        if S.AutoFace and isTgt then
-            HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
-        end
-        if not isTgt then PrevBallPos=nil; freePosHist={}; freeSpeedHist={}; return end
-        if S.DidParry then return end
-
-        local Vel   = GetVel(Ball)
-        local Speed = Vel.Magnitude
-
-        -- Stationary ball close range
-        if Speed < 1 then
-            if Dist <= 7 then FireParry() end
-            return
-        end
-
-        -- Anti-false-fire: only fire when ball is actually closing
-        local toPlayer = HPos - BPos
-        local dotVal   = Vel:Dot(toPlayer.Unit)
-        if dotVal < -(Speed * 0.25) and Dist > 10 then return end
-
-        pushFreeHist(Dist, now)
-
-        -- Speed boost detection
-        table.insert(freeSpeedHist, Speed)
-        if #freeSpeedHist > 3 then table.remove(freeSpeedHist, 1) end
-        local effectiveSpeed = Speed
-        if #freeSpeedHist >= 2 then
-            local oldest = freeSpeedHist[1]
-            if oldest > 0 and Speed / oldest > 1.20 then
-                effectiveSpeed = Speed * 1.12
-            end
-        end
-
-        -- Shield animation fires ~100ms before impact
-        -- hbox enlarged + ping lead to trigger shield animation in time
-        local hbox   = 8.5 + math.clamp(effectiveSpeed / 40, 0, 3.5)
-        local pingLead = (PingMs / 1000) * effectiveSpeed * 0.55
-        pingLead = math.min(pingLead, 6.0)
-        local fireAt = hbox + pingLead
-
-        if Dist <= fireAt then
-            FireParry()
-            PrevBallPos  = BPos
-            PrevBallTime = now
-            return
-        end
-
-        -- Next-frame extrapolation (2 frames)
-        if Speed > 1 then
-            for step = 1, 2 do
-                local nextPos  = BPos + Vel * (step / 60)
-                local nextDist = (HPos - nextPos).Magnitude
-                if nextDist <= fireAt then
-                    FireParry()
-                    return
-                end
-            end
-        end
-
-        -- 4-frame smoothed AntiCurve
-        if S.AntiCurve then
-            local sc = smoothFreeClosing(Dist, now)
-            if sc > 4 then
-                local curveFireAt = hbox + (PingMs / 1000) * sc * 0.55
-                if Dist <= curveFireAt then
-                    FireParry()
-                end
-            end
-        end
-
-        PrevBallPos  = BPos
-        PrevBallTime = now
-    end)
-end
--- ══════════════════════════════════════════════════════════════════
--- FREE LOBBY PARRY ENGINE
-local function StartLobbyEngine()
-    if LobbyConn.Parry then LobbyConn.Parry:Disconnect() end
-    LobbyFreeSpeedHist = {}; LobbyFreeVelHistory = {}
-    BuildLobbyBadge(true)
-    if _G.RyuuHudMode then
-        pcall(function()
-            _G.RyuuHudMode.Text = "🏟  Mode  —  LOBBY PARRY"
-            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(50,220,110)
-        end)
-    end
-
-    LobbyConn.Parry = RunService.PreSimulation:Connect(function()
-        if not S.LobbyParry then return end
-        local Ball = GetBall()
-        if not Ball then LobbyFreeVelHistory={}; return end
-        local HRP = GetHRP(); if not HRP then return end
-
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local tgt   = Ball:GetAttribute("target") or ""
-        local isTgt = tgt == Plr.Name
-
-        TrackParryHit(tgt)
-
-        if not isTgt then
-            LobbyFreeVelHistory = {}
-            return
-        end
-        if LobbyFreeDidParry then return end
-        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            LobbyFreeDidParry=false; LobbyFreeLastParriedBall=nil; return
-        end
-
-        local RawVel = GetVel(Ball)
-        -- Velocity smoothing (3-frame)
-        table.insert(LobbyFreeVelHistory, RawVel)
-        if #LobbyFreeVelHistory > 3 then table.remove(LobbyFreeVelHistory, 1) end
-        local sx, sy, sz = 0, 0, 0
-        for _, v in ipairs(LobbyFreeVelHistory) do sx=sx+v.X; sy=sy+v.Y; sz=sz+v.Z end
-        local vn  = #LobbyFreeVelHistory
-        local Vel = Vector3.new(sx/vn, sy/vn, sz/vn)
-        local Speed = Vel.Magnitude
-
-        -- Closing direction gate
-        local toPlayer   = HPos - BPos
-        local dotVal     = Vel:Dot(toPlayer.Unit)
-        local isClosing  = dotVal > -(Speed * 0.10)
-        if dotVal < -(Speed * 0.25) and Dist > 10 then return end
-
-        -- Speed spike multiplier
-        table.insert(LobbyFreeSpeedHist, Speed)
-        if #LobbyFreeSpeedHist > 8 then table.remove(LobbyFreeSpeedHist, 1) end
-
-        local spikeMul = 1.0
-        if #LobbyFreeSpeedHist >= 4 then
-            local prev = LobbyFreeSpeedHist[#LobbyFreeSpeedHist - 3]
-            if prev and prev > 1 then
-                local ratio = Speed / prev
-                if     ratio > 2.0 then spikeMul = 1.28
-                elseif ratio > 1.5 then spikeMul = 1.16
-                elseif ratio > 1.2 then spikeMul = 1.06
-                end
-            end
-        end
-
-        -- Dynamic hitbox: larger base so shield animation triggers in time
-        local SPD_REF      = 260
-        local HB_MIN       = 11.5
-        local HB_MAX       = 17.5
-        local t            = math.clamp(Speed / SPD_REF, 0, 1)
-        local curve        = t < 0.5 and (2*t*t) or (1-(-2*t+2)^2/2)
-        local dynamicHitbox = (HB_MIN + (HB_MAX - HB_MIN) * curve) * spikeMul
-
-        -- Ping lead tuned for shield anim window
-        local pingScale = math.clamp(Speed / 100, 0.4, 1.0)
-        local pingLead  = (PingRaw / 1000) * Speed * 0.60
-        pingLead = math.min(pingLead * pingScale, 6.5)
-        local fireDist  = dynamicHitbox + pingLead
-
-        if isClosing and Dist <= fireDist then
-            LobbyFireParry(Ball)
-            return
-        end
-
-        -- Multi-frame extrapolation
-        if Speed > 50 and isClosing then
-            local dt        = 1/60
-            local maxFrames = Speed > 220 and 5 or Speed > 160 and 4 or Speed > 100 and 3 or 2
-            for step = 1, maxFrames do
-                local nextPos  = BPos + Vel * (dt * step)
-                local nextDist = (HPos - nextPos).Magnitude
-                if nextDist <= fireDist then
-                    LobbyFireParry(Ball)
-                    return
-                end
-            end
-        end
-    end)
-end
--- ══════════════════════════════════════════════════════════════════
--- PREMIUM ENGINE ◈ Even Better Than Improved Free
--- ══════════════════════════════════════════════════════════════════
-local function StartPremiumEngine()
-    for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
-    PremiumConn = {}
-    speedHist   = {}
-    posHist     = {}
-    posHistQuad = {}
-
-    local lastVelDir = Vector3.zero
-    PremiumConn.DirWatch = RunService.PreSimulation:Connect(function()
-        local b = GetBall(); if not b then return end
-        local v = GetVel(b)
-        if v.Magnitude > 2 and lastVelDir.Magnitude > 0 then
-            if v.Unit:Dot(lastVelDir.Unit) < -0.5 then
-                S.DidParry = false
-            end
-        end
-        if v.Magnitude > 0.5 then lastVelDir = v end
-    end)
-
-    PremiumConn.Parry = RunService.PreSimulation:Connect(function()
-        local Ball = GetBall()
-        if not Ball then posHist={}; speedHist={}; posHistQuad={}; return end
-        local HRP = GetHRP(); if not HRP then return end
-
-        local BPos  = Ball.Position
-        local HPos  = HRP.Position
-        local Dist  = (HPos - BPos).Magnitude
-        local Vel   = GetVel(Ball)
-        local Speed = Vel.Magnitude
-        local now   = os.clock()
+        if not isTgt then PremDidParry = false; return end
 
         if P.AutoFace then
             pcall(function()
-                HRP.CFrame = CFrame.lookAt(HPos, Vector3.new(BPos.X, HPos.Y, BPos.Z))
+                HRP.CFrame = CFrame.lookAt(
+                    HPos,
+                    Vector3.new(BPos.X, HPos.Y, BPos.Z)
+                )
             end)
         end
 
-        -- God Emergency: tight but still allows shield anim
-        if not S.DidParry then
-            local eDist = P.GodEmergency and 3.5 or (S.EmergencyDist or 6)
-            if Dist <= eDist then
-                PremiumFire(); posHist={}; return
-            end
+        local pingStuds = (PingMs / 1000) * Speed
+
+        -- Accuracy 1-100: uses P.HitboxTarget studs
+        -- Accuracy 101-150: god mode — fires further ahead
+        -- At 150: looks up to 8 frames ahead, fires at 2x hitbox distance
+        local accuracyMul
+        if PremAccuracy <= 100 then
+            accuracyMul = PremAccuracy / 100
+        else
+            -- 101-150 scales from 1.0x to 2.0x hitbox + extra frame lookahead
+            accuracyMul = 1.0 + ((PremAccuracy - 100) / 50)
         end
 
-        if Ball:GetAttribute("target") ~= Plr.Name then
-            posHist={}; speedHist={}; posHistQuad={}; return
-        end
-        if S.DidParry then return end
+        local fireDist = (P.HitboxTarget * accuracyMul) + pingStuds
 
-        -- Closing gate
-        local toPlayer = HPos - BPos
-        local dotVal   = Vel:Dot(toPlayer.Unit)
-        if dotVal < -(Speed * 0.28) and Dist > 9 then return end
+        -- Frame lookahead: at accuracy 100 = 1 frame, at 150 = 8 frames
+        local maxFrames = math.floor(1 + ((PremAccuracy - 1) / 149) * 7)
 
-        if Speed < 1 then
-            if Dist <= 6 then PremiumFire() end
-            return
-        end
-
-        pushHist(Dist, now)
-        pushQuadHist(BPos, now)
-
-        -- Speed boost detection (3 frames, stronger than free)
-        table.insert(speedHist, Speed)
-        if #speedHist > 3 then table.remove(speedHist, 1) end
-        local effectiveSpeed = Speed
-        if P.SpeedBoostDetect and #speedHist >= 2 then
-            local oldest = speedHist[1]
-            if oldest > 0 and Speed / oldest > 1.18 then
-                effectiveSpeed = Speed * 1.22
-            end
-        end
-
-        -- Hitbox: tuned so shield animation displays before ball arrives
-        -- Base is slightly larger than raw P.HitboxTarget to gain ~90ms lead
-        local hbox     = (P.HitboxTarget or 6.5) + 2.2
-        local pingLead = (PingMs / 1000) * effectiveSpeed * 0.58
-        pingLead = math.min(pingLead, 5.5)
-        local fireAt   = hbox + pingLead
-
-        if Dist <= fireAt then
-            PremiumFire(); return
-        end
-
-        -- Advanced extrapolation: 3 frames with quad prediction
-        if Speed > 1 then
-            for step = 1, 3 do
-                local nextPos  = predictQuadPos(BPos, Vel, step / 60)
-                local nextDist = (HPos - nextPos).Magnitude
-                if nextDist <= fireAt then
-                    PremiumFire(); return
+        local shouldFire = Dist <= fireDist
+        if not shouldFire then
+            for step = 1, maxFrames do
+                local futurePos  = BPos + Vel * (step / 60)
+                local futureDist = (HPos - futurePos).Magnitude
+                if futureDist <= fireDist then
+                    shouldFire = true
+                    break
                 end
             end
         end
 
-        -- 5-frame smoothed AntiCurve / CurveCrusher
-        if P.CurveCrusher or S.AntiCurve then
-            local sc = smoothClosing(Dist, now)
-            if sc > 4 then
-                local curveFireAt = hbox + (PingMs / 1000) * sc * 0.58
-                if Dist <= curveFireAt then
-                    PremiumFire(); return
-                end
-            end
-        end
-
-        -- Quadratic curve prediction (premium exclusive)
-        if P.QuadCurvePredict then
-            local predPos  = predictQuadPos(BPos, Vel, 2/60)
-            local predDist = (HPos - predPos).Magnitude
-            if predDist <= fireAt then
-                PremiumFire(); return
-            end
+        if shouldFire then
+            PremiumFire()
         end
     end)
 end
+
+local function StopPremiumEngine()
+    for _, c in pairs(PremiumConn) do if c then c:Disconnect() end end
+    PremiumConn  = {}
+    PremDidParry = false
+end
+
 -- ══════════════════════════════════════════════════════════════════
 -- PREMIUM LOBBY PARRY ENGINE
+-- ══════════════════════════════════════════════════════════════════
+local PremLobbyConn      = {}
+local PremLobbyDidParry  = false
+local PremLobbyLastParry = 0
+
+local function PremLobbyFire()
+    local now = os.clock()
+    if PremLobbyDidParry then return end
+    if now - PremLobbyLastParry < PremCooldown then return end
+
+    if PremAccuracy < 51 then
+        local maxDelay = 0.12 * (1 - PremAccuracy / 51)
+        task.wait(math.random() * maxDelay)
+    end
+
+    VIM:SendMouseButtonEvent(0,0,0,true, game, 0)
+    task.wait(0.015)
+    VIM:SendMouseButtonEvent(0,0,0,false, game, 0)
+    PremLobbyLastParry      = now
+    PremLobbyDidParry       = true
+    S.ParryCount            = S.ParryCount + 1
+    ParryStats.total        = ParryStats.total + 1
+    ParryStats.lastFireTime = now
+    task.delay(PremCooldown, function()
+        PremLobbyDidParry = false
+    end)
+end
+
 local function StartPremiumLobbyEngine()
-    if PremLobbyConn.Parry then PremLobbyConn.Parry:Disconnect() end
-    PremLobbySpeedHist = {}; PremLobbyVelHistory = {}
+    if PremLobbyConn.Parry then PremLobbyConn.Parry:Disconnect(); PremLobbyConn.Parry = nil end
+    PremLobbyDidParry = false
     BuildLobbyBadge(true)
     if _G.RyuuHudMode then
         pcall(function()
-            _G.RyuuHudMode.Text = "🏟✨  Mode  —  PREM LOBBY"
+            _G.RyuuHudMode.Text       = "🏟✨  Mode  —  PREM LOBBY"
             _G.RyuuHudMode.TextColor3 = Color3.fromRGB(140,60,255)
         end)
     end
 
-    PremLobbyConn.Parry = RunService.PreSimulation:Connect(function()
+    PremLobbyConn.Parry = RunService.Heartbeat:Connect(function()
         if not P.LobbyParry then return end
         local Ball = GetBall()
-        if not Ball then PremLobbyVelHistory = {}; return end
-        local HRP = GetHRP(); if not HRP then return end
+        if not Ball then return end
+        local HRP  = GetHRP()
+        if not HRP then return end
+
+        local tgt   = Ball:GetAttribute("target") or ""
+        local isTgt = tgt == Plr.Name
+        TrackParryHit(tgt)
+
+        -- God Emergency for lobby
+        if P.GodEmergency and isTgt and not PremLobbyDidParry then
+            local eDist = (HRP.Position - Ball.Position).Magnitude
+            if eDist <= 3.5 then
+                PremLobbyFire(); return
+            end
+        end
+
+        if not isTgt then PremLobbyDidParry = false; return end
 
         local BPos  = Ball.Position
         local HPos  = HRP.Position
         local Dist  = (HPos - BPos).Magnitude
-        local tgt   = Ball:GetAttribute("target") or ""
-        local isTgt = tgt == Plr.Name
-
-        TrackParryHit(tgt)
-
-        -- God Emergency with 80-100ms buffer baked in
-        if P.GodEmergency and isTgt and not PremLobbyDidParry and Dist <= 3.2 then
-            PremLobbyFire(Ball)
-            return
-        end
-
-        if not isTgt then PremLobbyVelHistory = {}; return end
-        if PremLobbyDidParry then return end
-        if not Plr.Character or not Plr.Character:FindFirstChild("HumanoidRootPart") then
-            PremLobbyDidParry = false; PremLobbyLastParriedBall = nil; return
-        end
-
-        local RawVel = GetVel(Ball)
-
-        -- 4-frame weighted velocity smoothing
-        -- Recent frames weighted heavier so direction changes register fast
-        table.insert(PremLobbyVelHistory, RawVel)
-        if #PremLobbyVelHistory > 4 then table.remove(PremLobbyVelHistory, 1) end
-        local wx, wy, wz, wt = 0, 0, 0, 0
-        local weights = {0.10, 0.20, 0.30, 0.40}
-        for i, v in ipairs(PremLobbyVelHistory) do
-            local w = weights[i] or 0.25
-            wx = wx + v.X * w
-            wy = wy + v.Y * w
-            wz = wz + v.Z * w
-            wt = wt + w
-        end
-        local Vel   = Vector3.new(wx/wt, wy/wt, wz/wt)
+        local Vel   = GetVel(Ball)
         local Speed = Vel.Magnitude
 
-        AdaptPremCooldown(Speed)
+        local pingStuds = (PingMs / 1000) * Speed
 
-        -- Closing direction gate — rejects balls moving away
-        local toPlayer  = HPos - BPos
-        local dotVal    = Vel:Dot(toPlayer.Unit)
-        local isClosing = dotVal > -(Speed * 0.10)
-        -- Hard reject: ball moving clearly away and not close
-        if dotVal < -(Speed * 0.25) and Dist > 11 then return end
-        -- Soft reject: ball barely approaching at long range
-        if dotVal < 2.5 and Dist > 14 then return end
-
-        -- Speed spike multiplier (5-frame history)
-        table.insert(PremLobbySpeedHist, Speed)
-        if #PremLobbySpeedHist > 8 then table.remove(PremLobbySpeedHist, 1) end
-
-        local spikeMul = 1.0
-        if #PremLobbySpeedHist >= 5 then
-            local prev4 = PremLobbySpeedHist[#PremLobbySpeedHist - 4]
-            if prev4 and prev4 > 1 then
-                local ratio = Speed / prev4
-                if     ratio > 2.2 then spikeMul = 1.28
-                elseif ratio > 1.6 then spikeMul = 1.16
-                elseif ratio > 1.25 then spikeMul = 1.07
-                end
-            end
+        local accuracyMul
+        if PremAccuracy <= 100 then
+            accuracyMul = PremAccuracy / 100
+        else
+            accuracyMul = 1.0 + ((PremAccuracy - 100) / 50)
         end
 
-        -- S-Tier curve detection (occasional curves only so kept mild)
-        local sTierActive = DetectSTierCurve and DetectSTierCurve() or false
-        local sTierMul    = sTierActive and 1.10 or 1.0
+        -- Lobby gets +1 stud on top of premium hitbox
+        local fireDist  = (P.HitboxTarget * accuracyMul + 1.0) + pingStuds
+        local maxFrames = math.floor(1 + ((PremAccuracy - 1) / 149) * 7)
 
-        -- Dynamic hitbox designed for ~80-100ms early trigger across all speeds:
-        -- Slow  (<80):   fires at ~12-13 studs  → 80ms at 150 st/s
-        -- Medium(80-160): fires at ~13-15 studs → 90ms at ~145 st/s avg
-        -- Fast (>160):   fires at ~15-18 studs  → 95ms at ~180 st/s
-        local SPD_REF  = 240
-        local HB_MIN   = 12.0   -- slow ball base
-        local HB_MAX   = 18.0   -- fast ball base
-        local t        = math.clamp(Speed / SPD_REF, 0, 1)
-        -- Cubic ease gives more range at high speeds where you need it most
-        local curveFn  = 1 - (1 - t)^3
-        local dynamicHitbox = (HB_MIN + (HB_MAX - HB_MIN) * curveFn) * spikeMul * sTierMul
-
-        -- Ping lead: 0.09s lead target (sits inside 80-100ms window)
-        -- Capped per speed tier so slow balls don't over-trigger
-        local pingScale = math.clamp(Speed / 120, 0.30, 1.0)
-        local pingLead  = (PingRaw / 1000) * Speed * 0.58
-        local pingCap   = Speed > 160 and 6.5 or Speed > 80 and 4.5 or 3.0
-        pingLead = math.min(pingLead * pingScale, pingCap)
-        local fireDist  = dynamicHitbox + pingLead
-
-        -- Primary fire
-        if isClosing and Dist <= fireDist then
-            PremLobbyFire(Ball)
-            return
-        end
-
-        -- Multi-frame extrapolation
-        -- Straight shots: up to 5 frames
-        -- Curved shots: +2 extra frames with slight direction blend
-        if Speed > 40 and isClosing then
-            local dt        = 1/60
-            local baseFrames = Speed > 220 and 5 or Speed > 160 and 4 or Speed > 80 and 3 or 2
-            local maxFrames  = baseFrames + (sTierActive and 2 or 0)
-
+        local shouldFire = Dist <= fireDist
+        if not shouldFire then
             for step = 1, maxFrames do
-                local nextPos
-                if sTierActive then
-                    -- Mild curve blend: 5% per frame toward player direction
-                    local curveFactor = 0.05 * step
-                    local blendDir    = (Vel.Unit + toPlayer.Unit * curveFactor).Unit
-                    nextPos = BPos + blendDir * Speed * (dt * step)
-                else
-                    nextPos = BPos + Vel * (dt * step)
-                end
-                local nextDist = (HPos - nextPos).Magnitude
-                if nextDist <= fireDist then
-                    PremLobbyFire(Ball)
-                    return
+                local futurePos  = BPos + Vel * (step / 60)
+                local futureDist = (HPos - futurePos).Magnitude
+                if futureDist <= fireDist then
+                    shouldFire = true
+                    break
                 end
             end
+        end
+
+        if shouldFire then
+            PremLobbyFire()
         end
     end)
+end
+
+local function StopPremiumLobbyEngine()
+    if PremLobbyConn.Parry then PremLobbyConn.Parry:Disconnect(); PremLobbyConn.Parry = nil end
+    PremLobbyDidParry = false
+    BuildLobbyBadge(false)
+    if _G.RyuuHudMode then
+        pcall(function()
+            _G.RyuuHudMode.Text       = "⚡  Mode  —  IDLE"
+            _G.RyuuHudMode.TextColor3 = Color3.fromRGB(160,160,160)
+        end)
+    end
 end
 -- ══════════════════════════════════════════════════════════════════
 -- ABILITY ESP
@@ -3732,6 +3593,34 @@ PT:CreateToggle({Name="Auto Face Ball (Premium)",CurrentValue=false,Flag="PAF",
 PT:CreateToggle({Name="Boost Detection",CurrentValue=true,Flag="PABD",
     Callback=function(v) PremGuard(v,"Boost Detect",function(val) P.SpeedBoostDetect=val end) end})
 PT:CreateDivider()
+PT:CreateSection("🎯 Premium Parry Accuracy")
+PT:CreateLabel("1-50 = Human feel · 51-99 = Sharp · 100 = Machine perfect · 101-150 = GOD (fires frames ahead)")
+
+PT:CreateSlider({
+    Name         = "Parry Accuracy",
+    Range        = {1, 150},
+    Increment    = 1,
+    CurrentValue = 100,
+    Flag         = "PPACC",
+    Callback     = function(v)
+        PremGuard(v, "Parry Accuracy", function(val)
+            PremAccuracy = val
+            local tier = val >= 150 and "👑 GOD MODE"
+                      or val >= 120 and "⚡ Insane"
+                      or val >= 101 and "🔥 God-like"
+                      or val == 100 and "✅ Machine Perfect"
+                      or val >=  80 and "💪 Elite"
+                      or val >=  51 and "👍 Sharp"
+                      or "🎭 Human"
+            Rayfield:Notify({
+                Title   = "Accuracy: " .. val .. "  —  " .. tier,
+                Content = val > 100 and "Firing " .. math.floor(1+((val-1)/149)*7) .. " frames ahead" or "",
+                Duration = 3,
+                Image   = 4483362458
+            })
+        end)
+    end
+})
 
 PT:CreateSection("🎯 Premium Hitbox")
 PT:CreateSlider({Name="Hitbox Target",Range={2.5,6.0},Increment=0.1,CurrentValue=4.0,Flag="PHB",
