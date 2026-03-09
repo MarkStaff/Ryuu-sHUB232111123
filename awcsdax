@@ -1347,23 +1347,23 @@ local function StartPremiumEngine()
 
         -- ── Ping compensation ──
         local ping = PingAdapt.min
-        local pingFactor = ping <= 60  and 0.5
-            or ping <= 100 and (0.5 + (ping-60)/40 * 0.2)   -- 0.5→0.7 for 60-100ms
-            or (0.7 + ((ping-100)/100) * 0.3)                -- 0.7→1.0 for 100-200ms
-        pingFactor = math.min(pingFactor, 1.8)
+        local pingFactor = ping <= 60  and 1.1
+            or ping <= 100 and (1.1 + (ping-60)/40 * 0.35)  -- 1.1→1.45 for 60-100ms
+            or (1.45 + ((ping-100)/100) * 0.4)               -- 1.45→1.85 for 100-200ms
+        pingFactor = math.min(pingFactor, 2.8)
         local pingComp = (ping / 1000) * effectiveSpeed * pingFactor
 
-        -- ── Hitbox: slight speed scale, capped so fireAt never exceeds ~13.5 ──
-        local baseHbox = P.HitboxTarget or 10.5
+        -- ── Hitbox: base raised, speed-scaled, hard capped ──
+        local baseHbox = P.HitboxTarget or 11.5
         local speedScalar = math.min(Speed / 60, 1.8)
-        local hbox = baseHbox * (1 + speedScalar * 0.06)  -- max ~11.6 at extreme speed
-        local fireAt = math.min(hbox + pingComp, 13.4)    -- hard cap at 13.4
+        local hbox = baseHbox * (1 + speedScalar * 0.05)
+        local fireAt = math.min(hbox + pingComp, 14.2)
 
         -- Core distance check
         if Dist <= fireAt then PremiumFire(); return end
 
-        -- ── Lookahead: 4-frame quadratic prediction ──
-        local nextPos  = predictQuadPos(BPos, Vel, 4/60)
+        -- ── Lookahead: 5-frame quadratic prediction ──
+        local nextPos  = predictQuadPos(BPos, Vel, 5/60)
         local nextDist = (HPos - nextPos).Magnitude
         if nextDist <= fireAt then PremiumFire(); return end
 
