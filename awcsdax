@@ -821,7 +821,7 @@ local function BuildVelArrow()
 end
 
 -- ══════════════════════════════════════════════════════════════════
-- SHARED HELPERS (add/replace at top of script)
+-- SHARED HELPERS (add/replace at top of script)
 local smoothedPingSamples = {}
 local function updateSmoothedPing()
     local raw = Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
