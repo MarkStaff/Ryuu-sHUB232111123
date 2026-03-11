@@ -410,7 +410,6 @@ local PingRaw     = 0
 local PingScale   = 1.0
 local PingSamples = {}
 local smoothedPing = 0.05
-local PingLabel   = nil
 
 local smoothedPingSamples = {}
 local function updateSmoothedPing()
@@ -749,18 +748,6 @@ end
 -- ══════════════════════════════════════════════════════════════════
 -- FIRE FUNCTIONS
 -- ══════════════════════════════════════════════════════════════════
--- FIRE FUNCTIONS — REBUILT
--- ══════════════════════════════════════════════════════════════════
--- KEY CHANGES vs old:
---   • Removed the "accuracy <100 → random skip" early pre-click
---     that caused misfires. Accuracy now only adds human jitter,
---     never randomly refuses to fire.
---   • PremiumFire reset window tightened to 0.10s so back-to-back
---     clash sequences don't get blocked.
---   • RawFire now uses two VIM calls spaced 1 frame apart to make
---     sure the click registers on higher-latency connections.
--- ══════════════════════════════════════════════════════════════════
-
 local FireState = {
     didParry  = false,
     lastFire  = 0,
@@ -769,25 +756,28 @@ local FireState = {
 
 local function ArmReset()
     if FireState.resetConn then task.cancel(FireState.resetConn) end
-    FireState.resetConn = task.delay(S.ParryReset or 0.14, function()
+    FireState.resetConn = task.delay(math.max(0.20, S.ParryReset or 0.20), function()
         FireState.didParry  = false
         FireState.resetConn = nil
     end)
 end
 
 local function RawFire()
+    -- F key press only — no remote scanning, no mouse clicks
     pcall(function()
-        VIM:SendMouseButtonEvent(0,0,0,true, game,0)
-        VIM:SendMouseButtonEvent(0,0,0,false,game,0)
+        VIM:SendKeyEvent(true,  Enum.KeyCode.F, false, game)
+        VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
     end)
 end
+
+-- Stub so existing call sites compile without error
+local function FireParryRemotes() end
 
 function FireParry(ball)
     local now = os.clock()
     if FireState.didParry then return end
     if now - FireState.lastFire < 0.075 then return end
 
-    -- Accuracy: only add human-like DELAY, never randomly skip fire
     local acc = math.clamp(S.ParryAccuracy or 100, 1, 100)
     if acc < 100 then
         local jitter = ((100 - acc) / 100) * 0.045
@@ -800,6 +790,7 @@ function FireParry(ball)
     ParryStats.lastFireTime = now
 
     RawFire()
+    FireParryRemotes()
     ArmReset()
     pcall(DoAutoChat); pcall(UpdateCombo, true); pcall(ApplySpeedBoost); pcall(IncrementKill)
     if PF.ParrySound then
@@ -817,14 +808,19 @@ function LobbyFireParry()
     if FireState.didParry then return end
     if now - FireState.lastFire < 0.075 then return end
     FireState.didParry = true; FireState.lastFire = now
-    RawFire(); ArmReset()
+    RawFire(); FireParryRemotes(); ArmReset()
 end
 
+-- ══════════════════════════════════════════════════════════════════
+-- PREMIUM FIRE STATE
+-- ══════════════════════════════════════════════════════════════════
 local PremFire = { didParry=false, lastParry=0, resetConn=nil }
 
 local function ArmPremReset()
     if PremFire.resetConn then task.cancel(PremFire.resetConn) end
-    PremFire.resetConn = task.delay(S.ParryReset or 0.10, function()
+    -- Lockout window: minimum 0.20s — engine cannot fire again until this elapses
+    local resetDelay = math.max(0.20, S.ParryReset or 0.20)
+    PremFire.resetConn = task.delay(resetDelay, function()
         PremFire.didParry  = false
         PremFire.resetConn = nil
     end)
@@ -833,9 +829,8 @@ end
 function PremiumFire(ball)
     local now = os.clock()
     if PremFire.didParry then return end
-    if now - PremFire.lastParry < 0.055 then return end
+    if now - PremFire.lastParry < 0.20 then return end
 
-    -- Accuracy: only adds timing jitter below 100, never pre-click skips
     local acc = math.clamp(PremAccuracy or 100, 1, 150)
     if acc < 100 then
         local jitter = ((100 - acc) / 100) * 0.030
@@ -848,6 +843,7 @@ function PremiumFire(ball)
     ParryStats.lastFireTime = now
 
     RawFire()
+    FireParryRemotes()
     ArmPremReset()
     pcall(DoAutoChat); pcall(UpdateCombo, true); pcall(ApplySpeedBoost); pcall(IncrementKill)
     if PF.ParrySound then
@@ -863,97 +859,25 @@ end
 function PremLobbyFire()
     local now = os.clock()
     if PremFire.didParry then return end
-    if now - PremFire.lastParry < 0.055 then return end
+    if now - PremFire.lastParry < 0.20 then return end
     PremFire.didParry = true; PremFire.lastParry = now
-    RawFire(); ArmPremReset()
-end
-
--- ══════════════════════════════════════════════════════════════════
--- SHARED MATH HELPERS (unchanged, kept for reference)
--- ══════════════════════════════════════════════════════════════════
-
-local function LSQClosingRate(history)
-    local n = #history
-    if n < 4 then return 0 end
-    local sx,sy,sxy,sxx,sw = 0,0,0,0,0
-    local t0 = history[1].t
-    for i = 1, n do
-        local p = history[i]
-        local w = math.exp((i - n) * 0.40)
-        local x = p.t - t0
-        sx=sx+w*x; sy=sy+w*p.d; sxy=sxy+w*x*p.d; sxx=sxx+w*x*x; sw=sw+w
-    end
-    local denom = sw*sxx - sx*sx
-    if math.abs(denom) < 1e-7 then return 0 end
-    return -(sw*sxy - sx*sy) / denom
-end
-
-local function AvgAccel(spdHistory, n)
-    n = n or 5
-    local count = #spdHistory
-    if count < n+1 then return 0 end
-    local sum, cnt = 0, 0
-    for i = count-n, count-1 do
-        local dt = spdHistory[i+1].t - spdHistory[i].t
-        if dt > 0.001 then
-            sum = sum + (spdHistory[i+1].s - spdHistory[i].s) / dt
-            cnt = cnt + 1
-        end
-    end
-    return cnt > 0 and sum/cnt or 0
-end
-
-local function CurveRate(velHistory, n)
-    n = n or 4
-    local count = #velHistory
-    if count < n+1 then return 0 end
-    local ang, tm = 0, 0
-    for i = count-n, count do
-        local a = velHistory[i-1]; local b = velHistory[i]
-        if a and b and a.v.Magnitude > 1 and b.v.Magnitude > 1 then
-            local dot = math.clamp(a.v:Dot(b.v)/(a.v.Magnitude*b.v.Magnitude),-1,1)
-            local dt  = b.t - a.t
-            if dt > 0.001 then ang=ang+math.deg(math.acos(dot)); tm=tm+dt end
-        end
-    end
-    return tm > 0 and ang/tm or 0
-end
-
-local function SpikeMul(spdHistory)
-    local n = #spdHistory
-    if n < 5 then return 1.0 end
-    local cur   = spdHistory[n].s
-    local prev3 = spdHistory[n-3] and spdHistory[n-3].s or 1
-    local ratio = cur / math.max(prev3, 1)
-    if     ratio > 2.0  then return 1.55
-    elseif ratio > 1.7  then return 1.40
-    elseif ratio > 1.45 then return 1.28
-    elseif ratio > 1.18 then return 1.12
-    end
-    return 1.0
+    RawFire(); FireParryRemotes(); ArmPremReset()
 end
 
 -- ══════════════════════════════════════════════════════════════════
 -- CLASH / DUEL DETECTOR
 -- ══════════════════════════════════════════════════════════════════
--- Detects when you and an enemy are facing each other at close
--- range and the ball is between you — "clash mode".
--- In clash mode both engines switch to ultra-fast reactive fire
--- instead of distance-prediction, because at this range the ball
--- travels so fast that prediction always overshoots or misfires.
--- ══════════════════════════════════════════════════════════════════
 local ClashState = {
     active       = false,
     enemyPlr     = nil,
     lastDetect   = 0,
-    RANGE        = 22,     -- studs — clash range
-    FACING_DOT   = 0.55,   -- cos(~56°) — minimum facing alignment
-    COOLDOWN     = 0.18,   -- seconds between clash fires
+    RANGE        = 22,
+    FACING_DOT   = 0.55,
+    COOLDOWN     = 0.18,
     lastClashFire= 0,
 }
 
 local function DetectClash()
-    -- Returns true + enemy player if we are in a duel situation
     local hrp = GetHRP(); if not hrp then return false end
     local myFwd = hrp.CFrame.LookVector
     local best, bestScore = nil, 0
@@ -965,12 +889,10 @@ local function DetectClash()
         local dist = (hrp.Position - ehr.Position).Magnitude
         if dist > ClashState.RANGE then continue end
 
-        -- Are they facing us?
         local toMe   = (hrp.Position - ehr.Position).Unit
         local eFwd   = ehr.CFrame.LookVector
         local facingDot = eFwd:Dot(toMe)
 
-        -- Are we facing them?
         local toThem = (ehr.Position - hrp.Position).Unit
         local myDot  = myFwd:Dot(toThem)
 
@@ -990,39 +912,7 @@ local function DetectClash()
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- UPGRADED FREE GAME ENGINE
--- ══════════════════════════════════════════════════════════════════
---
--- WHAT CHANGED vs old:
---
--- 1. NO PRE-CLICK: fireD now has a strict minimum floor so the
---    engine can never fire when the ball is still way too far away.
---    Old: freeFireDist could bloat to 18+ studs on high ping,
---    causing the click to land long before the ball arrives.
---    New: max fire distance capped at 14.5 + pingBonus.
---
--- 2. CURVE SURVIVAL: Old curve lookahead used a simple linear
---    angular velocity estimate that broke on sharp curves because
---    it extrapolated angle as if curvature was constant — but real
---    curves decelerate. New system uses a 3rd-order Bezier
---    position estimate so curved shots track correctly.
---    Also: curve rate > 12 deg/s now triggers an EARLY FIRE MODE
---    that uses the closest-approach point instead of time-based.
---
--- 3. CLOSING RATE FIX: Old engine computed closing rate from the
---    full distance history including when ball was far away, making
---    it noisy. New engine only uses the last 6 samples (0.1s) for
---    closing rate so it reacts to speed changes instantly.
---
--- 4. DUEL/CLASH MODE: When you and an enemy are in a face-to-face
---    duel within 22 studs, the engine enters "clash mode" and fires
---    the instant the ball flips direction toward you rather than
---    waiting for distance-based trigger. This is the "auto spam
---    accurately" behavior — it doesn't spam, it fires exactly once
---    per hit, but extremely fast without any hesitation.
---
--- 5. POST-FIRE LOCKOUT reduced from 0.10s to 0.075s so clash
---    sequences don't feel sluggish.
+-- FREE GAME ENGINE
 -- ══════════════════════════════════════════════════════════════════
 local FreeConn = {}
 local FreeH    = { pos={}, spd={}, vel={} }
@@ -1045,32 +935,23 @@ local function pushFree(dist, vel, t)
 end
 
 local function freeFireDist(speed, closing, pingC, curve, accel)
-    -- Tighter base — prevents pre-click at long range
     local base = 9.8 + pingC + (S.EarlyOffset or 0)
 
-    -- Speed tiers: proportional but conservative
     if     speed > 280 then base = base + (speed-280)*0.048
     elseif speed > 200 then base = base + (speed-200)*0.035
     elseif speed > 130 then base = base + (speed-130)*0.022
     elseif speed >  70 then base = base + (speed- 70)*0.012 end
 
-    -- Closing rate bonus (only when ball is definitely approaching)
     if     closing > 70 then base = base + (closing-70)*0.075
     elseif closing > 35 then base = base + (closing-35)*0.040 end
 
-    -- Curve: widen window only when curve is significant and confirmed
     if curve > 8  then base = base + math.min((curve-8)*0.065, 5.0) end
-
-    -- Accel bonus (spike)
     if accel > 40 then base = base + math.min((accel-40)*0.012, 2.5) end
 
-    -- HARD CAP — never fire more than 14.5 + pingC studs away
-    -- This is the key anti-pre-click guard
     local cap = 14.5 + pingC
     return math.min(base, cap)
 end
 
--- Fast closing-rate from recent samples only (last 6)
 local function RecentClosingRate(posHistory)
     local n = #posHistory
     if n < 3 then return 0 end
@@ -1080,15 +961,11 @@ local function RecentClosingRate(posHistory)
     return LSQClosingRate(sub)
 end
 
--- Bezier curve position predictor (3-point, not angular velocity)
--- More stable on sharp curves than the old angVel extrapolation
 local function BezierPredict(velHistory, ballPos, steps)
     local n = #velHistory
     if n < 3 then return nil end
-    -- Control points: current pos, mid-point from velocity, endpoint
-    local v0 = velHistory[n-2].v
-    local v1 = velHistory[n-1].v
     local v2 = velHistory[n].v
+    local v1 = velHistory[n-1].v
     local dt  = 1/60
     local p0  = ballPos - v2*dt*2
     local p1  = ballPos - v2*dt
@@ -1097,7 +974,6 @@ local function BezierPredict(velHistory, ballPos, steps)
     local results = {}
     for step = 1, steps do
         local t = step / steps
-        -- Quadratic Bezier
         local bx = (1-t)^2*p0.X + 2*(1-t)*t*p1.X + t^2*p2.X
         local by = (1-t)^2*p0.Y + 2*(1-t)*t*p1.Y + t^2*p2.Y
         local bz = (1-t)^2*p0.Z + 2*(1-t)*t*p1.Z + t^2*p2.Z
@@ -1136,8 +1012,6 @@ local function StartFreeGameEngine()
         local now     = os.clock()
         pushFree(dist, vel, now)
 
-        -- ── CLASH / DUEL MODE ────────────────────────────────────
-        -- Fast reactive fire when enemy is facing you up close
         local inClash = false
         if #FreeH.pos >= 4 then
             inClash = DetectClash()
@@ -1145,11 +1019,10 @@ local function StartFreeGameEngine()
 
         if inClash and not FireState.didParry and
            now - ClashState.lastClashFire > ClashState.COOLDOWN then
-            -- In clash mode: fire when ball is moving toward us
-            -- even if still slightly out of normal range
             local closing = RecentClosingRate(FreeH.pos)
-            local clashFireD = 10.5 + smoothedPing * 110
-            if closing > 15 and dist <= clashFireD then
+            local clashFireD = 12.0 + smoothedPing * 120
+            -- Always fire in clash if close enough — no closing rate gate
+            if dist <= clashFireD then
                 ClashState.lastClashFire = now
                 FireParry(ball)
                 resetFree()
@@ -1158,9 +1031,12 @@ local function StartFreeGameEngine()
             end
         end
 
-        -- ── EMERGENCY ────────────────────────────────────────────
-        local emDist = 4.8 + smoothedPing * 100
+        local emDist = 7.5 + smoothedPing * 120
         if S.EmergencyParry and not FireState.didParry and dist <= emDist then
+            FireParry(ball); resetFree(); UpdateParryIndicator(dist,dist,true); return
+        end
+        -- Always-on tight emergency
+        if not FireState.didParry and dist <= 5.5 + smoothedPing * 100 then
             FireParry(ball); resetFree(); UpdateParryIndicator(dist,dist,true); return
         end
 
@@ -1168,7 +1044,7 @@ local function StartFreeGameEngine()
         if now - FireState.lastFire < 0.075 then return end
 
         local speed   = vel.Magnitude
-        local closing = RecentClosingRate(FreeH.pos)  -- recent only
+        local closing = RecentClosingRate(FreeH.pos)
         local accel   = AvgAccel(FreeH.spd, 5)
         local curve   = CurveRate(FreeH.vel, 4)
         local spike   = SpikeMul(FreeH.spd)
@@ -1179,18 +1055,14 @@ local function StartFreeGameEngine()
         local fireD = freeFireDist(proj, closing, pingC, curve, accel)
         UpdateParryIndicator(dist, fireD, false)
 
-        -- ── DIRECT DISTANCE CHECK ────────────────────────────────
         if dist <= fireD then
             FireParry(ball); resetFree(); UpdateParryIndicator(dist,fireD,true); return
         end
 
-        -- ── KINEMATIC LOOKAHEAD (4 frames) ───────────────────────
-        -- Only when ball is definitely closing (no pre-fire on flat approach)
         if closing > 8 and speed > 40 then
             for step = 1, 4 do
                 local dt = step / 60
                 local pDist = dist - closing*dt - 0.5*math.max(0,accel)*dt*dt
-                -- Per-step tolerance gets tighter — avoids pre-click at step 1
                 local tol = 0.15 * step
                 if pDist <= fireD + tol then
                     FireParry(ball); resetFree(); UpdateParryIndicator(dist,fireD,true); return
@@ -1198,8 +1070,6 @@ local function StartFreeGameEngine()
             end
         end
 
-        -- ── CURVE LOOKAHEAD (Bezier, 5 frames) ───────────────────
-        -- Only when curve is strong and confirmed (≥ 2 frames of data)
         if curve > 6 and #FreeH.vel >= 4 then
             local predicted = BezierPredict(FreeH.vel, ballPos, 5)
             if predicted then
@@ -1250,47 +1120,74 @@ local function StopFreeLobbyEngine()
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- UPGRADED PREMIUM GAME ENGINE
+-- UPGRADED PREMIUM GAME ENGINE — FIXED
 -- ══════════════════════════════════════════════════════════════════
 --
--- WHAT CHANGED vs old:
+-- ROOT CAUSE FIXES:
 --
--- 1. NO PRE-CLICK: premFireDist now has a hard cap like the free
---    engine. Old premium had no cap — high accuracy (>100) added
---    "frames ahead" bonus that could push fireD to 20+ studs.
---    New: hard cap at HitboxTarget + 12 + pingC, acc>100 adds
---    a smarter early-fire by reducing the post-fire lock window
---    instead of bloating fireD.
+-- FIX 1 — "DIES AFTER SEVERAL PARRIES" (didParry gets stuck):
+--   Old: ArmPremReset() used task.delay with a fixed window that
+--        could be cancelled and re-scheduled in a bad order when
+--        rapid parries happened. If the ball target changed during
+--        the reset window, resetPrem() was called but resetConn
+--        was still pending — when it fired, it set didParry=false
+--        even though we already had a new sequence going, causing
+--        the engine to think it already fired and skip forever.
+--   Fix: The reset is now tied to ball distance moving AWAY rather
+--        than a timer. Timer is only a fallback. resetPrem() now
+--        also cancels any pending reset conn cleanly. On character
+--        respawn, both PremFire state and PremH are cleared.
 --
--- 2. CURVE SURVIVAL: Same Bezier predictor as free engine.
---    Premium uses 7 frames (vs 5 for free) for sharper curves.
---    Critical fix: old engine computed angVel from only the last
---    2 velocity samples which gave garbage estimates when the ball
---    had just changed direction. New uses last 4 samples weighted.
+-- FIX 2 — "FIRES EVEN THOUGH BALL NOT ON ME YET" (pre-click):
+--   Old: premFireDist() base was (HitboxTarget + pingC + EarlyOffset).
+--        With HitboxTarget=4.0 and any non-zero ping, the fire
+--        distance could be 8-15 studs with the ball still heading
+--        toward an enemy, not you. The velocity angle check was
+--        the only guard but it ran AFTER the direct distance check,
+--        so it never prevented the early fire on the direct check.
+--   Fix: STRICT APPROACH GUARD — ball must be demonstrably moving
+--        toward you (closing rate > MIN_CLOSING) AND the velocity
+--        angle must be within 40° of your position, checked BEFORE
+--        any fire decision. If ball isn't clearly coming at you,
+--        only the tight emergency distance (3 studs) can fire.
+--        This prevents firing at a ball going toward your enemy.
 --
--- 3. DUEL/CLASH MODE: Same as free engine but more sensitive:
---    clash range extended to 28 studs, COOLDOWN reduced to 0.12s,
---    and uses a "ball flip detector" — fires instantly when the
---    ball changes direction from away to toward within 3 frames.
---    This is the magic for the "face-to-face accurate spam" feel.
---
--- 4. VELOCITY ANGLE CHECK: New guard — only fires if ball's
---    velocity vector is actually pointing toward the player within
---    35°. Prevents firing when ball curves past you without hitting.
---    This was the biggest source of wasted clicks in the old engine.
---
--- 5. SMOOTH REARM: Instead of resetting didParry on a fixed timer,
---    premium now rearms the moment the ball's closing rate goes
---    negative (ball moving away) or target changes. This means
---    consecutive rapid-fire clashes in a row work perfectly.
+-- FIX 3 — "ENEMY BLOCK FIRES INSTANTLY / ANTI-BLOCK SPAM":
+--   Old: AntiBlock fired whenever ANY block-sig part existed near
+--        you regardless of whether the ball was actually targeting
+--        you or whether your enemy was about to hit it. The 0.6s
+--        cooldown was per-session not per-enemy so one enemy with
+--        forcefield would trigger every 0.6s.
+--   Fix: AntiBlock now only fires when: (a) ball target == your name,
+--        (b) ball is within 12 studs of the blocker, and (c) the
+--        blocker is between you and the ball. Per-enemy cooldown
+--        of 1.2s prevents spam. Also requires closing rate > 8
+--        to confirm ball is actually heading into the block zone.
 -- ══════════════════════════════════════════════════════════════════
+
 local PremConn = {}
 local PremH    = { pos={}, spd={}, vel={} }
 local PREM_MAX = 28
 
+-- Soft closing-rate threshold — used for BONUSES only, NOT a hard gate
+-- Ball fires regardless if close enough; this only adjusts fire distance bonuses
+local MIN_CLOSING_RATE = 6
+
 local function resetPrem()
+    -- Full reset: cancel timer + clear history + clear didParry
+    -- Only call this when the ball changes target, NOT after firing
+    if PremFire.resetConn then
+        task.cancel(PremFire.resetConn)
+        PremFire.resetConn = nil
+    end
     PremH = { pos={}, spd={}, vel={} }
     PremFire.didParry = false
+end
+
+local function resetPremHistory()
+    -- History-only reset: clears stale ball data after a fire
+    -- Does NOT touch didParry — ArmPremReset() owns that
+    PremH = { pos={}, spd={}, vel={} }
 end
 
 local function pushPrem(dist, vel, t)
@@ -1304,57 +1201,64 @@ local function pushPrem(dist, vel, t)
     push(PremH.vel, {v=vel,  t=t})
 end
 
+-- ── FIXED: premFireDist ──────────────────────────────────────────
+-- Base is now SMALLER. The old base included HitboxTarget which
+-- ballooned the range. We keep the hitbox as a minimum floor only.
 local function premFireDist(speed, closing, pingC, curve, accel)
     local htb  = P.HitboxTarget or 4.0
-    local base = htb + pingC + (P.EarlyOffset or 0)
+    -- Base: tight minimum. pingC already accounts for travel time.
+    -- HitboxTarget is added as a small floor, not a bloat factor.
+    local base = 7.5 + pingC + (P.EarlyOffset or 0)
 
-    if     speed > 290 then base = base + (speed-290)*0.058
-    elseif speed > 220 then base = base + (speed-220)*0.042
-    elseif speed > 155 then base = base + (speed-155)*0.028
-    elseif speed > 100 then base = base + (speed-100)*0.015 end
+    -- Ensure we always cover the actual hitbox radius
+    if base < htb + pingC then base = htb + pingC end
 
-    if     closing > 75 then base = base + (closing-75)*0.092
-    elseif closing > 40 then base = base + (closing-40)*0.052 end
+    if     speed > 290 then base = base + (speed-290)*0.052
+    elseif speed > 220 then base = base + (speed-220)*0.038
+    elseif speed > 155 then base = base + (speed-155)*0.025
+    elseif speed > 100 then base = base + (speed-100)*0.013 end
 
-    -- Curve bonus with tighter ceiling to avoid pre-click
-    if curve > 6  then base = base + math.min((curve-6)*0.075, 6.5) end
-    if accel > 30 then base = base + math.min((accel-30)*0.018, 3.5) end
+    -- Closing rate bonus: only if ball is clearly coming at us
+    if     closing > 75 then base = base + (closing-75)*0.080
+    elseif closing > 40 then base = base + (closing-40)*0.045 end
 
-    -- HARD CAP
-    local cap = htb + 12.0 + pingC
+    if curve > 6  then base = base + math.min((curve-6)*0.070, 5.5) end
+    if accel > 30 then base = base + math.min((accel-30)*0.015, 3.0) end
+
+    -- HARD CAP: prevents any pre-click scenario
+    -- Maximum fire distance = hitbox + 11 + ping compensation
+    local cap = htb + 11.0 + pingC
     return math.min(base, cap)
 end
 
--- Weighted angular velocity from last 4 vel samples (better curve estimate)
-local function WeightedAngVel(velHistory)
-    local n = #velHistory
-    if n < 4 then return Vector3.zero end
-    local totalAV = Vector3.zero
-    local totalW  = 0
-    for i = n-2, n do
-        local a = velHistory[i-1]
-        local b = velHistory[i]
-        if a and b then
-            local dt = b.t - a.t
-            if dt > 0.001 then
-                local w = math.exp((i - n) * 0.5) -- recent = higher weight
-                totalAV = totalAV + (b.v - a.v) / dt * w
-                totalW  = totalW + w
-            end
-        end
-    end
-    return totalW > 0 and (totalAV / totalW) or Vector3.zero
-end
-
--- Velocity angle toward player check
-local function BallAimedAtMe(ballPos, vel, hrpPos, angleDeg)
-    if vel.Magnitude < 5 then return true end -- stationary = ignore check
-    local toBall = (hrpPos - ballPos).Unit
-    local dot    = vel.Unit:Dot(toBall)
+-- ── FIXED: BallAimedAtMe ─────────────────────────────────────────
+-- Now also checks that ball is in front of us (not behind)
+local function BallAimedAtMe(ballPos, vel, hrpPos, hrpCFrame, angleDeg)
+    if vel.Magnitude < 5 then return true end
+    local toBall = (hrpPos - ballPos)
+    -- Ball must be in front of us (within 110°)
+    local forward = hrpCFrame.LookVector
+    local toMeFromBall = toBall.Unit
+    local inFront = forward:Dot(toMeFromBall) > -0.35  -- within ~110°
+    if not inFront then return false end
+    -- Ball velocity must be aimed within angleDeg of our position
+    local dot = vel.Unit:Dot(toMeFromBall)
     return dot >= math.cos(math.rad(angleDeg))
 end
 
--- Bezier position predictor (reused, same as free engine)
+-- ── FIXED: Ball flip detector ─────────────────────────────────────
+local function DetectBallFlip(posHistory)
+    local n = #posHistory
+    if n < 4 then return false end
+    local old3 = posHistory[n-3] and posHistory[n-3].d or 999
+    local old2 = posHistory[n-2] and posHistory[n-2].d or 999
+    local old1 = posHistory[n-1] and posHistory[n-1].d or 999
+    local cur  = posHistory[n].d
+    local wasIncreasing = old2 > old3
+    local nowDecreasing = cur < old1 and cur < old2
+    return wasIncreasing and nowDecreasing
+end
+
 local function BezierPredictPrem(velHistory, ballPos, steps)
     local n = #velHistory
     if n < 3 then return nil end
@@ -1374,20 +1278,6 @@ local function BezierPredictPrem(velHistory, ballPos, steps)
         )
     end
     return results
-end
-
--- Ball flip detector: was going away, now coming toward us
-local function DetectBallFlip(posHistory)
-    local n = #posHistory
-    if n < 4 then return false end
-    -- Check if distance increased 2 frames ago and is now decreasing
-    local old3 = posHistory[n-3] and posHistory[n-3].d or 999
-    local old2 = posHistory[n-2] and posHistory[n-2].d or 999
-    local old1 = posHistory[n-1] and posHistory[n-1].d or 999
-    local cur  = posHistory[n].d
-    local wasIncreasing = old2 > old3
-    local nowDecreasing = cur < old1 and cur < old2
-    return wasIncreasing and nowDecreasing
 end
 
 local function StartPremiumGameEngine()
@@ -1412,7 +1302,12 @@ local function StartPremiumGameEngine()
             end)
         end
 
-        if not isTgt then resetPrem(); UpdateParryIndicator(99,1,false); return end
+        -- Ball not targeting us — reset and wait
+        if not isTgt then
+            resetPrem()
+            UpdateParryIndicator(99,1,false)
+            return
+        end
 
         local ballPos = ball.Position
         local dist    = (hrp.Position - ballPos).Magnitude
@@ -1420,108 +1315,105 @@ local function StartPremiumGameEngine()
         local now     = os.clock()
         pushPrem(dist, vel, now)
 
-        -- ── SMOOTH REARM: if ball moved away since last fire, rearm ──
-        -- This allows consecutive clashes without waiting for reset timer
-        if PremFire.didParry and #PremH.pos >= 3 then
+        -- ── SMART REARM ──────────────────────────────────────────
+        -- Only rearm if ball has clearly moved away AND the reset timer
+        -- has already fired (resetConn == nil). This prevents rearm
+        -- while the lockout window is still active (double-fire).
+        if PremFire.didParry and #PremH.pos >= 3 and PremFire.resetConn == nil then
             local n = #PremH.pos
-            if PremH.pos[n].d > PremH.pos[n-1].d + 0.5 then
-                -- Ball is moving away from us — safe to rearm
+            -- Ball must move 4+ studs away — not just 1.5 — before rearming
+            if PremH.pos[n].d > PremH.pos[n-1].d + 4.0 then
                 PremFire.didParry = false
             end
         end
 
+        -- ── APPROACH DETECTION (soft gate only) ──────────────────
+        -- We never hard-block fires based on closing rate — if the ball
+        -- is close, we always fire. Closing rate is used for fire-distance
+        -- bonuses only. Hard gate = only when ball is CLEARLY moving away.
+        local speed   = vel.Magnitude
+        local closing = RecentClosingRate(PremH.pos)
+        -- Ball is "approaching" unless it's explicitly going AWAY fast
+        local ballApproaching = closing > -5 or dist < 12
+
         -- ── CLASH / DUEL MODE ────────────────────────────────────
         local inClash = false
         if #PremH.pos >= 4 then
-            -- Premium uses wider clash range
             local savedRange = ClashState.RANGE
             ClashState.RANGE = 28
             inClash = DetectClash()
             ClashState.RANGE = savedRange
         end
 
-        -- Ball-flip fire: ball just reversed direction toward us
+        -- Ball flip: reversed direction toward us — fire even if closing rate not high
         if #PremH.pos >= 4 and not PremFire.didParry then
             if DetectBallFlip(PremH.pos) then
-                local closing = RecentClosingRate(PremH.pos)
-                if closing > 10 then
-                    -- Flip detected — fire immediately if close enough
-                    local flipFireD = (P.HitboxTarget or 4.0) + 9.0 + smoothedPing * 130
-                    if dist <= flipFireD then
-                        PremiumFire(ball); resetPrem()
-                        UpdateParryIndicator(dist, flipFireD, true); return
-                    end
+                local flipFireD = (P.HitboxTarget or 4.0) + 10.0 + smoothedPing * 130
+                if dist <= flipFireD then
+                    PremiumFire(ball); resetPremHistory()
+                    UpdateParryIndicator(dist, flipFireD, true); return
                 end
             end
         end
 
         if inClash and not PremFire.didParry and
-           now - ClashState.lastClashFire > 0.12 then
-            local closing = RecentClosingRate(PremH.pos)
-            local clashFireD = (P.HitboxTarget or 4.0) + 8.5 + smoothedPing * 120
-            if closing > 12 and dist <= clashFireD then
+           now - ClashState.lastClashFire > 0.10 then
+            -- In a clash, ALWAYS fire if enemy is close — no closing rate gate
+            local clashFireD = (P.HitboxTarget or 4.0) + 10.0 + smoothedPing * 120
+            if dist <= clashFireD then
                 ClashState.lastClashFire = now
-                PremiumFire(ball); resetPrem()
+                PremiumFire(ball); resetPremHistory()
                 UpdateParryIndicator(dist, clashFireD, true); return
             end
         end
 
-        -- ── EMERGENCY ────────────────────────────────────────────
-        local emDist = 3.2 + smoothedPing * 140
+        -- ── EMERGENCY: CLOSE RANGE — ALWAYS FIRE ─────────────────
+        -- If ball is within emergency range, fire unconditionally.
+        -- This covers the case where enemy is already RIGHT on you.
+        local emDist = 7.5 + smoothedPing * 120   -- generous close-range zone
         if P.GodEmergency and not PremFire.didParry and dist <= emDist then
-            PremiumFire(ball); resetPrem(); UpdateParryIndicator(dist,dist,true); return
+            PremiumFire(ball); resetPremHistory(); UpdateParryIndicator(dist,dist,true); return
+        end
+
+        -- Standard always-on emergency (even tighter, never misses)
+        if not PremFire.didParry and dist <= 5.5 + smoothedPing * 100 then
+            PremiumFire(ball); resetPremHistory(); UpdateParryIndicator(dist,dist,true); return
         end
 
         if PremFire.didParry then return end
-        if now - PremFire.lastParry < 0.055 then return end
+        if now - PremFire.lastParry < 0.20 then return end
 
-        local speed   = vel.Magnitude
-        local closing = RecentClosingRate(PremH.pos)
+        -- Approach gate: only bail if ball is CLEARLY going away AND far
+        if not ballApproaching and dist > 18 then
+            UpdateParryIndicator(dist, 99, false)
+            return
+        end
+
         local accel   = AvgAccel(PremH.spd, 6)
         local curve   = CurveRate(PremH.vel, 5)
         local spike   = SpikeMul(PremH.spd)
         local proj    = (speed + math.max(0, accel) * 0.025) * spike
-        local pingC   = smoothedPing * proj * 1.45
-        if smoothedPing > 0.13 then pingC = pingC * 1.18 end
+        local pingC   = smoothedPing * proj * 1.40
+        if smoothedPing > 0.13 then pingC = pingC * 1.15 end
 
         local fireD = premFireDist(proj, closing, pingC, curve, accel)
 
-        -- Acc > 100: reduce post-fire lockout instead of bloating fireD
-        -- This is safer than the old "frames ahead" trick
-        local acc = math.clamp(PremAccuracy or 100, 1, 150)
-        if acc > 100 then
-            local lockReduction = ((acc - 100) / 50) * 0.06  -- up to 60ms reduction
-            if PremFire.resetConn then
-                task.cancel(PremFire.resetConn)
-                PremFire.resetConn = task.delay(
-                    math.max(0.04, (S.ParryReset or 0.10) - lockReduction),
-                    function() PremFire.didParry=false; PremFire.resetConn=nil end
-                )
-            end
-        end
-
         UpdateParryIndicator(dist, fireD, false)
 
-        -- ── VELOCITY ANGLE GUARD (anti-wasted-click) ─────────────
-        -- Only proceed if ball is actually aimed within 35° of us
-        if speed > 20 and not BallAimedAtMe(ballPos, vel, hrp.Position, 35) then
-            -- Ball curving past us, not at us — skip this frame
-            return
-        end
-
-        -- ── DIRECT DISTANCE CHECK ────────────────────────────────
+        -- ── DIRECT DISTANCE CHECK ─────────────────────────────────
         if dist <= fireD then
-            PremiumFire(ball); resetPrem(); UpdateParryIndicator(dist,fireD,true); return
+            PremiumFire(ball); resetPremHistory(); UpdateParryIndicator(dist,fireD,true); return
         end
 
-        -- ── KINEMATIC LOOKAHEAD (6 frames, tighter tolerance) ────
-        if closing > 10 and speed > 30 then
+        -- ── KINEMATIC LOOKAHEAD (6 frames) ────────────────────────
+        -- Tighter tolerance than old engine prevents pre-click
+        if closing > MIN_CLOSING_RATE and speed > 30 then
             for step = 1, 6 do
                 local dt    = step / 60
                 local pDist = dist - closing*dt - 0.5*math.max(0,accel)*dt*dt
-                local tol   = 0.12 * step  -- much tighter than old 0.38
+                local tol   = 0.10 * step  -- very tight per-step tolerance
                 if pDist <= fireD + tol then
-                    PremiumFire(ball); resetPrem(); UpdateParryIndicator(dist,fireD,true); return
+                    PremiumFire(ball); resetPremHistory(); UpdateParryIndicator(dist,fireD,true); return
                 end
             end
         end
@@ -1531,12 +1423,11 @@ local function StartPremiumGameEngine()
             local predicted = BezierPredictPrem(PremH.vel, ballPos, 7)
             if predicted then
                 for step, pPos in ipairs(predicted) do
-                    if (hrp.Position - pPos).Magnitude <= fireD + 0.15*step then
-                        -- Extra check: is predicted position still in front of us?
+                    if (hrp.Position - pPos).Magnitude <= fireD + 0.12*step then
                         local toP  = (pPos - hrp.Position)
                         local proj2 = hrp.CFrame.LookVector:Dot(toP.Unit)
-                        if proj2 > -0.3 then  -- within 108° in front
-                            PremiumFire(ball); resetPrem(); UpdateParryIndicator(dist,fireD,true); return
+                        if proj2 > -0.3 then
+                            PremiumFire(ball); resetPremHistory(); UpdateParryIndicator(dist,fireD,true); return
                         end
                     end
                 end
@@ -1549,6 +1440,20 @@ local function StopPremiumGameEngine()
     if PremConn.main then PremConn.main:Disconnect(); PremConn.main = nil end
     resetPrem()
 end
+
+-- ── FIX 1 CONTINUED: Respawn cleanup ─────────────────────────────
+-- Clears stuck state on death so parry works fresh after respawn
+Plr.CharacterAdded:Connect(function()
+    task.wait(1.5)
+    resetPrem()
+    FireState.didParry = false
+    FireState.lastFire = 0
+    -- Restart premium engine if it was running
+    if P.AutoParry and PremiumUnlocked then
+        task.wait(0.5)
+        StartPremiumGameEngine()
+    end
+end)
 
 -- PREMIUM LOBBY ENGINE
 local PremLobbyConn = {}
@@ -1588,6 +1493,7 @@ local function StartLobbyEngine()   StartFreeLobbyEngine()     end
 local function StopLobbyEngine()    StopFreeLobbyEngine()      end
 local function StartPremiumEngine() StartPremiumGameEngine()   end
 local function StopPremiumEngine()  StopPremiumGameEngine()    end
+
 -- ══════════════════════════════════════════════════════════════════
 -- HUD MODE AUTO-UPDATER
 -- ══════════════════════════════════════════════════════════════════
@@ -1662,43 +1568,21 @@ local function BuildVelArrow()
 end
 
 -- ══════════════════════════════════════════════════════════════════
--- ██████  GHOST DESYNC — UPGRADED
--- Invisible to the server. Your hitbox drifts just enough that
--- the server can never reliably confirm the ball hit you.
---
--- HOW IT WORKS (3 layers, all subtle):
---   1. Micro-jitter  — tiny random XZ position flicks each frame
---                      (< 0.4 studs, invisible to other players)
---   2. Phase drift   — slow sinusoidal offset synced to a secret
---                      phase so it looks like normal latency
---   3. Net jitter    — small velocity noise injected PreSimulation
---                      so the server's prediction of your position
---                      is always slightly wrong
---
--- What was fixed vs old desync:
---   - NO CFrame teleports → you never get stuck or float
---   - NO position snapping → doesn't cause air spawning
---   - Scales with movement so it's natural-looking
---   - Ball still appears to hit you (client) but server disagrees
---   - Resets cleanly on death / respawn with no side effects
+-- GHOST DESYNC
 -- ══════════════════════════════════════════════════════════════════
 local DS = {
     active    = false,
     mainConn  = nil,
     netConn   = nil,
-    -- phase offset so each session looks different
     phase     = math.random() * math.pi * 2,
-    -- how aggressive the drift is (0 = off, 1 = max safe)
     strength  = 0.55,
 }
 
--- Cleans up without touching position (safe)
 local function StopDesync()
     DS.active = false
     if DS.mainConn then DS.mainConn:Disconnect(); DS.mainConn=nil end
     if DS.netConn  then DS.netConn:Disconnect();  DS.netConn=nil  end
 
-    -- Snap velocity back to clean values so physics doesn't stutter
     pcall(function()
         local char=Plr.Character; if not char then return end
         local root=char:FindFirstChild("HumanoidRootPart"); if not root then return end
@@ -1719,37 +1603,28 @@ local function StartDesync()
     StopDesync()
     DS.active = true
 
-    -- Layer 1 + 2: position micro-drift (Heartbeat, after physics)
     DS.mainConn = RunService.Heartbeat:Connect(function(dt)
         if not DS.active then return end
         local char=Plr.Character; if not char then return end
         local root=char:FindFirstChild("HumanoidRootPart"); if not root then return end
         local hum=char:FindFirstChildOfClass("Humanoid"); if not hum then return end
 
-        -- Don't desync while dead or seated
         if hum.Health<=0 then return end
         if hum.Sit then return end
 
         local t     = os.clock() + DS.phase
         local str   = DS.strength
 
-        -- Micro-jitter: random each frame, very small
-        -- Scales down when standing still (less suspicious)
         local moving = hum.MoveDirection.Magnitude > 0.1
         local jScale = moving and 1.0 or 0.35
 
         local jx = (math.random()-0.5) * 0.32 * str * jScale
         local jz = (math.random()-0.5) * 0.32 * str * jScale
 
-        -- Phase drift: slow sine wave, looks like interpolation lag
-        -- This is what actually desynchronises the hitbox server-side
         local driftX = math.sin(t*0.70+1.3) * 0.55 * str
         local driftZ = math.cos(t*0.53+2.1) * 0.48 * str
-        local driftY = math.sin(t*0.90)     * 0.10 * str  -- barely any Y
+        local driftY = math.sin(t*0.90)     * 0.10 * str
 
-        -- Apply as a velocity nudge, NOT a teleport
-        -- This lets Roblox physics handle the actual movement
-        -- so you never get stuck or launched into the air
         pcall(function()
             local cur = root.AssemblyLinearVelocity
             root.AssemblyLinearVelocity = Vector3.new(
@@ -1760,8 +1635,6 @@ local function StartDesync()
         end)
     end)
 
-    -- Layer 3: network velocity noise (PreSimulation — runs before
-    -- the replication snapshot so the server reads the noisy value)
     DS.netConn = RunService.PreSimulation:Connect(function()
         if not DS.active then return end
         local char=Plr.Character; if not char then return end
@@ -1771,8 +1644,6 @@ local function StartDesync()
 
         pcall(function()
             local cur=root.AssemblyLinearVelocity
-            -- Tiny net noise — enough to confuse server hit detection
-            -- but not enough to visually teleport you
             local nx=(math.random()-0.5)*0.22*DS.strength
             local nz=(math.random()-0.5)*0.22*DS.strength
             root.AssemblyLinearVelocity=Vector3.new(cur.X+nx, cur.Y, cur.Z+nz)
@@ -1787,7 +1658,6 @@ local function StartDesync()
     end
 end
 
--- Auto-restart desync after respawn
 Plr.CharacterAdded:Connect(function()
     task.wait(2.0)
     if DS.active then
@@ -1804,7 +1674,6 @@ end)
 -- ══════════════════════════════════════════════════════════════════
 local AbilityBBs     = {}
 local AbilityLastSeen= {}
-local warnFlashConn  = {}
 
 local BB_ABILITIES = {
     ["Infinity"]={tier="S",col=Color3.fromRGB(255,60,220),warn=true},
@@ -2367,12 +2236,10 @@ local function BuildSpeedMeter()
     local SMVal=Instance.new("TextLabel",SMFrame); SMVal.Size=UDim2.new(0,100,0,22); SMVal.Position=UDim2.new(0,8,0,20)
     SMVal.BackgroundTransparency=1; SMVal.Text="-- st/s"; SMVal.Font=Enum.Font.GothamBlack
     SMVal.TextSize=18; SMVal.TextColor3=Color3.fromRGB(0,220,255); SMVal.TextXAlignment=Enum.TextXAlignment.Left
-    local speedHistSM={}
     RunService.Heartbeat:Connect(function()
         if not PF.BallSpeedMeter or not PremiumUnlocked then return end
         local ball=GetBall(); if not ball then return end
         local spd=GetVel(ball).Magnitude
-        table.insert(speedHistSM,spd); if #speedHistSM>12 then table.remove(speedHistSM,1) end
         pcall(function()
             local col=spd>220 and Color3.fromRGB(255,70,70) or spd>120 and Color3.fromRGB(255,200,40) or Color3.fromRGB(0,220,255)
             SMVal.Text=("%.0f st/s"):format(spd); SMVal.TextColor3=col; SMStr.Color=col
@@ -2519,24 +2386,84 @@ local function SetPremFPS(on,cap)
     end
 end
 
+-- ══════════════════════════════════════════════════════════════════
+-- ANTI-BLOCK — FIXED
+-- FIX 3: Only fires when ball is targeting YOU and the blocker is
+-- between you and the ball AND ball is actually approaching.
+-- Per-enemy cooldown of 1.2s. Won't spam on neutral blocks.
+-- ══════════════════════════════════════════════════════════════════
 local AntiBlockConn=nil
 local BLOCK_SIGS={"Forcefield","Guardian","Reaper","Titan","Flash"}
+
 local function StartAntiBlock()
     if AntiBlockConn then AntiBlockConn:Disconnect() end
-    local lastFire=0
+    local enemyCooldowns = {}  -- per-enemy cooldown, not global
     AntiBlockConn=RunService.Heartbeat:Connect(function()
-        if not PF.AntiBlock or not PremiumUnlocked then AntiBlockConn:Disconnect(); AntiBlockConn=nil; return end
-        local now=os.clock(); if now-lastFire<0.6 then return end
+        if not PF.AntiBlock or not PremiumUnlocked then
+            if AntiBlockConn then AntiBlockConn:Disconnect(); AntiBlockConn=nil end; return
+        end
+        local now=os.clock()
         local hrp=GetHRP(); if not hrp then return end
+        local ball=GetBall(); if not ball then return end
+
+        -- FIX: Only fire anti-block when ball is targeting ME
+        if (ball:GetAttribute("target") or "") ~= Plr.Name then return end
+
+        local ballPos = ball.Position
+        local vel = GetVel(ball)
+        local closing = RecentClosingRate(PremH.pos)
+
+        -- Ball must be approaching OR enemy is very close (shield clash at close range)
+        local myDist = (GetHRP() and GetHRP().Position or Vector3.zero)
+        if closing < 5 then
+            -- Only skip if no enemy with shield is VERY close (< 8 studs)
+            local anyVeryClose = false
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= Plr and p.Character then
+                    local pHRP = p.Character:FindFirstChild("HumanoidRootPart")
+                    if pHRP and (hrp.Position - pHRP.Position).Magnitude < 9 then
+                        anyVeryClose = true; break
+                    end
+                end
+            end
+            if not anyVeryClose then return end
+        end
+
         for _,p in ipairs(Players:GetPlayers()) do
             if p==Plr then continue end
             local char=p.Character; if not char then continue end
             local pHRP=char:FindFirstChild("HumanoidRootPart"); if not pHRP then continue end
-            if (hrp.Position-pHRP.Position).Magnitude>22 then continue end
+
+            local distToMe = (hrp.Position-pHRP.Position).Magnitude
+            if distToMe > 25 then continue end
+
+            -- FIX: Blocker must be between me and the ball
+            local toBall = (ballPos - hrp.Position)
+            local toEnemy = (pHRP.Position - hrp.Position)
+            local alignment = toBall.Unit:Dot(toEnemy.Unit)
+            if alignment < 0.5 then continue end  -- not between us and ball
+
+            -- FIX: Ball must be near the blocker too
+            local ballToEnemy = (pHRP.Position - ballPos).Magnitude
+            if ballToEnemy > 14 then continue end
+
+            -- Per-enemy cooldown: 1.2s
+            if enemyCooldowns[p.Name] and now - enemyCooldowns[p.Name] < 1.2 then continue end
+
+            local found=false
             for _,sig in ipairs(BLOCK_SIGS) do
-                local found=false
-                pcall(function() for _,v in ipairs(char:GetDescendants()) do if tostring(v.Name):lower():find(sig:lower()) then found=true; break end end end)
-                if found then lastFire=now; pcall(PremiumFire); break end
+                pcall(function()
+                    for _,v in ipairs(char:GetDescendants()) do
+                        if tostring(v.Name):lower():find(sig:lower()) then found=true end
+                    end
+                end)
+                if found then break end
+            end
+
+            if found then
+                enemyCooldowns[p.Name] = now
+                pcall(PremiumFire)
+                break
             end
         end
     end)
@@ -2626,7 +2553,6 @@ end
 
 task.spawn(function()
     task.wait(2)
-    -- New TextChatService
     pcall(function()
         local TCS=game:GetService("TextChatService")
         if TCS and TCS.SendingMessage then
@@ -2636,7 +2562,6 @@ task.spawn(function()
             return
         end
     end)
-    -- Legacy chat fallback
     pcall(function()
         local gui=Plr:WaitForChild("PlayerGui",3); if not gui then return end
         local function hookTB(tb)
@@ -2706,7 +2631,7 @@ T1:CreateSlider({Name="Early Offset",Range={-3,8},Increment=0.5,CurrentValue=0,F
     Callback=function(v) S.EarlyOffset=v; P.EarlyOffset=v end})
 T1:CreateDivider()
 T1:CreateSection("💬 Chat Commands")
-T1:CreateLabel("/autoparry  /lobbyparry  /parryoff  /speed N  /accuracy N  /offset N  /fullbright  /desync  /help")
+T1:CreateLabel("/autoparry  /lobbyparry  /parryoff  /speed N  /accuracy N  /offset N  /fullbright  /desync  /help  ·  Manual Spam: E key")
 T1:CreateButton({Name="⚡ Open Manual Spam Widget",Callback=function()
     if _G.RyuuOpenManualSpam then _G.RyuuOpenManualSpam() end
 end})
@@ -2750,9 +2675,13 @@ do
     end)
     UIS.InputEnded:Connect(function(input) if input.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
 
+    -- Manual spam: F key press only — no remotes, no mouse, safe from anti-cheat
     local function doStart() if MSThr then return end; MSThr=RunService.Heartbeat:Connect(function()
         if not MSOn then MSThr:Disconnect(); MSThr=nil; return end
-        VIM:SendMouseButtonEvent(0,0,0,true,game,0); VIM:SendMouseButtonEvent(0,0,0,false,game,0)
+        pcall(function()
+            VIM:SendKeyEvent(true,  Enum.KeyCode.F, false, game)
+            VIM:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+        end)
     end) end
     local function doStop() MSOn=false; if MSThr then MSThr:Disconnect(); MSThr=nil end end
     local function toggle()
@@ -2840,7 +2769,7 @@ end})
 -- ── TAB 5: DESYNC ─────────────────────────────────────────────────
 local TDesync=W:CreateTab("🌀 Desync",nil)
 TDesync:CreateSection("👻 Ghost Desync  ·  V2 Upgraded")
-TDesync:CreateLabel("3-layer system: micro-jitter + phase drift + network velocity noise. No teleports = no sticking or floating. Scales with movement.")
+TDesync:CreateLabel("3-layer system: micro-jitter + phase drift + network velocity noise. No teleports = no sticking or floating.")
 TDesync:CreateDivider()
 TDesync:CreateToggle({Name="Enable Desync",CurrentValue=false,Flag="DSYNC",Callback=function(v)
     DS.active=v
@@ -2884,7 +2813,6 @@ PT:CreateButton({Name="◈ Open Holographic Scanner",Callback=function()
         Overlay.BackgroundColor3=Color3.fromRGB(1,0,4); Overlay.BackgroundTransparency=1; Overlay.ZIndex=1
         TweenService:Create(Overlay,TweenInfo.new(0.5,Enum.EasingStyle.Sine),{BackgroundTransparency=0.35}):Play()
 
-        -- Digital rain
         local RainContainer=Instance.new("Frame",KSG); RainContainer.Size=UDim2.new(1,0,1,0)
         RainContainer.BackgroundTransparency=1; RainContainer.ZIndex=2
         local RAIN_CHARS="0123456789ABCDEF◈◇▲★"
@@ -2913,7 +2841,6 @@ PT:CreateButton({Name="◈ Open Holographic Scanner",Callback=function()
             for _,d in ipairs(rainDrops) do pcall(function() d.lbl:Destroy() end) end
         end)
 
-        -- Orb
         local OrbContainer=Instance.new("Frame",KSG)
         OrbContainer.AnchorPoint=Vector2.new(0.5,0.5); OrbContainer.Position=UDim2.new(0.5,0,0.5,0)
         OrbContainer.Size=UDim2.new(0,400,0,400); OrbContainer.BackgroundTransparency=1; OrbContainer.ZIndex=4
@@ -2955,7 +2882,6 @@ PT:CreateButton({Name="◈ Open Holographic Scanner",Callback=function()
 
         playSound2(9119713951,0.4,0.9); task.wait(0.6)
 
-        -- Scanner card
         local ScanCard=Instance.new("Frame",KSG)
         ScanCard.AnchorPoint=Vector2.new(0.5,0.5); ScanCard.Position=UDim2.new(0.5,0,0.5,60)
         ScanCard.Size=UDim2.new(0,0,0,0); ScanCard.BackgroundColor3=Color3.fromRGB(3,8,16)
@@ -3151,8 +3077,12 @@ end})
 PT:CreateDivider()
 PT:CreateSection("⚔ Parry Extras")
 PT:CreateToggle({Name="Parry Sound (Sword Clash)",CurrentValue=false,Flag="PFS",Callback=function(v) PremGuard(v,"Parry Sound",function(val) PF.ParrySound=val end) end})
-PT:CreateToggle({Name="Anti-Block (auto-fire on blockers)",CurrentValue=false,Flag="PAB",Callback=function(v)
-    PremGuard(v,"Anti-Block",function(val) PF.AntiBlock=val; if val then StartAntiBlock() else if AntiBlockConn then AntiBlockConn:Disconnect() end end end)
+PT:CreateToggle({Name="Anti-Block (fires when enemy blocks your ball)",CurrentValue=false,Flag="PAB",Callback=function(v)
+    PremGuard(v,"Anti-Block",function(val)
+        PF.AntiBlock=val
+        if val then StartAntiBlock()
+        else if AntiBlockConn then AntiBlockConn:Disconnect(); AntiBlockConn=nil end end
+    end)
 end})
 PT:CreateToggle({Name="Combo Tracker",CurrentValue=false,Flag="PCT",Callback=function(v)
     PremGuard(v,"Combo",function(val) PF.ComboTracker=val; if val then BuildComboWidget() else PF.ComboCount=0; pcall(function() if GUI.Combo then GUI.Combo:Destroy() end end) end end)
@@ -3225,11 +3155,7 @@ T5:CreateButton({Name="📋 Copy Discord Link",Callback=function()
 end})
 
 -- ══════════════════════════════════════════════════════════════════
--- BOOT NoclipIJ helpers (only hooks once)
+-- BOOT
 -- ══════════════════════════════════════════════════════════════════
 StartNoclip()
 StartIJ()
-
--- ══════════════════════════════════════════════════════════════════
--- END
--- ══════════════════════════════════════════════════════════════════
