@@ -126,6 +126,79 @@ local function ValidateKey(key)
 end
 
 -- ══════════════════════════════════════════════════════════════════
+-- PREMIUM PERSISTENCE — auto-save key + settings per device
+-- ══════════════════════════════════════════════════════════════════
+local PREM_SAVE_FILE = "ryuu_premium.txt"
+
+local function SavePremiumData(key, settings)
+    pcall(function()
+        local lines = { "key=" .. tostring(key) }
+        if settings then
+            for k, v in pairs(settings) do
+                lines[#lines+1] = tostring(k) .. "=" .. tostring(v)
+            end
+        end
+        writefile(PREM_SAVE_FILE, table.concat(lines, "\n"))
+    end)
+end
+
+local function LoadPremiumData()
+    local ok, data = pcall(function() return readfile(PREM_SAVE_FILE) end)
+    if not ok or not data or data == "" then return nil end
+    local result = {}
+    for line in data:gmatch("[^\n]+") do
+        local k, v = line:match("^(.-)=(.+)$")
+        if k and v then result[k] = v end
+    end
+    return result.key and result or nil
+end
+
+local function ParseBool(s) return s == "true" end
+local function ParseNum(s)  return tonumber(s) end
+
+-- Called whenever any premium setting changes — saves everything
+local function SavePremSettings()
+    if not PremiumUnlocked then return end
+    -- We save the key from file (already stored there) — just update settings
+    local existing = LoadPremiumData()
+    local key = existing and existing.key or ""
+    SavePremiumData(key, {
+        -- P settings
+        AutoParry       = tostring(P.AutoParry),
+        LobbyParry      = tostring(P.LobbyParry),
+        GodEmergency    = tostring(P.GodEmergency),
+        AutoFace        = tostring(P.AutoFace),
+        HitboxTarget    = tostring(P.HitboxTarget),
+        EarlyOffset     = tostring(P.EarlyOffset),
+        -- PF settings
+        ParrySound      = tostring(PF.ParrySound),
+        AntiBlock       = tostring(PF.AntiBlock),
+        ComboTracker    = tostring(PF.ComboTracker),
+        AutoChat        = tostring(PF.AutoChat),
+        TrajectoryESP   = tostring(PF.TrajectoryESP),
+        BallSpeedMeter  = tostring(PF.BallSpeedMeter),
+        TimeToImpact    = tostring(PF.TimeToImpact),
+        TargetAlert     = tostring(PF.TargetAlert),
+        DistESP         = tostring(PF.DistESP),
+        Chams           = tostring(PF.Chams),
+        BallHighlight   = tostring(PF.BallHighlight),
+        RainbowTrail    = tostring(PF.RainbowTrail),
+        AutoDodge       = tostring(PF.AutoDodge),
+        SpeedOnParry    = tostring(PF.SpeedOnParry),
+        SpeedOnParryAmt = tostring(PF.SpeedOnParryAmt),
+        GhostMode       = tostring(PF.GhostMode),
+        PremFPS         = tostring(PF.PremFPS),
+        PremFPSCap      = tostring(PF.PremFPSCap),
+        KillTracker     = tostring(PF.KillTracker),
+        PremWatermark   = tostring(PF.PremWatermark),
+        SafeZoneWarn    = tostring(PF.SafeZoneWarn),
+        VelArrow        = tostring(PF.VelArrow),
+        -- Accuracy
+        PremAccuracy    = tostring(PremAccuracy),
+    })
+end
+
+-- ══════════════════════════════════════════════════════════════════
 -- INTRO ◈ Holographic Boot Sequence
 -- ══════════════════════════════════════════════════════════════════
 do
@@ -401,6 +474,80 @@ local P = {
 local PremiumUnlocked = false
 local PremiumActive   = false
 local PremAccuracy    = 100
+
+-- ── AUTO-RESTORE PREMIUM ─────────────────────────────────────────
+-- If this device already has a saved key, re-validate silently and
+-- restore all premium settings without asking for the key again.
+task.defer(function()
+    local saved = LoadPremiumData()
+    if not saved or not saved.key then return end
+    local result = ValidateKey(saved.key)
+    if result ~= "ok" then return end
+
+    PremiumUnlocked = true
+    PremiumActive   = true
+
+    -- Restore P settings
+    if saved.AutoParry    then P.AutoParry    = ParseBool(saved.AutoParry)    end
+    if saved.LobbyParry   then P.LobbyParry   = ParseBool(saved.LobbyParry)   end
+    if saved.GodEmergency then P.GodEmergency = ParseBool(saved.GodEmergency) end
+    if saved.AutoFace     then P.AutoFace     = ParseBool(saved.AutoFace)     end
+    if saved.HitboxTarget then P.HitboxTarget = ParseNum(saved.HitboxTarget) or 4.0 end
+    if saved.EarlyOffset  then P.EarlyOffset  = ParseNum(saved.EarlyOffset)  or 0   end
+
+    -- Restore PF settings
+    if saved.ParrySound      then PF.ParrySound      = ParseBool(saved.ParrySound)      end
+    if saved.AntiBlock       then PF.AntiBlock       = ParseBool(saved.AntiBlock)       end
+    if saved.ComboTracker    then PF.ComboTracker    = ParseBool(saved.ComboTracker)    end
+    if saved.AutoChat        then PF.AutoChat        = ParseBool(saved.AutoChat)        end
+    if saved.TrajectoryESP   then PF.TrajectoryESP   = ParseBool(saved.TrajectoryESP)   end
+    if saved.BallSpeedMeter  then PF.BallSpeedMeter  = ParseBool(saved.BallSpeedMeter)  end
+    if saved.TimeToImpact    then PF.TimeToImpact    = ParseBool(saved.TimeToImpact)    end
+    if saved.TargetAlert     then PF.TargetAlert     = ParseBool(saved.TargetAlert)     end
+    if saved.DistESP         then PF.DistESP         = ParseBool(saved.DistESP)         end
+    if saved.Chams           then PF.Chams           = ParseBool(saved.Chams)           end
+    if saved.BallHighlight   then PF.BallHighlight   = ParseBool(saved.BallHighlight)   end
+    if saved.RainbowTrail    then PF.RainbowTrail    = ParseBool(saved.RainbowTrail)    end
+    if saved.AutoDodge       then PF.AutoDodge       = ParseBool(saved.AutoDodge)       end
+    if saved.SpeedOnParry    then PF.SpeedOnParry    = ParseBool(saved.SpeedOnParry)    end
+    if saved.SpeedOnParryAmt then PF.SpeedOnParryAmt = ParseNum(saved.SpeedOnParryAmt) or 40 end
+    if saved.GhostMode       then PF.GhostMode       = ParseBool(saved.GhostMode)       end
+    if saved.PremFPS         then PF.PremFPS         = ParseBool(saved.PremFPS)         end
+    if saved.PremFPSCap      then PF.PremFPSCap      = ParseNum(saved.PremFPSCap) or 0  end
+    if saved.KillTracker     then PF.KillTracker     = ParseBool(saved.KillTracker)     end
+    if saved.PremWatermark   then PF.PremWatermark   = ParseBool(saved.PremWatermark)   end
+    if saved.SafeZoneWarn    then PF.SafeZoneWarn    = ParseBool(saved.SafeZoneWarn)    end
+    if saved.VelArrow        then PF.VelArrow        = ParseBool(saved.VelArrow)        end
+    if saved.PremAccuracy    then PremAccuracy       = ParseNum(saved.PremAccuracy) or 100 end
+
+    -- Start engines/features that were active
+    task.wait(3.0) -- wait for UI to fully build
+    if P.AutoParry   then StopEngine(); StartPremiumEngine() end
+    if P.LobbyParry  then StartPremiumLobbyEngine() end
+    if PF.AntiBlock  then StartAntiBlock() end
+    if PF.AutoDodge  then StartAutoDodge() end
+    if PF.PremFPS    then SetPremFPS(true, PF.PremFPSCap) end
+    if PF.GhostMode  then ApplyGhost(true) end
+    if PF.Chams      then ApplyChams(true) end
+    if PF.KillTracker     then BuildKillWidget() end
+    if PF.ComboTracker    then BuildComboWidget() end
+    if PF.TrajectoryESP   then BuildTrajectoryESP() end
+    if PF.BallSpeedMeter  then BuildSpeedMeter() end
+    if PF.TimeToImpact    then BuildTTI() end
+    if PF.TargetAlert     then BuildTargetAlert() end
+    if PF.SafeZoneWarn    then BuildSafeZoneWarning() end
+    if PF.PremWatermark   then BuildWatermark() end
+    if PF.BallHighlight   then StartBallHighlight() end
+    if PF.RainbowTrail    then StartRainbowTrail() end
+    if PF.VelArrow        then VelArrowActive=true; BuildVelArrow() end
+
+    Rayfield:Notify({
+        Title   = "✨ Premium Auto-Restored",
+        Content = "Saved key recognized — all settings loaded.",
+        Duration = 5,
+        Image   = 4483362458
+    })
+end)
 
 -- ══════════════════════════════════════════════════════════════════
 -- PING / SMOOTHED
@@ -2478,6 +2625,8 @@ local function PremGuard(val, label, fn)
         return
     end
     fn(val)
+    -- Auto-save all premium settings after every change
+    task.defer(SavePremSettings)
 end
 
 -- ══════════════════════════════════════════════════════════════════
@@ -3014,7 +3163,8 @@ PT:CreateButton({Name="◈ Open Holographic Scanner",Callback=function()
                 sFlash.BackgroundColor3=Color3.fromRGB(60,255,140); sFlash.BackgroundTransparency=0.6; sFlash.ZIndex=30
                 TweenService:Create(sFlash,TweenInfo.new(0.4),{BackgroundTransparency=1}):Play(); ScanDebris:AddItem(sFlash,0.8)
                 PremiumUnlocked=true; PremiumActive=true
-                Rayfield:Notify({Title="✨ Premium Activated",Content="Full access granted.",Duration=6,Image=4483362458})
+                SavePremiumData(key, {}) -- save key immediately; settings saved lazily on each toggle
+                Rayfield:Notify({Title="✨ Premium Activated",Content="Full access granted. Settings will auto-restore next game.",Duration=6,Image=4483362458})
                 if S.AutoParry then StopEngine(); task.wait(0.08); P.AutoParry=true; StartPremiumEngine() end
                 task.wait(2.0); closeScanner()
             else
